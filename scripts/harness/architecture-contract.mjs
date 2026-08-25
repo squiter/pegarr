@@ -9,6 +9,10 @@ const coreImports = {
   "src/normalization.ts": ["./domain.js"],
   "src/matching.ts": ["./domain.js", "./normalization.js"],
 };
+const adapterImports = {
+  "src/adapters/http.ts": [],
+  "src/adapters/sonarr.ts": ["node:crypto", "../domain.js", "./http.js"],
+};
 
 for (const [file, allowedImports] of Object.entries(coreImports)) {
   const content = readFileSync(resolve(repoRoot, file), "utf8");
@@ -22,6 +26,25 @@ for (const [file, allowedImports] of Object.entries(coreImports)) {
       issues.push(`${file} imports ${imported}; allowed core imports: ${allowedImports.join(", ") || "none"}`);
     }
   }
+}
+
+for (const [file, allowedImports] of Object.entries(adapterImports)) {
+  const content = readFileSync(resolve(repoRoot, file), "utf8");
+  const imports = [...content.matchAll(/(?:from\s+|import\s*)["']([^"']+)["']/gu)].map(
+    (match) => match[1],
+  );
+  for (const imported of imports) {
+    if (!allowedImports.includes(imported)) {
+      issues.push(
+        `${file} imports ${imported}; allowed adapter imports: ${allowedImports.join(", ") || "none"}`,
+      );
+    }
+  }
+}
+
+const sonarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/sonarr.ts"), "utf8");
+if (!sonarrAdapter.includes('method: "GET"') || sonarrAdapter.includes('method: "POST"')) {
+  issues.push("The Phase 0 Sonarr adapter must remain read-only");
 }
 
 const packageJson = readJson("package.json");

@@ -28,12 +28,30 @@ export interface ReleaseTraits {
   readonly releaseGroup?: string;
 }
 
+export interface ArrReleaseEvidence {
+  readonly application: "sonarr" | "radarr" | "synthetic";
+  readonly instanceId: string;
+  readonly indexer: string;
+  readonly protocol: string;
+  readonly quality?: string;
+  readonly sizeBytes?: number;
+  readonly ageHours?: number;
+  readonly seeders?: number;
+  readonly leechers?: number;
+  readonly languages: readonly string[];
+  readonly customFormats: readonly {
+    readonly id: number;
+    readonly name: string;
+  }[];
+}
+
 export interface ArrReleaseCandidate {
   readonly id: string;
   readonly title: string;
   readonly downloadAllowed: boolean;
   readonly rejectionReasons: readonly string[];
   readonly customFormatScore: number;
+  readonly evidence: ArrReleaseEvidence;
   readonly traits?: ReleaseTraits;
 }
 
@@ -101,6 +119,7 @@ export interface ReleaseAssessment {
     readonly downloadAllowed: boolean;
     readonly rejectionReasons: readonly string[];
     readonly customFormatScore: number;
+    readonly evidence: ArrReleaseEvidence;
   };
   readonly subtitle: {
     readonly confidence: SubtitleConfidence;

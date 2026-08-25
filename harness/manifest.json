@@ -89,13 +89,43 @@
       "title": "Built image starts non-root, read-only, without egress and serves core routes",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Local Docker architecture only; does not reproduce the NAS"
+    },
+    {
+      "id": "PEG-SONARR-001",
+      "title": "Episode release search is bounded, read-only, and authenticates by header",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Injected transport with a synthetic API key; no network"
+    },
+    {
+      "id": "PEG-SONARR-002",
+      "title": "Sonarr releases map into safe evidence while preserving Arr decisions",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Sanitized synthetic Sonarr response"
+    },
+    {
+      "id": "PEG-SONARR-003",
+      "title": "Successful empty and malformed Sonarr responses remain distinct",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Injected response bodies; no network"
+    },
+    {
+      "id": "PEG-SONARR-004",
+      "title": "Sonarr authentication, quota, outage, and transport failures are classified",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Injected failures; no retries or network"
+    },
+    {
+      "id": "PEG-SONARR-005",
+      "title": "Sensitive upstream release fields never enter Pegarr release evidence",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Serialization assertion over a sanitized synthetic response"
     }
   ],
   "manualGaps": [
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "Phase 0 has no live connector and automated tests must not use private services"
+      "reason": "The Sonarr contract seam is fixture-proven but installed versions and live transport remain unverified; Radarr has no adapter yet"
     },
     {
       "id": "PEG-MANUAL-002",

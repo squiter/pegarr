@@ -12,6 +12,7 @@ const requiredDocs = [
   "ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md",
   "docs/harness.md",
   "docs/harness-scenarios.md",
+  "docs/contracts/sonarr-v3-release-search.md",
 ];
 
 for (const file of requiredDocs) {

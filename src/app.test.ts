@@ -34,7 +34,9 @@ test("PEG-API-002 fixture-backed feasibility route is read-only and explainable"
   assert.equal(result.statusCode, 200);
   assert.equal(report.mode, "read_only");
   assert.equal(report.fixture, "synthetic-sonarr-episode-v1");
+  assert.equal(report.releases[0]?.video.evidence.application, "sonarr");
   assert.equal(report.releases[0]?.subtitle.languages[0]?.evidence?.reasons[0], "Exact normalized release name");
+  assert.doesNotMatch(JSON.stringify(report), /synthetic-guid|downloadUrl|magnetUrl/iu);
   assert.equal((await resolveRoute("POST", "/api/v1/feasibility/demo", tmpdir())).statusCode, 405);
 });
 

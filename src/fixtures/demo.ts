@@ -1,4 +1,6 @@
 import type { FeasibilityInput } from "../domain.js";
+import { mapSonarrReleaseResponse } from "../adapters/sonarr.js";
+import { syntheticSonarrEpisodeReleaseResponse } from "./sonarr-release-search.js";
 
 export const demoFeasibilityInput: FeasibilityInput = {
   fixture: "synthetic-sonarr-episode-v1",
@@ -18,37 +20,7 @@ export const demoFeasibilityInput: FeasibilityInput = {
       { code: "en", required: false, forced: false, hearingImpaired: "avoid" },
     ],
   },
-  releases: [
-    {
-      id: "sonarr-release-1",
-      title: "Example.Show.S03E05.1080p.WEB-DL.H264-GROUP",
-      downloadAllowed: true,
-      rejectionReasons: [],
-      customFormatScore: 100,
-    },
-    {
-      id: "sonarr-release-2",
-      title: "Example.Show.S03E05.1080p.WEB.H264-OTHER",
-      downloadAllowed: true,
-      rejectionReasons: [],
-      customFormatScore: 0,
-      traits: { source: "WEB-DL", resolution: "1080p", codec: "H.264", releaseGroup: "OTHER" },
-    },
-    {
-      id: "sonarr-release-3",
-      title: "Example.Show.S03E05.720p.HDTV.H264-OLD",
-      downloadAllowed: false,
-      rejectionReasons: ["Quality profile does not allow HDTV-720p"],
-      customFormatScore: 0,
-    },
-    {
-      id: "sonarr-release-4",
-      title: "Example.Show.S03E05.2160p.WEB-DL.H265-NEW",
-      downloadAllowed: true,
-      rejectionReasons: [],
-      customFormatScore: 0,
-    },
-  ],
+  releases: mapSonarrReleaseResponse(syntheticSonarrEpisodeReleaseResponse, "synthetic-sonarr"),
   providerResults: [
     {
       provider: "subdl",

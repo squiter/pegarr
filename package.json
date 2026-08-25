@@ -14,7 +14,7 @@
     "start": "node dist/index.js",
     "dev": "node --watch --experimental-strip-types src/index.ts",
     "test": "npm run build && npm run test:unit",
-    "test:unit": "node --test --test-concurrency=1 scripts/harness/*.test.mjs dist/*.test.js",
+    "test:unit": "node --test --test-concurrency=1 scripts/harness/*.test.mjs dist/*.test.js dist/**/*.test.js",
     "typecheck": "tsc --noEmit",
     "check:fast": "node scripts/harness/run-checks.mjs fast",
     "check:affected": "node scripts/harness/run-checks.mjs affected",

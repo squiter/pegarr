@@ -53,6 +53,7 @@ export function assessRelease(input: FeasibilityInput, release: ArrReleaseCandid
       downloadAllowed: release.downloadAllowed,
       rejectionReasons: release.rejectionReasons,
       customFormatScore: release.customFormatScore,
+      evidence: release.evidence,
     },
     subtitle: {
       confidence: overallConfidence(languages),
