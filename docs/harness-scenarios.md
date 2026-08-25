@@ -39,12 +39,17 @@
 | PEG-RUNTIME-004 | Concurrent and repeated status reads use one bounded probe window | `src/runtime.test.ts` |
 | PEG-PROBE-001 | The one-shot Sonarr probe reports measured safe evidence | `src/probe-sonarr.test.ts` |
 | PEG-PROBE-002 | Probe exit states remain distinct and configuration failures stay redacted | `src/probe-sonarr.test.ts` |
+| PEG-RADARR-001 | Movie search is bounded, read-only, and authenticates by header | `src/adapters/radarr.test.ts` |
+| PEG-RADARR-002 | Radarr rows preserve Arr decisions, editions, and safe evidence | `src/adapters/radarr.test.ts` |
+| PEG-RADARR-003 | Successful empty and malformed Radarr responses stay distinct | `src/adapters/radarr.test.ts` |
+| PEG-RADARR-004 | Radarr authentication, quota, outage, and transport failures are classified | `src/adapters/radarr.test.ts` |
+| PEG-RADARR-005 | Radarr selection secrets never enter release evidence | `src/adapters/radarr.test.ts` |
 
 ## Explicit manual gaps
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Sonarr release/status, configuration, and transport are fixture-proven only; installed DNS, TLS, version, and latency remain unverified, and Radarr has no adapter |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Sonarr version, Docker runtime, routes, authentication enforcement, and unauthenticated latency are verified; the authenticated packaged probe and release response remain open, while Radarr is fixture-proven only |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | Needs a sanitized contract capture first |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside Phase 0 and require explicit confirmation |

@@ -1,7 +1,7 @@
 # Sonarr v3 episode release-search contract
 
 Snapshot date: 2026-08-25
-Status: fixture-proven, not yet verified against the installed NAS version
+Status: fixture-proven against the verified installed Sonarr `4.0.19.2979`; live release response not yet captured
 
 ## Primary evidence
 
@@ -58,4 +58,4 @@ Transport exception messages are replaced with stable Pegarr messages so private
 
 ## Remaining proof
 
-`PEG-MANUAL-001` remains open until a separately authorized, read-only probe verifies the installed Sonarr version, authentication header, response shape, response size, and latency. No live Grab is part of that probe.
+The installed Sonarr version and authentication requirement are verified separately in the system-status contract. `PEG-MANUAL-001` remains open until a separately authorized, read-only probe verifies this release endpoint's authentication header, response shape, response size, and latency. No live Grab is part of that probe.

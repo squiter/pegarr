@@ -203,13 +203,43 @@
       "title": "Probe exit states remain distinct and configuration failures stay redacted",
       "evidence": "src/probe-sonarr.test.ts",
       "boundary": "In-memory environment maps; no process environment or network"
+    },
+    {
+      "id": "PEG-RADARR-001",
+      "title": "Movie release search is bounded, read-only, and authenticates by header",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Injected transport with a synthetic API key; no network"
+    },
+    {
+      "id": "PEG-RADARR-002",
+      "title": "Radarr releases preserve Arr decisions, editions, and safe evidence",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Sanitized synthetic Radarr response"
+    },
+    {
+      "id": "PEG-RADARR-003",
+      "title": "Successful empty and malformed Radarr responses remain distinct",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Injected response bodies; no network"
+    },
+    {
+      "id": "PEG-RADARR-004",
+      "title": "Radarr authentication, quota, outage, and transport failures are classified",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Injected failures; no retries or network"
+    },
+    {
+      "id": "PEG-RADARR-005",
+      "title": "Radarr selection secrets never enter release evidence",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Serialization assertion over a sanitized synthetic response"
     }
   ],
   "manualGaps": [
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "The Sonarr release/status contracts, configuration, and HTTP transport are fixture-proven, but an installed version, DNS behavior, TLS, and latency remain unverified; Radarr has no adapter yet"
+      "reason": "Sonarr version, Docker runtime, routes, authentication enforcement, and unauthenticated latency are verified; its authenticated packaged probe and release response remain open, while the Radarr movie release contract is fixture-proven only"
     },
     {
       "id": "PEG-MANUAL-002",

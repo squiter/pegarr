@@ -26,6 +26,7 @@ export interface ReleaseTraits {
   readonly resolution?: string;
   readonly codec?: string;
   readonly releaseGroup?: string;
+  readonly edition?: string;
 }
 
 export interface ArrReleaseEvidence {

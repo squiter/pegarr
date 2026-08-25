@@ -35,6 +35,7 @@ The current repository foundation includes:
 - a deterministic `/api/v1/feasibility/demo` report backed by sanitized synthetic evidence;
 - provider-independent normalization and explainable confidence results;
 - a bounded, transport-injected Sonarr v3 episode release-search adapter proven with a sanitized contract fixture;
+- a bounded, transport-injected Radarr v3 movie release-search adapter that retains edition evidence;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;
 - secret-file-only Sonarr configuration and a browser-safe version/status route;
 - a measured one-shot Sonarr probe with a 30-second status cache and single-flight protection;
@@ -61,7 +62,7 @@ The demo maps a sanitized synthetic Sonarr v3 response into four release candida
 
 Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise.
 
-See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), and [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), and [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 

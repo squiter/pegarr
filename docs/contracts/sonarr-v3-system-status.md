@@ -1,7 +1,7 @@
 # Sonarr v3 system-status contract
 
 Snapshot date: 2026-08-25
-Status: fixture-proven, runtime-enabled when explicitly configured, not yet verified against the installed NAS version
+Status: installed version verified; API-key transport remains fixture-proven and runtime-enabled when explicitly configured
 
 ## Primary evidence
 
@@ -37,6 +37,18 @@ Concurrent status readers share one in-flight request. Completed states are cach
 
 The probe exits `0` for `available`, `1` for a configured upstream failure, and `2` for disabled or invalid configuration. It emits no exception message, URL, hostname, or secret value.
 
+## Live NAS evidence
+
+On 2026-08-25, a separately authorized read-only check confirmed:
+
+- Sonarr version `4.0.19.2979` in the authenticated system-status UI;
+- Docker runtime enabled;
+- no health issue reported by Sonarr;
+- both the private HTTPS route and direct HTTP route reached the API and returned `401` without credentials, proving that authentication is enforced;
+- the unauthenticated HTTPS response completed in approximately 56 ms and the direct HTTP response in approximately 121 ms.
+
+No API key, private hostname, private address, filesystem path, database detail, or library content is recorded in this evidence.
+
 ## Remaining proof
 
-The automated harness injects a sanitized response and also executes the packaged command against a synthetic sibling container on an internal-only Docker network. `PEG-MANUAL-001` remains open until a separately authorized probe records the installed version and measured evidence without recording the API key or private address.
+The automated harness injects a sanitized response and also executes the packaged command against a synthetic sibling container on an internal-only Docker network. The installed version, Docker runtime, route reachability, authentication requirement, and unauthenticated latency are now verified. `PEG-MANUAL-001` remains open only for an API-key-authenticated packaged probe of the response shape, exact response size, and latency, plus the corresponding Radarr proof.
