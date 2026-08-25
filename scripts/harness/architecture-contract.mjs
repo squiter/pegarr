@@ -101,6 +101,10 @@ for (const [name, command] of Object.entries(requiredHarnessScripts)) {
   }
 }
 
+if (packageJson.scripts?.["probe:sonarr"] !== "node dist/probe-sonarr.js") {
+  issues.push("package.json script probe:sonarr must remain the read-only packaged probe");
+}
+
 const ciWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/ci.yml"), "utf8");
 if (!ciWorkflow.includes("run: npm run check")) {
   issues.push("CI must run the full harness completion gate");

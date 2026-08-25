@@ -44,6 +44,7 @@ export interface SonarrSystemStatus {
   readonly appName: "Sonarr";
   readonly version: string;
   readonly isDocker?: boolean;
+  readonly responseBytes?: number;
 }
 
 const defaultTimeoutMs = 15_000;
@@ -115,7 +116,17 @@ export class SonarrClient {
 
     assertSuccessfulStatus(response, "status probe");
     try {
-      return mapSonarrSystemStatus(response.body);
+      const status = mapSonarrSystemStatus(response.body);
+      const responseBytes = optionalBoundedInteger(
+        response.responseBytes,
+        0,
+        256 * 1024,
+        "system status responseBytes",
+      );
+      return {
+        ...status,
+        ...(responseBytes === undefined ? {} : { responseBytes }),
+      };
     } catch {
       throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid status response", {
         status: response.status,
@@ -370,4 +381,13 @@ function boundedInteger(value: number, minimum: number, maximum: number, field: 
     throw new TypeError(`${field} must be an integer between ${minimum} and ${maximum}`);
   }
   return value;
+}
+
+function optionalBoundedInteger(
+  value: number | undefined,
+  minimum: number,
+  maximum: number,
+  field: string,
+): number | undefined {
+  return value === undefined ? undefined : boundedInteger(value, minimum, maximum, field);
 }

@@ -11,6 +11,7 @@ export interface JsonResponse {
   readonly status: number;
   readonly headers: Readonly<Record<string, string>>;
   readonly body: unknown;
+  readonly responseBytes?: number;
 }
 
 export interface JsonTransport {

@@ -22,6 +22,7 @@ These checks prevent an adapter from turning a configured service into an arbitr
 - The caller supplies a timeout between 1 ms and 60 seconds.
 - The caller supplies a response limit capped at 10 MiB.
 - Declared `Content-Length` and streamed bytes are both enforced.
+- The exact accepted body-byte count is returned as safe transport evidence.
 - Invalid JSON on a successful response is an explicit `invalid_json` failure.
 - Invalid or empty non-success bodies are discarded; adapters classify the HTTP status.
 - Only content type, retry metadata, and standard rate-limit headers are returned to adapters.

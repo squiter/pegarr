@@ -185,6 +185,24 @@
       "title": "Sonarr upstream failures remain distinct and redact private details",
       "evidence": "src/runtime.test.ts",
       "boundary": "Injected HTTP failure; no DNS or network"
+    },
+    {
+      "id": "PEG-RUNTIME-004",
+      "title": "Concurrent and repeated Sonarr status reads use one bounded probe window",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected fetch and deterministic clock; no DNS or network"
+    },
+    {
+      "id": "PEG-PROBE-001",
+      "title": "One-shot Sonarr probe reports measured safe evidence",
+      "evidence": "src/probe-sonarr.test.ts",
+      "boundary": "Temporary synthetic secret, injected fetch, and deterministic clock"
+    },
+    {
+      "id": "PEG-PROBE-002",
+      "title": "Probe exit states remain distinct and configuration failures stay redacted",
+      "evidence": "src/probe-sonarr.test.ts",
+      "boundary": "In-memory environment maps; no process environment or network"
     }
   ],
   "manualGaps": [

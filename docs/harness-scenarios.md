@@ -36,6 +36,9 @@
 | PEG-RUNTIME-001 | Configured Sonarr status returns only safe read-only evidence | `src/runtime.test.ts` |
 | PEG-RUNTIME-002 | Sonarr status is read-only and disabled without configuration | `src/app.test.ts` |
 | PEG-RUNTIME-003 | Upstream failures remain distinct and redact private details | `src/runtime.test.ts` |
+| PEG-RUNTIME-004 | Concurrent and repeated status reads use one bounded probe window | `src/runtime.test.ts` |
+| PEG-PROBE-001 | The one-shot Sonarr probe reports measured safe evidence | `src/probe-sonarr.test.ts` |
+| PEG-PROBE-002 | Probe exit states remain distinct and configuration failures stay redacted | `src/probe-sonarr.test.ts` |
 
 ## Explicit manual gaps
 

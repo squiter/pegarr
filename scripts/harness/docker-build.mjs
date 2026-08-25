@@ -209,16 +209,35 @@ async function configuredSonarrSmokeTest() {
         process.stdout.write(
           `${scenario} ${result.stdout.trim()} (secret-file, node, read-only, internal-network)\n`,
         );
-        return;
+        break;
       }
       await delay(250);
     }
 
-    const pegarrLogs = docker(["logs", pegarrName]);
-    const fixtureLogs = docker(["logs", fixtureName]);
-    throw new Error(
-      `${scenario} endpoint probe failed:\n${outputOf(result)}\nPegarr logs:\n${outputOf(pegarrLogs)}\nFixture logs:\n${outputOf(fixtureLogs)}`,
-    );
+    if (result?.status !== 0) {
+      const pegarrLogs = docker(["logs", pegarrName]);
+      const fixtureLogs = docker(["logs", fixtureName]);
+      throw new Error(
+        `${scenario} endpoint probe failed:\n${outputOf(result)}\nPegarr logs:\n${outputOf(pegarrLogs)}\nFixture logs:\n${outputOf(fixtureLogs)}`,
+      );
+    }
+
+    const packagedProbe = docker([
+      "exec",
+      pegarrName,
+      "npm",
+      "run",
+      "--silent",
+      "probe:sonarr",
+    ]);
+    if (
+      packagedProbe.status !== 0 ||
+      !packagedProbe.stdout.includes('"state":"available"') ||
+      /private|synthetic-docker-api-key|sonarr-fixture/iu.test(packagedProbe.stdout)
+    ) {
+      throw new Error(`${scenario} packaged probe failed:\n${outputOf(packagedProbe)}`);
+    }
+    process.stdout.write(`${scenario} packaged one-shot probe=available\n`);
   } finally {
     docker(["rm", "--force", pegarrName]);
     docker(["rm", "--force", fixtureName]);

@@ -49,6 +49,14 @@ After startup, request:
 GET /api/v1/integrations/sonarr/status
 ```
 
-The response states whether Sonarr is disabled, available, unauthorized, rate limited, unavailable, or invalid. An available response includes only Sonarr's application name, version, and container flag. It never includes the API key, configured URL, hostname, instance name, filesystem paths, OS details, branch, URL base, or database metadata.
+The response states whether Sonarr is disabled, available, unauthorized, rate limited, unavailable, or invalid. An available response includes only Sonarr's application name, version, container flag, transport-security category, measured response bytes, bounded latency, and observation time. It never includes the API key, configured URL, hostname, instance name, filesystem paths, OS details, branch, URL base, or database metadata.
 
-This endpoint performs only `GET /api/v3/system/status`. It does not search releases or expose a Grab operation.
+This endpoint performs only `GET /api/v3/system/status`. Concurrent calls share one in-flight request, and results are cached for 30 seconds so page refreshes cannot repeatedly hit Sonarr. It does not search releases or expose a Grab operation.
+
+For a fresh one-shot verification from the packaged container, run:
+
+```console
+docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml run --rm pegarr npm run --silent probe:sonarr
+```
+
+The command prints one compact JSON record. Exit code `0` means Sonarr was available; `1` means a configured upstream failure such as unauthorized or unavailable; `2` means disabled or invalid configuration. The output is designed to be safe to attach to an issue, but review diagnostics before publishing them as a general precaution.

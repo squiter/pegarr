@@ -21,7 +21,9 @@ The response is capped at 256 KiB and uses the shared timeout and redirect-free 
 
 - canonical application name `Sonarr`;
 - version;
-- `isDocker` when Sonarr supplies a boolean.
+- `isDocker` when Sonarr supplies a boolean;
+- exact bounded response bytes measured by Pegarr's transport;
+- bounded request latency, observation time, and the `https` or `explicit_http` transport-security category.
 
 ## Fields Pegarr deliberately discards
 
@@ -31,6 +33,10 @@ Sonarr's resource also exposes instance name, startup and application-data paths
 
 The Pegarr endpoint reports one of `disabled`, `available`, `unauthorized`, `rate_limited`, `unavailable`, `unexpected_status`, or `invalid_response`. These are diagnostic integration states, not subtitle-availability results.
 
+Concurrent status readers share one in-flight request. Completed states are cached for 30 seconds, including failures, to prevent refreshes from hammering an unavailable or rate-limited instance. The one-shot `probe:sonarr` command creates a fresh runtime and bypasses that cache.
+
+The probe exits `0` for `available`, `1` for a configured upstream failure, and `2` for disabled or invalid configuration. It emits no exception message, URL, hostname, or secret value.
+
 ## Remaining proof
 
-The automated harness injects a sanitized response and never performs DNS or network access. `PEG-MANUAL-001` remains open until a separately authorized probe measures the installed version, transport security, response size, and latency without recording the API key or private address.
+The automated harness injects a sanitized response and also executes the packaged command against a synthetic sibling container on an internal-only Docker network. `PEG-MANUAL-001` remains open until a separately authorized probe records the installed version and measured evidence without recording the API key or private address.

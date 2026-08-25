@@ -177,5 +177,6 @@ test("PEG-HTTP-004 invalid success JSON stays distinct from safe error metadata"
     status: 503,
     headers: { "content-type": "text/plain;charset=UTF-8", "retry-after": "30" },
     body: null,
+    responseBytes: new TextEncoder().encode("private non-json body").byteLength,
   });
 });

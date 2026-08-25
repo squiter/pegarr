@@ -72,13 +72,14 @@ export class FetchJsonTransport implements JsonTransport {
         cache: "no-store",
         referrerPolicy: "no-referrer",
       });
-      const text = await readBoundedBody(response, maxResponseBytes);
-      const body = parseBody(text, response.status);
+      const boundedBody = await readBoundedBody(response, maxResponseBytes);
+      const body = parseBody(boundedBody.text, response.status);
 
       return {
         status: response.status,
         headers: responseHeaders(response.headers),
         body,
+        responseBytes: boundedBody.bytes,
       };
     } catch (error) {
       if (error instanceof JsonTransportError) {
@@ -176,7 +177,10 @@ function responseHeaders(headers: Headers): Readonly<Record<string, string>> {
   return safe;
 }
 
-async function readBoundedBody(response: Response, maxResponseBytes: number): Promise<string> {
+async function readBoundedBody(
+  response: Response,
+  maxResponseBytes: number,
+): Promise<{ readonly text: string; readonly bytes: number }> {
   const declaredLength = response.headers.get("content-length");
   if (declaredLength !== null && /^\d+$/u.test(declaredLength)) {
     if (Number(declaredLength) > maxResponseBytes) {
@@ -189,7 +193,7 @@ async function readBoundedBody(response: Response, maxResponseBytes: number): Pr
     }
   }
   if (response.body === null) {
-    return "";
+    return { text: "", bytes: 0 };
   }
 
   const reader = response.body.getReader();
@@ -218,7 +222,7 @@ async function readBoundedBody(response: Response, maxResponseBytes: number): Pr
     body.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder().decode(body);
+  return { text: new TextDecoder().decode(body), bytes: received };
 }
 
 function parseBody(value: string, status: number): unknown {

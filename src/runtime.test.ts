@@ -24,15 +24,18 @@ test("PEG-RUNTIME-001 configured Sonarr status returns only safe read-only evide
 
   let capturedUrl: URL | undefined;
   let capturedHeaders: Headers | undefined;
+  const upstreamBody = JSON.stringify(syntheticSonarrSystemStatusResponse);
+  const clock = [1_000, 1_025];
   const services = createRuntimeServices(configuration, {
     fetchImplementation: async (input, init) => {
       capturedUrl = new URL(input);
       capturedHeaders = new Headers(init?.headers);
-      return new Response(JSON.stringify(syntheticSonarrSystemStatusResponse), {
+      return new Response(upstreamBody, {
         status: 200,
         headers: { "content-type": "application/json" },
       });
     },
+    now: () => clock.shift() ?? 1_025,
   });
   const response = await resolveRoute(
     "GET",
@@ -55,7 +58,11 @@ test("PEG-RUNTIME-001 configured Sonarr status returns only safe read-only evide
       state: "available",
       appName: "Sonarr",
       version: "5.0.0.0",
+      transportSecurity: "https",
       isDocker: true,
+      responseBytes: new TextEncoder().encode(upstreamBody).byteLength,
+      latencyMs: 25,
+      observedAt: "1970-01-01T00:00:01.025Z",
     },
   });
   assert.doesNotMatch(
@@ -90,4 +97,41 @@ test("PEG-RUNTIME-003 upstream failures remain distinct and redact private detai
     assert.equal(status.state, testCase.state);
     assert.doesNotMatch(JSON.stringify(status), /private|synthetic-api-key|example\.invalid/iu);
   }
+});
+
+test("PEG-RUNTIME-004 concurrent and repeated status reads use one bounded probe window", async () => {
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-api-key-value"),
+    },
+  };
+  let currentTime = 1_000;
+  let requestCount = 0;
+  const services = createRuntimeServices(configuration, {
+    fetchImplementation: async () => {
+      requestCount += 1;
+      await Promise.resolve();
+      return new Response(JSON.stringify(syntheticSonarrSystemStatusResponse), { status: 200 });
+    },
+    now: () => currentTime,
+    sonarrStatusTtlMs: 30_000,
+  });
+
+  const [first, concurrent] = await Promise.all([
+    services.readSonarrStatus(),
+    services.readSonarrStatus(),
+  ]);
+  const cached = await services.readSonarrStatus();
+  assert.equal(requestCount, 1);
+  assert.deepEqual(concurrent, first);
+  assert.deepEqual(cached, first);
+
+  currentTime += 30_001;
+  const refreshed = await services.readSonarrStatus();
+  assert.equal(requestCount, 2);
+  assert.equal(refreshed.state, "available");
 });

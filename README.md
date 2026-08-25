@@ -37,6 +37,7 @@ The current repository foundation includes:
 - a bounded, transport-injected Sonarr v3 episode release-search adapter proven with a sanitized contract fixture;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;
 - secret-file-only Sonarr configuration and a browser-safe version/status route;
+- a measured one-shot Sonarr probe with a 30-second status cache and single-flight protection;
 - a non-root, read-only Docker runtime;
 - local and NAS-oriented Compose examples;
 - CI checks and Docker builds on every pull request;
@@ -79,7 +80,7 @@ docker compose -f deploy/compose.nas.yaml up -d
 docker compose -f deploy/compose.nas.yaml ps
 ```
 
-For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [Sonarr Compose overlay](deploy/compose.sonarr.yaml) mounts the API key as a Docker secret; follow the [configuration guide](docs/configuration.md) and never put the key in `.env`.
+For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [Sonarr Compose overlay](deploy/compose.sonarr.yaml) mounts the API key as a Docker secret; follow the [configuration guide](docs/configuration.md) to run the one-shot status probe, and never put the key in `.env`.
 
 ## Container publishing
 
