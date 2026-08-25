@@ -23,4 +23,10 @@ The repository is in Phase 0, the API feasibility spike. Prefer small contract p
 
 ## Verification
 
-Run `npm run check` and build the Docker image for changes that affect runtime or deployment. Keep NAS deployment examples secret-safe and architecture-neutral (`linux/amd64` and `linux/arm64`).
+`harness/manifest.json` is the machine-readable coverage ledger. Every behavior change must add or update a stable scenario there and reference its ID in the deterministic test that proves it. Record live-service and NAS-only validation as manual gaps instead of implying automated coverage.
+
+Use `npm run check:affected` as the local completion gate. It always runs repository contracts and selects compiled checks and the Docker build from the changed paths. Use `npm run check` for the full local gate and `npm run check:fast` only for quick feedback while work is still in progress.
+
+Harness failures write compact remediation guidance to the terminal and full evidence under `.artifacts/harness/`. Fix recurring failures by improving the relevant guide, fixture, tool, or sensor rather than adding prompt-only instructions.
+
+Keep NAS deployment examples secret-safe and architecture-neutral (`linux/amd64` and `linux/arm64`).

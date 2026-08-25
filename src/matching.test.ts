@@ -6,7 +6,7 @@ import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { assessLanguage, buildFeasibilityReport } from "./matching.js";
 import { normalizeLanguage, normalizeRelease } from "./normalization.js";
 
-test("normalization keeps evidence while canonicalizing common aliases", () => {
+test("PEG-MATCH-001 normalization keeps evidence while canonicalizing common aliases", () => {
   const release = normalizeRelease("Café.Show.S01E02.1080p.WEB-DL.x265-GROUP");
 
   assert.equal(release.original, "Café.Show.S01E02.1080p.WEB-DL.x265-GROUP");
@@ -17,7 +17,7 @@ test("normalization keeps evidence while canonicalizing common aliases", () => {
   assert.equal(normalizeLanguage("PT_BR"), "pt-br");
 });
 
-test("demo report associates subtitle evidence with every Arr release", () => {
+test("PEG-MATCH-002 demo report associates subtitle evidence with every Arr release", () => {
   const report = buildFeasibilityReport(demoFeasibilityInput);
 
   assert.equal(report.mode, "read_only");
@@ -32,7 +32,7 @@ test("demo report associates subtitle evidence with every Arr release", () => {
   assert.ok(report.releases[3]?.subtitle.languages[0]?.warnings.some((warning) => warning.includes("rate limited")));
 });
 
-test("provider failures produce Unknown instead of No match found", () => {
+test("PEG-MATCH-003 provider failures produce Unknown instead of No match found", () => {
   const providerResults: readonly ProviderSearchResult[] = [
     { provider: "subdl", status: "timeout", subtitles: [] },
   ];
@@ -47,7 +47,7 @@ test("provider failures produce Unknown instead of No match found", () => {
   assert.deepEqual(result.warnings, ["subdl search timed out"]);
 });
 
-test("successful empty provider results produce No match found", () => {
+test("PEG-MATCH-004 successful empty provider results produce No match found", () => {
   const providerResults: readonly ProviderSearchResult[] = [
     { provider: "subdl", status: "success", subtitles: [] },
   ];
@@ -62,7 +62,7 @@ test("successful empty provider results produce No match found", () => {
   assert.deepEqual(result.warnings, []);
 });
 
-test("wrong episodes are rejected before release scoring", () => {
+test("PEG-MATCH-005 wrong episodes are rejected before release scoring", () => {
   const input: FeasibilityInput = {
     ...demoFeasibilityInput,
     providerResults: [

@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "phase": "phase-0-api-feasibility",
+  "completion": {
+    "affected": "npm run check:affected",
+    "full": "npm run check"
+  },
+  "automatedScenarios": [
+    {
+      "id": "PEG-OPS-001",
+      "title": "Liveness reports the process as healthy",
+      "evidence": "src/app.test.ts",
+      "boundary": "Pure in-process route contract"
+    },
+    {
+      "id": "PEG-OPS-002",
+      "title": "Readiness reflects data-directory accessibility",
+      "evidence": "src/app.test.ts",
+      "boundary": "Temporary local directories only"
+    },
+    {
+      "id": "PEG-API-001",
+      "title": "Read-only routes reject mutation methods",
+      "evidence": "src/app.test.ts",
+      "boundary": "No external service or mutation"
+    },
+    {
+      "id": "PEG-API-002",
+      "title": "Synthetic feasibility report stays explainable and read-only",
+      "evidence": "src/app.test.ts",
+      "boundary": "Synthetic fixture only"
+    },
+    {
+      "id": "PEG-API-003",
+      "title": "Unknown routes return a generic response without reflecting secrets",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process request only"
+    },
+    {
+      "id": "PEG-MATCH-001",
+      "title": "Normalization preserves original evidence and canonicalizes aliases",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching"
+    },
+    {
+      "id": "PEG-MATCH-002",
+      "title": "Subtitle evidence is assessed beside every Arr release decision",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Synthetic fixture only"
+    },
+    {
+      "id": "PEG-MATCH-003",
+      "title": "Provider failures produce Unknown instead of No match found",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Synthetic provider response"
+    },
+    {
+      "id": "PEG-MATCH-004",
+      "title": "Successful empty searches produce No match found",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Synthetic provider response"
+    },
+    {
+      "id": "PEG-MATCH-005",
+      "title": "Wrong episodes are rejected before release scoring",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching"
+    },
+    {
+      "id": "PEG-HARNESS-001",
+      "title": "Affected paths select the narrow deterministic sensor set",
+      "evidence": "scripts/harness/run-checks.test.mjs",
+      "boundary": "Harness self-test"
+    },
+    {
+      "id": "PEG-HARNESS-002",
+      "title": "Raw tool failures become compact actionable signals",
+      "evidence": "scripts/harness/run-checks.test.mjs",
+      "boundary": "Harness self-test"
+    },
+    {
+      "id": "PEG-HARNESS-003",
+      "title": "Docker frontend timeouts use one bounded classic-builder fallback",
+      "evidence": "scripts/harness/run-checks.test.mjs",
+      "boundary": "Fallback classification only; the affected gate executes the real build"
+    },
+    {
+      "id": "PEG-DOCKER-001",
+      "title": "Built image starts non-root, read-only, without egress and serves core routes",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Local Docker architecture only; does not reproduce the NAS"
+    }
+  ],
+  "manualGaps": [
+    {
+      "id": "PEG-MANUAL-001",
+      "title": "Live Sonarr and Radarr API compatibility",
+      "reason": "Phase 0 has no live connector and automated tests must not use private services"
+    },
+    {
+      "id": "PEG-MANUAL-002",
+      "title": "Live Bazarr profile resolution and provider policy",
+      "reason": "Requires sanitized contract capture before an adapter can be implemented"
+    },
+    {
+      "id": "PEG-MANUAL-003",
+      "title": "NAS pull, startup, persistence, and architecture smoke test",
+      "reason": "CI builds amd64 and arm64 images but cannot prove the user's NAS environment"
+    },
+    {
+      "id": "PEG-MANUAL-004",
+      "title": "Any future Grab confirmation flow",
+      "reason": "Mutating behavior is outside Phase 0 and must never run against a live service automatically"
+    }
+  ]
+}

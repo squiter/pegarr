@@ -5,14 +5,14 @@ import test from "node:test";
 import type { FeasibilityReport } from "./domain.js";
 import { healthResponse, readinessResponse, resolveRoute } from "./app.js";
 
-test("liveness is healthy", () => {
+test("PEG-OPS-001 liveness is healthy", () => {
   assert.deepEqual(healthResponse(), {
     statusCode: 200,
     body: { service: "pegarr", status: "ok" },
   });
 });
 
-test("readiness requires an accessible data directory", async () => {
+test("PEG-OPS-002 readiness requires an accessible data directory", async () => {
   assert.equal((await readinessResponse(tmpdir())).statusCode, 200);
   assert.equal(
     (await readinessResponse(`${tmpdir()}/pegarr-directory-that-does-not-exist`)).statusCode,
@@ -20,14 +20,14 @@ test("readiness requires an accessible data directory", async () => {
   );
 });
 
-test("health routes reject mutations", async () => {
+test("PEG-API-001 health routes reject mutations", async () => {
   const result = await resolveRoute("POST", "/health", tmpdir());
 
   assert.equal(result.statusCode, 405);
   assert.deepEqual(result.headers, { allow: "GET" });
 });
 
-test("fixture-backed feasibility route is read-only and explainable", async () => {
+test("PEG-API-002 fixture-backed feasibility route is read-only and explainable", async () => {
   const result = await resolveRoute("GET", "/api/v1/feasibility/demo", tmpdir());
   const report = result.body as FeasibilityReport;
 
@@ -38,7 +38,7 @@ test("fixture-backed feasibility route is read-only and explainable", async () =
   assert.equal((await resolveRoute("POST", "/api/v1/feasibility/demo", tmpdir())).statusCode, 405);
 });
 
-test("unknown routes return a generic response", async () => {
+test("PEG-API-003 unknown routes return a generic response", async () => {
   const result = await resolveRoute("GET", "/does-not-exist?token=secret", tmpdir());
 
   assert.deepEqual(result, {

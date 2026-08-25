@@ -53,6 +53,12 @@ Then open <http://localhost:8080/health> or inspect the Phase 0 report at <http:
 
 The demo associates synthetic SubDL evidence with four Sonarr-style releases. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly.
 
+## Development harness
+
+Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise.
+
+See [the harness guide](docs/harness.md) and [scenario catalog](docs/harness-scenarios.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+
 To use Docker instead:
 
 ```console
