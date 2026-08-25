@@ -1,0 +1,27 @@
+name: Bug report
+description: Report reproducible incorrect behavior in Pegarr.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, private service URLs, or unsanitized media data.
+  - type: input
+    id: version
+    attributes:
+      label: Pegarr version or image tag
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Include minimal reproduction steps and the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Add redacted logs or fixtures if they help reproduce the problem.
