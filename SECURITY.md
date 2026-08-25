@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please use GitHub's private vulnerability reporting for this repository. Do not open a public issue containing a vulnerability, credential, private service address, or media-library detail.
+Please contact the repository owner through a private channel. Do not open an issue containing a vulnerability, credential, private service address, or media-library detail. GitHub private vulnerability reporting will become the preferred channel if it is enabled for the repository later.
 
 Include the affected revision, reproduction steps, likely impact, and any suggested mitigation. Please do not test against systems or accounts you do not own or have permission to use.
 
