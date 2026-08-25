@@ -12,7 +12,9 @@ const requiredDocs = [
   "ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md",
   "docs/harness.md",
   "docs/harness-scenarios.md",
+  "docs/configuration.md",
   "docs/contracts/sonarr-v3-release-search.md",
+  "docs/contracts/sonarr-v3-system-status.md",
   "docs/contracts/http-transport.md",
 ];
 

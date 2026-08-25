@@ -91,6 +91,12 @@
       "boundary": "Local Docker architecture only; does not reproduce the NAS"
     },
     {
+      "id": "PEG-DOCKER-002",
+      "title": "Packaged runtime reads a Sonarr secret file on an internal-only network",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling container and secret; local Docker architecture only"
+    },
+    {
       "id": "PEG-SONARR-001",
       "title": "Episode release search is bounded, read-only, and authenticates by header",
       "evidence": "src/adapters/sonarr.test.ts",
@@ -143,13 +149,49 @@
       "title": "Invalid success JSON is distinct from safe non-success metadata",
       "evidence": "src/adapters/fetch-json-transport.test.ts",
       "boundary": "In-memory Response bodies and headers"
+    },
+    {
+      "id": "PEG-CONFIG-001",
+      "title": "Disabled Sonarr configuration stays disabled and partial input fails safely",
+      "evidence": "src/config.test.ts",
+      "boundary": "In-memory environment map; no process environment or network"
+    },
+    {
+      "id": "PEG-CONFIG-002",
+      "title": "Sonarr credentials load only from a bounded secret file",
+      "evidence": "src/config.test.ts",
+      "boundary": "Synthetic secret in a temporary local directory"
+    },
+    {
+      "id": "PEG-SONARR-006",
+      "title": "Sonarr system status is bounded and discards private upstream metadata",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Sanitized synthetic Sonarr response and injected transport"
+    },
+    {
+      "id": "PEG-RUNTIME-001",
+      "title": "Configured Sonarr status returns only safe read-only evidence",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary synthetic secret and injected fetch; no DNS or network"
+    },
+    {
+      "id": "PEG-RUNTIME-002",
+      "title": "Sonarr status is read-only and disabled without configuration",
+      "evidence": "src/app.test.ts",
+      "boundary": "Pure in-process route contract"
+    },
+    {
+      "id": "PEG-RUNTIME-003",
+      "title": "Sonarr upstream failures remain distinct and redact private details",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected HTTP failure; no DNS or network"
     }
   ],
   "manualGaps": [
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "The Sonarr contract and HTTP transport are fixture-proven but installed versions, DNS behavior, TLS, and latency remain unverified; Radarr has no adapter yet"
+      "reason": "The Sonarr release/status contracts, configuration, and HTTP transport are fixture-proven, but an installed version, DNS behavior, TLS, and latency remain unverified; Radarr has no adapter yet"
     },
     {
       "id": "PEG-MANUAL-002",

@@ -1,6 +1,6 @@
 # Read-only HTTP transport contract
 
-Status: hermetically tested, not yet enabled by runtime configuration
+Status: hermetically tested and runtime-enabled only for an explicitly configured Sonarr status probe
 
 Pegarr adapters use one transport boundary so network, URL, timeout, size, and redaction behavior is not reimplemented for each service.
 

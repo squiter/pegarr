@@ -48,3 +48,25 @@ test("PEG-API-003 unknown routes return a generic response", async () => {
     body: { service: "pegarr", status: "not_found" },
   });
 });
+
+test("PEG-RUNTIME-002 Sonarr status is read-only and disabled without configuration", async () => {
+  const result = await resolveRoute(
+    "GET",
+    "/api/v1/integrations/sonarr/status",
+    tmpdir(),
+  );
+  assert.deepEqual(result, {
+    statusCode: 200,
+    body: {
+      service: "pegarr",
+      integration: "sonarr",
+      mode: "read_only",
+      configured: false,
+      state: "disabled",
+    },
+  });
+  assert.equal(
+    (await resolveRoute("POST", "/api/v1/integrations/sonarr/status", tmpdir())).statusCode,
+    405,
+  );
+});

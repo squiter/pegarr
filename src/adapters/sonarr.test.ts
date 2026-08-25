@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { syntheticSonarrEpisodeReleaseResponse } from "../fixtures/sonarr-release-search.js";
+import { syntheticSonarrSystemStatusResponse } from "../fixtures/sonarr-system-status.js";
 import {
   JsonTransportError,
   type JsonResponse,
@@ -10,6 +11,7 @@ import {
 } from "./http.js";
 import {
   mapSonarrReleaseResponse,
+  mapSonarrSystemStatus,
   SonarrAdapterError,
   SonarrClient,
 } from "./sonarr.js";
@@ -143,4 +145,35 @@ test("PEG-SONARR-005 sensitive upstream fields never enter Pegarr release eviden
 
   assert.doesNotMatch(serialized, /synthetic-guid|downloadUrl|magnetUrl|example\.invalid/iu);
   assert.match(serialized, /Synthetic Indexer/u);
+});
+
+test("PEG-SONARR-006 system status is bounded and discards private upstream metadata", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: syntheticSonarrSystemStatusResponse };
+
+  assert.deepEqual(await client(transport).readSystemStatus(), {
+    appName: "Sonarr",
+    version: "5.0.0.0",
+    isDocker: true,
+  });
+  assert.deepEqual(transport.requests, [
+    {
+      method: "GET",
+      path: "/api/v3/system/status",
+      query: {},
+      headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+      timeoutMs: 2_500,
+      maxResponseBytes: 64_000,
+    },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(mapSonarrSystemStatus(syntheticSonarrSystemStatusResponse)),
+    /instanceName|startupPath|appData|osName|branch|urlBase|database/iu,
+  );
+
+  transport.response = { status: 200, headers: {}, body: { appName: "Not Sonarr", version: "1" } };
+  await assert.rejects(
+    client(transport).readSystemStatus(),
+    (error: unknown) => error instanceof SonarrAdapterError && error.code === "invalid_response",
+  );
 });

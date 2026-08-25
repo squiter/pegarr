@@ -40,6 +40,12 @@ export interface SonarrClientOptions {
   readonly maxResponseBytes?: number;
 }
 
+export interface SonarrSystemStatus {
+  readonly appName: "Sonarr";
+  readonly version: string;
+  readonly isDocker?: boolean;
+}
+
 const defaultTimeoutMs = 15_000;
 const defaultMaxResponseBytes = 5 * 1024 * 1024;
 
@@ -72,7 +78,7 @@ export class SonarrClient {
 
   async searchEpisodeReleases(episodeId: number): Promise<readonly ArrReleaseCandidate[]> {
     const normalizedEpisodeId = boundedInteger(episodeId, 1, Number.MAX_SAFE_INTEGER, "episodeId");
-    const request: ReadonlyJsonRequest = {
+    const response = await this.#requestJson({
       method: "GET",
       path: "/api/v3/release",
       query: { episodeId: String(normalizedEpisodeId) },
@@ -82,22 +88,9 @@ export class SonarrClient {
       },
       timeoutMs: this.#timeoutMs,
       maxResponseBytes: this.#maxResponseBytes,
-    };
+    });
 
-    let response: JsonResponse;
-    try {
-      response = await this.#transport.requestJson(request);
-    } catch (error) {
-      if (
-        error instanceof JsonTransportError &&
-        (error.code === "invalid_json" || error.code === "response_too_large")
-      ) {
-        throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid release response");
-      }
-      throw new SonarrAdapterError("unavailable", "Sonarr release search transport failed");
-    }
-
-    assertSuccessfulStatus(response);
+    assertSuccessfulStatus(response, "release search");
     try {
       return mapSonarrReleaseResponse(response.body, this.#instanceId);
     } catch {
@@ -106,6 +99,62 @@ export class SonarrClient {
       });
     }
   }
+
+  async readSystemStatus(): Promise<SonarrSystemStatus> {
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/system/status",
+      query: {},
+      headers: {
+        accept: "application/json",
+        "x-api-key": this.#apiKey,
+      },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: Math.min(this.#maxResponseBytes, 256 * 1024),
+    });
+
+    assertSuccessfulStatus(response, "status probe");
+    try {
+      return mapSonarrSystemStatus(response.body);
+    } catch {
+      throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid status response", {
+        status: response.status,
+      });
+    }
+  }
+
+  async #requestJson(request: ReadonlyJsonRequest): Promise<JsonResponse> {
+    try {
+      return await this.#transport.requestJson(request);
+    } catch (error) {
+      if (
+        error instanceof JsonTransportError &&
+        (error.code === "invalid_json" || error.code === "response_too_large")
+      ) {
+        throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid response");
+      }
+      throw new SonarrAdapterError("unavailable", "Sonarr request transport failed");
+    }
+  }
+}
+
+export function mapSonarrSystemStatus(body: unknown): SonarrSystemStatus {
+  const status = record(body, "system status");
+  const appName = requiredString(status.appName, "system status.appName");
+  if (appName.toLowerCase() !== "sonarr") {
+    throw new TypeError("system status.appName must identify Sonarr");
+  }
+  const version = requiredString(status.version, "system status.version");
+  if (!/^[0-9][0-9a-z._+-]{0,63}$/iu.test(version)) {
+    throw new TypeError("system status.version must be a safe version label");
+  }
+  const isDocker = optionalBoolean(status.isDocker, "system status.isDocker");
+
+  return {
+    appName: "Sonarr",
+    version,
+    ...(isDocker === undefined ? {} : { isDocker }),
+  };
 }
 
 export function mapSonarrReleaseResponse(
@@ -176,7 +225,7 @@ function mapRelease(value: unknown, index: number, instanceId: string): ArrRelea
   };
 }
 
-function assertSuccessfulStatus(response: JsonResponse): void {
+function assertSuccessfulStatus(response: JsonResponse, operation: string): void {
   if (response.status === 200) {
     return;
   }
@@ -187,17 +236,17 @@ function assertSuccessfulStatus(response: JsonResponse): void {
   }
   if (response.status === 429) {
     const retryAfterSeconds = parseRetryAfter(response.headers);
-    throw new SonarrAdapterError("rate_limited", "Sonarr rate limited the release search", {
+    throw new SonarrAdapterError("rate_limited", `Sonarr rate limited the ${operation}`, {
       status: response.status,
       ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
     });
   }
   if (response.status >= 500) {
-    throw new SonarrAdapterError("unavailable", "Sonarr release search is unavailable", {
+    throw new SonarrAdapterError("unavailable", `Sonarr ${operation} is unavailable`, {
       status: response.status,
     });
   }
-  throw new SonarrAdapterError("unexpected_status", "Sonarr rejected the release search request", {
+  throw new SonarrAdapterError("unexpected_status", `Sonarr rejected the ${operation} request`, {
     status: response.status,
   });
 }
@@ -259,6 +308,13 @@ function requiredBoolean(value: unknown, field: string): boolean {
     throw new TypeError(`${field} must be a boolean`);
   }
   return value;
+}
+
+function optionalBoolean(value: unknown, field: string): boolean | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return requiredBoolean(value, field);
 }
 
 function stringArray(value: unknown, field: string): readonly string[] {

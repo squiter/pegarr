@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
+import type { RuntimeServices, SonarrIntegrationStatus } from "./runtime.js";
 
 export interface RouteResult {
   readonly statusCode: number;
@@ -43,9 +44,15 @@ export async function resolveRoute(
   method: string | undefined,
   requestUrl: string | undefined,
   dataDirectory: string,
+  services?: RuntimeServices,
 ): Promise<RouteResult> {
   const pathname = new URL(requestUrl ?? "/", "http://pegarr.invalid").pathname;
-  const knownReadOnlyRoutes = new Set(["/health", "/health/ready", "/api/v1/feasibility/demo"]);
+  const knownReadOnlyRoutes = new Set([
+    "/health",
+    "/health/ready",
+    "/api/v1/feasibility/demo",
+    "/api/v1/integrations/sonarr/status",
+  ]);
 
   if (knownReadOnlyRoutes.has(pathname) && method !== "GET") {
     return {
@@ -70,16 +77,47 @@ export async function resolveRoute(
     };
   }
 
+  if (pathname === "/api/v1/integrations/sonarr/status") {
+    return {
+      statusCode: 200,
+      body: {
+        service: "pegarr",
+        ...(await safeSonarrStatus(services)),
+      },
+    };
+  }
+
   return {
     statusCode: 404,
     body: { service: "pegarr", status: "not_found" },
   };
 }
 
-export function createRequestHandler(dataDirectory: string) {
+export function createRequestHandler(dataDirectory: string, services?: RuntimeServices) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
-    const result = await resolveRoute(request.method, request.url, dataDirectory);
+    const result = await resolveRoute(request.method, request.url, dataDirectory, services);
     response.writeHead(result.statusCode, { ...jsonHeaders, ...result.headers });
     response.end(`${JSON.stringify(result.body)}\n`);
   };
+}
+
+async function safeSonarrStatus(services: RuntimeServices | undefined): Promise<SonarrIntegrationStatus> {
+  if (services === undefined) {
+    return {
+      integration: "sonarr",
+      mode: "read_only",
+      configured: false,
+      state: "disabled",
+    };
+  }
+  try {
+    return await services.readSonarrStatus();
+  } catch {
+    return {
+      integration: "sonarr",
+      mode: "read_only",
+      configured: true,
+      state: "unavailable",
+    };
+  }
 }

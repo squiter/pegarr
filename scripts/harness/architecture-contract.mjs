@@ -63,6 +63,25 @@ for (const contract of [
   }
 }
 
+const configuration = readFileSync(resolve(repoRoot, "src/config.ts"), "utf8");
+for (const contract of [
+  "PEGARR_SONARR_API_KEY_FILE",
+  "maximumSecretBytes = 4_096",
+  'return "[redacted]"',
+]) {
+  if (!configuration.includes(contract)) {
+    issues.push(`The runtime configuration must retain ${contract}`);
+  }
+}
+
+const sonarrCompose = readFileSync(resolve(repoRoot, "deploy/compose.sonarr.yaml"), "utf8");
+if (!sonarrCompose.includes("PEGARR_SONARR_API_KEY_FILE: /run/secrets/sonarr_api_key")) {
+  issues.push("The Sonarr Compose overlay must mount the API key through a secret file");
+}
+if (/PEGARR_SONARR_API_KEY\s*:/u.test(sonarrCompose)) {
+  issues.push("The Sonarr Compose overlay may not pass the API key as an environment value");
+}
+
 const packageJson = readJson("package.json");
 const runtimeDependencies = Object.keys(packageJson.dependencies ?? {});
 for (const dependency of runtimeDependencies) {
@@ -98,6 +117,9 @@ if (manifest.phase.startsWith("phase-0")) {
   }
   if (!app.includes('"/api/v1/feasibility/demo"')) {
     issues.push("Phase 0 must retain the synthetic read-only feasibility route");
+  }
+  if (!app.includes('"/api/v1/integrations/sonarr/status"')) {
+    issues.push("Phase 0 must retain the read-only Sonarr status route");
   }
 }
 

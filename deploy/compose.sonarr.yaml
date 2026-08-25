@@ -1,0 +1,14 @@
+services:
+  pegarr:
+    environment:
+      PEGARR_SONARR_URL: ${PEGARR_SONARR_URL:?set PEGARR_SONARR_URL}
+      PEGARR_SONARR_ALLOWED_HOSTS: ${PEGARR_SONARR_ALLOWED_HOSTS:?set PEGARR_SONARR_ALLOWED_HOSTS}
+      PEGARR_SONARR_API_KEY_FILE: /run/secrets/sonarr_api_key
+      PEGARR_SONARR_INSTANCE_ID: ${PEGARR_SONARR_INSTANCE_ID:-sonarr}
+      PEGARR_SONARR_ALLOW_INSECURE_HTTP: ${PEGARR_SONARR_ALLOW_INSECURE_HTTP:-false}
+    secrets:
+      - sonarr_api_key
+
+secrets:
+  sonarr_api_key:
+    file: ${PEGARR_SONARR_API_KEY_HOST_FILE:?set an absolute PEGARR_SONARR_API_KEY_HOST_FILE}

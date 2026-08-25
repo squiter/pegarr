@@ -9,7 +9,7 @@
 Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It is designed to compare interactive-search releases with subtitle-provider evidence, explain the confidence of each match, and eventually let an authorized user grab the best-informed release.
 
 > [!IMPORTANT]
-> Pegarr is in its API-feasibility phase. The current container exposes a synthetic, read-only feasibility report; it does not connect to live services or perform Grab operations yet.
+> Pegarr is in its API-feasibility phase. The container exposes a synthetic, read-only feasibility report and an opt-in Sonarr status probe. It does not perform Grab operations.
 
 ## Why Pegarr?
 
@@ -36,6 +36,7 @@ The current repository foundation includes:
 - provider-independent normalization and explainable confidence results;
 - a bounded, transport-injected Sonarr v3 episode release-search adapter proven with a sanitized contract fixture;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;
+- secret-file-only Sonarr configuration and a browser-safe version/status route;
 - a non-root, read-only Docker runtime;
 - local and NAS-oriented Compose examples;
 - CI checks and Docker builds on every pull request;
@@ -51,15 +52,15 @@ npm run check
 npm start
 ```
 
-Then open <http://localhost:8080/health> or inspect the Phase 0 report at <http://localhost:8080/api/v1/feasibility/demo>.
+Then open <http://localhost:8080/health> or inspect the Phase 0 report at <http://localhost:8080/api/v1/feasibility/demo>. Sonarr integration state is available at <http://localhost:8080/api/v1/integrations/sonarr/status> and reports `disabled` until explicitly configured.
 
-The demo maps a sanitized synthetic Sonarr v3 response into four release candidates, then associates synthetic SubDL evidence with them. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly. The runtime does not load live service configuration or make live network calls yet.
+The demo maps a sanitized synthetic Sonarr v3 response into four release candidates, then associates synthetic SubDL evidence with them. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly. Live release searches are not runtime-enabled yet.
 
 ## Development harness
 
 Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise.
 
-See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [HTTP transport contract](docs/contracts/http-transport.md), and [Sonarr contract snapshot](docs/contracts/sonarr-v3-release-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), and [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 
@@ -78,7 +79,7 @@ docker compose -f deploy/compose.nas.yaml up -d
 docker compose -f deploy/compose.nas.yaml ps
 ```
 
-For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. No Sonarr, Radarr, Bazarr, or provider credentials are accepted by this initial scaffold. When those integrations are added, secrets will remain server-side and will not be committed to `.env` files.
+For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [Sonarr Compose overlay](deploy/compose.sonarr.yaml) mounts the API key as a Docker secret; follow the [configuration guide](docs/configuration.md) and never put the key in `.env`.
 
 ## Container publishing
 

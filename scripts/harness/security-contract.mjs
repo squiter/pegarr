@@ -34,6 +34,13 @@ for (const file of files) {
     issues.push(`${file} may not use browser storage for service credentials or state`);
   }
 
+  if (
+    /(?:compose[^/]*\.ya?ml|\.env\.example)$/u.test(file) &&
+    /PEGARR_(?:SONARR|RADARR|BAZARR|SUBDL)_API_KEY\s*[:=]/u.test(content)
+  ) {
+    issues.push(`${file} may not pass an integration API key as an environment value`);
+  }
+
   if (file.includes("fixtures/") || file.includes("fixture")) {
     if (/\b(?:10\.|127\.0\.0\.1|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/u.test(content)) {
       issues.push(`${file} contains a private or loopback address`);
