@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
+import type { FeasibilityReport } from "./domain.js";
 import { healthResponse, readinessResponse, resolveRoute } from "./app.js";
 
 test("liveness is healthy", () => {
@@ -24,6 +25,17 @@ test("health routes reject mutations", async () => {
 
   assert.equal(result.statusCode, 405);
   assert.deepEqual(result.headers, { allow: "GET" });
+});
+
+test("fixture-backed feasibility route is read-only and explainable", async () => {
+  const result = await resolveRoute("GET", "/api/v1/feasibility/demo", tmpdir());
+  const report = result.body as FeasibilityReport;
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(report.mode, "read_only");
+  assert.equal(report.fixture, "synthetic-sonarr-episode-v1");
+  assert.equal(report.releases[0]?.subtitle.languages[0]?.evidence?.reasons[0], "Exact normalized release name");
+  assert.equal((await resolveRoute("POST", "/api/v1/feasibility/demo", tmpdir())).statusCode, 405);
 });
 
 test("unknown routes return a generic response", async () => {

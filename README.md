@@ -9,7 +9,7 @@
 Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It is designed to compare interactive-search releases with subtitle-provider evidence, explain the confidence of each match, and eventually let an authorized user grab the best-informed release.
 
 > [!IMPORTANT]
-> Pegarr is in its API-feasibility phase. The current container exposes operational health endpoints, but the release-selection workflow is not implemented yet.
+> Pegarr is in its API-feasibility phase. The current container exposes a synthetic, read-only feasibility report; it does not connect to live services or perform Grab operations yet.
 
 ## Why Pegarr?
 
@@ -32,6 +32,8 @@ The current repository foundation includes:
 
 - a dependency-light TypeScript service;
 - `/health` and `/health/ready` endpoints;
+- a deterministic `/api/v1/feasibility/demo` report backed by sanitized synthetic evidence;
+- provider-independent normalization and explainable confidence results;
 - a non-root, read-only Docker runtime;
 - local and NAS-oriented Compose examples;
 - CI checks and Docker builds on every pull request;
@@ -47,7 +49,9 @@ npm run check
 npm start
 ```
 
-Then open <http://localhost:8080/health>.
+Then open <http://localhost:8080/health> or inspect the Phase 0 report at <http://localhost:8080/api/v1/feasibility/demo>.
+
+The demo associates synthetic SubDL evidence with four Sonarr-style releases. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly.
 
 To use Docker instead:
 

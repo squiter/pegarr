@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please contact the repository owner through a private channel. Do not open an issue containing a vulnerability, credential, private service address, or media-library detail. GitHub private vulnerability reporting will become the preferred channel if it is enabled for the repository later.
+Please use [GitHub private vulnerability reporting](https://github.com/squiter/pegarr/security/advisories/new). Do not open an issue containing a vulnerability, credential, private service address, or media-library detail.
 
 Include the affected revision, reproduction steps, likely impact, and any suggested mitigation. Please do not test against systems or accounts you do not own or have permission to use.
 

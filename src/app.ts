@@ -2,10 +2,13 @@ import { constants as fsConstants } from "node:fs";
 import { access } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { demoFeasibilityInput } from "./fixtures/demo.js";
+import { buildFeasibilityReport } from "./matching.js";
+
 export interface RouteResult {
   readonly statusCode: number;
   readonly headers?: Readonly<Record<string, string>>;
-  readonly body: Readonly<Record<string, string>>;
+  readonly body: unknown;
 }
 
 const jsonHeaders = {
@@ -42,8 +45,9 @@ export async function resolveRoute(
   dataDirectory: string,
 ): Promise<RouteResult> {
   const pathname = new URL(requestUrl ?? "/", "http://pegarr.invalid").pathname;
+  const knownReadOnlyRoutes = new Set(["/health", "/health/ready", "/api/v1/feasibility/demo"]);
 
-  if ((pathname === "/health" || pathname === "/health/ready") && method !== "GET") {
+  if (knownReadOnlyRoutes.has(pathname) && method !== "GET") {
     return {
       statusCode: 405,
       headers: { allow: "GET" },
@@ -57,6 +61,13 @@ export async function resolveRoute(
 
   if (pathname === "/health/ready") {
     return readinessResponse(dataDirectory);
+  }
+
+  if (pathname === "/api/v1/feasibility/demo") {
+    return {
+      statusCode: 200,
+      body: buildFeasibilityReport(demoFeasibilityInput),
+    };
   }
 
   return {
