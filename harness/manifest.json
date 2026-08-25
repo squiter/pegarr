@@ -119,13 +119,37 @@
       "title": "Sensitive upstream release fields never enter Pegarr release evidence",
       "evidence": "src/adapters/sonarr.test.ts",
       "boundary": "Serialization assertion over a sanitized synthetic response"
+    },
+    {
+      "id": "PEG-HTTP-001",
+      "title": "Read-only HTTP requests stay on an explicit allowlisted base URL",
+      "evidence": "src/adapters/fetch-json-transport.test.ts",
+      "boundary": "Injected fetch implementation; no DNS or network"
+    },
+    {
+      "id": "PEG-HTTP-002",
+      "title": "HTTP timeouts and network failures return stable redacted errors",
+      "evidence": "src/adapters/fetch-json-transport.test.ts",
+      "boundary": "Injected failures; no network"
+    },
+    {
+      "id": "PEG-HTTP-003",
+      "title": "HTTP response limits block declared and streamed oversized bodies",
+      "evidence": "src/adapters/fetch-json-transport.test.ts",
+      "boundary": "In-memory Response bodies"
+    },
+    {
+      "id": "PEG-HTTP-004",
+      "title": "Invalid success JSON is distinct from safe non-success metadata",
+      "evidence": "src/adapters/fetch-json-transport.test.ts",
+      "boundary": "In-memory Response bodies and headers"
     }
   ],
   "manualGaps": [
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "The Sonarr contract seam is fixture-proven but installed versions and live transport remain unverified; Radarr has no adapter yet"
+      "reason": "The Sonarr contract and HTTP transport are fixture-proven but installed versions, DNS behavior, TLS, and latency remain unverified; Radarr has no adapter yet"
     },
     {
       "id": "PEG-MANUAL-002",

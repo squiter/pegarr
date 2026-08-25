@@ -25,12 +25,16 @@
 | PEG-SONARR-003 | Successful empty and malformed responses stay distinct | `src/adapters/sonarr.test.ts` |
 | PEG-SONARR-004 | Authentication, quota, outage, and transport failures are classified | `src/adapters/sonarr.test.ts` |
 | PEG-SONARR-005 | Unsafe upstream URLs and selection handles do not reach release evidence | `src/adapters/sonarr.test.ts` |
+| PEG-HTTP-001 | Requests remain on an explicit allowlisted base URL | `src/adapters/fetch-json-transport.test.ts` |
+| PEG-HTTP-002 | Timeouts and network failures are stable and redacted | `src/adapters/fetch-json-transport.test.ts` |
+| PEG-HTTP-003 | Declared and streamed oversized bodies are blocked | `src/adapters/fetch-json-transport.test.ts` |
+| PEG-HTTP-004 | Invalid success JSON stays distinct from safe error metadata | `src/adapters/fetch-json-transport.test.ts` |
 
 ## Explicit manual gaps
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Sonarr is fixture-proven only; installed versions remain unverified and Radarr has no adapter |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Sonarr and its transport are fixture-proven only; installed DNS, TLS, version, and latency remain unverified, and Radarr has no adapter |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | Needs a sanitized contract capture first |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside Phase 0 and require explicit confirmation |

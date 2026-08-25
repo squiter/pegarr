@@ -11,6 +11,7 @@ const coreImports = {
 };
 const adapterImports = {
   "src/adapters/http.ts": [],
+  "src/adapters/fetch-json-transport.ts": ["./http.js"],
   "src/adapters/sonarr.ts": ["node:crypto", "../domain.js", "./http.js"],
 };
 
@@ -45,6 +46,21 @@ for (const [file, allowedImports] of Object.entries(adapterImports)) {
 const sonarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/sonarr.ts"), "utf8");
 if (!sonarrAdapter.includes('method: "GET"') || sonarrAdapter.includes('method: "POST"')) {
   issues.push("The Phase 0 Sonarr adapter must remain read-only");
+}
+
+const fetchTransport = readFileSync(
+  resolve(repoRoot, "src/adapters/fetch-json-transport.ts"),
+  "utf8",
+);
+for (const contract of [
+  'redirect: "error"',
+  'credentials: "omit"',
+  'cache: "no-store"',
+  'referrerPolicy: "no-referrer"',
+]) {
+  if (!fetchTransport.includes(contract)) {
+    issues.push(`The HTTP transport must retain ${contract}`);
+  }
 }
 
 const packageJson = readJson("package.json");

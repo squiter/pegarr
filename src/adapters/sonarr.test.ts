@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { syntheticSonarrEpisodeReleaseResponse } from "../fixtures/sonarr-release-search.js";
-import type { JsonResponse, JsonTransport, ReadonlyJsonRequest } from "./http.js";
+import {
+  JsonTransportError,
+  type JsonResponse,
+  type JsonTransport,
+  type ReadonlyJsonRequest,
+} from "./http.js";
 import {
   mapSonarrReleaseResponse,
   SonarrAdapterError,
@@ -108,6 +113,10 @@ test("PEG-SONARR-004 authentication, quota, outage, and transport failures are c
     },
     { response: { status: 503, headers: {}, body: {} }, code: "unavailable" },
     { failure: new Error("private topology and credential must not escape"), code: "unavailable" },
+    {
+      failure: new JsonTransportError("response_too_large", "private response detail"),
+      code: "invalid_response",
+    },
   ];
 
   for (const testCase of cases) {

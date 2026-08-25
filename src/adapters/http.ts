@@ -16,3 +16,20 @@ export interface JsonResponse {
 export interface JsonTransport {
   requestJson(request: ReadonlyJsonRequest): Promise<JsonResponse>;
 }
+
+export type JsonTransportErrorCode =
+  | "invalid_request"
+  | "timeout"
+  | "network"
+  | "response_too_large"
+  | "invalid_json";
+
+export class JsonTransportError extends Error {
+  readonly code: JsonTransportErrorCode;
+
+  constructor(code: JsonTransportErrorCode, message: string) {
+    super(message);
+    this.name = "JsonTransportError";
+    this.code = code;
+  }
+}

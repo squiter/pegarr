@@ -13,6 +13,7 @@ const requiredDocs = [
   "docs/harness.md",
   "docs/harness-scenarios.md",
   "docs/contracts/sonarr-v3-release-search.md",
+  "docs/contracts/http-transport.md",
 ];
 
 for (const file of requiredDocs) {

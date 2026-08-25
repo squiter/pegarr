@@ -35,6 +35,7 @@ The current repository foundation includes:
 - a deterministic `/api/v1/feasibility/demo` report backed by sanitized synthetic evidence;
 - provider-independent normalization and explainable confidence results;
 - a bounded, transport-injected Sonarr v3 episode release-search adapter proven with a sanitized contract fixture;
+- a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;
 - a non-root, read-only Docker runtime;
 - local and NAS-oriented Compose examples;
 - CI checks and Docker builds on every pull request;
@@ -52,13 +53,13 @@ npm start
 
 Then open <http://localhost:8080/health> or inspect the Phase 0 report at <http://localhost:8080/api/v1/feasibility/demo>.
 
-The demo maps a sanitized synthetic Sonarr v3 response into four release candidates, then associates synthetic SubDL evidence with them. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly. The adapter does not make live network calls yet.
+The demo maps a sanitized synthetic Sonarr v3 response into four release candidates, then associates synthetic SubDL evidence with them. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly. The runtime does not load live service configuration or make live network calls yet.
 
 ## Development harness
 
 Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise.
 
-See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), and [Sonarr contract snapshot](docs/contracts/sonarr-v3-release-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [HTTP transport contract](docs/contracts/http-transport.md), and [Sonarr contract snapshot](docs/contracts/sonarr-v3-release-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 

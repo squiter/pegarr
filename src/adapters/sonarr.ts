@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 
 import type { ArrReleaseCandidate, ArrReleaseEvidence, ReleaseTraits } from "../domain.js";
-import type { JsonResponse, JsonTransport, ReadonlyJsonRequest } from "./http.js";
+import {
+  JsonTransportError,
+  type JsonResponse,
+  type JsonTransport,
+  type ReadonlyJsonRequest,
+} from "./http.js";
 
 export type SonarrErrorCode =
   | "unauthorized"
@@ -82,7 +87,13 @@ export class SonarrClient {
     let response: JsonResponse;
     try {
       response = await this.#transport.requestJson(request);
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof JsonTransportError &&
+        (error.code === "invalid_json" || error.code === "response_too_large")
+      ) {
+        throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid release response");
+      }
       throw new SonarrAdapterError("unavailable", "Sonarr release search transport failed");
     }
 
