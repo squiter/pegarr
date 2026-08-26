@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { syntheticSonarrMissingItemsResponse } from "../fixtures/sonarr-missing-items.js";
 import { syntheticSonarrEpisodeReleaseResponse } from "../fixtures/sonarr-release-search.js";
+import { syntheticSonarrSeasonReleaseResponse } from "../fixtures/sonarr-season-release-search.js";
 import { syntheticSonarrSystemStatusResponse } from "../fixtures/sonarr-system-status.js";
 import {
   JsonTransportError,
@@ -235,4 +236,31 @@ test("PEG-SONARR-008 missing-item mapping rejects malformed envelopes and drops 
     client(transport).listMissingEpisodes(),
     (error: unknown) => error instanceof SonarrAdapterError && error.code === "invalid_response",
   );
+});
+
+test("PEG-SONARR-009 season search preserves full-season and episode coverage evidence", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: syntheticSonarrSeasonReleaseResponse };
+
+  const releases = await client(transport).searchSeasonReleases(42, 3);
+
+  assert.deepEqual(transport.requests, [{
+    method: "GET",
+    path: "/api/v3/release",
+    query: { seriesId: "42", seasonNumber: "3" },
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  }]);
+  assert.equal(releases.length, 2);
+  assert.deepEqual(releases[0]?.evidence.episodeNumbers, [1, 2, 3, 4, 5, 6]);
+  assert.equal(releases[0]?.evidence.fullSeason, true);
+  assert.equal(releases[0]?.evidence.seasonNumber, 3);
+  assert.equal(releases[1]?.evidence.fullSeason, false);
+  assert.deepEqual(releases[1]?.rejectionReasons, [
+    "Season search prefers a full-season release",
+  ]);
+  await assert.rejects(client(transport).searchSeasonReleases(0, 3), /seriesId/u);
+  await assert.rejects(client(transport).searchSeasonReleases(42, -1), /seasonNumber/u);
+  assert.equal(transport.requests.length, 1);
 });

@@ -63,6 +63,7 @@
 | PEG-DOCKER-006 | The packaged episode report composes three integrations on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-007 | The packaged movie report composes three integrations on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-008 | The packaged missing inventory reads both Arr services on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-009 | The packaged season report preserves full-season coverage on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-BAZARR-001 | Policy reads are bounded GETs authenticated only by header | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-002 | Profiles retain original multilingual and conditional semantics | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
@@ -95,6 +96,15 @@
 | PEG-INVENTORY-001 | Packaged inventory reads one bounded page from each configured Arr | `src/inventory-missing.test.ts` |
 | PEG-INVENTORY-002 | One unavailable Arr produces usable partial inventory | `src/inventory-missing.test.ts` |
 | PEG-INVENTORY-003 | Disabled and invalid inventory configuration fails before network access | `src/inventory-missing.test.ts` |
+| PEG-SONARR-009 | Season search preserves full-season and episode coverage evidence | `src/adapters/sonarr.test.ts` |
+| PEG-SUBDL-006 | Season searches omit episode and retain explicit pack coverage | `src/adapters/subdl.test.ts` |
+| PEG-MATCH-009 | Full-season subtitle packs cover episodes with explicit evidence | `src/matching.test.ts` |
+| PEG-MATCH-010 | Season matching requires explicit full-season coverage | `src/matching.test.ts` |
+| PEG-SEASONFLOW-001 | Season releases and full-season subtitle evidence produce one report | `src/season-feasibility.test.ts` |
+| PEG-SEASONFLOW-002 | Unresolved series policy stops season provider work | `src/season-feasibility.test.ts` |
+| PEG-SEASONFLOW-003 | Sonarr season failure remains classified and stops provider work | `src/season-feasibility.test.ts` |
+| PEG-SEASONREPORT-001 | Packaged season report composes all three read-only integrations | `src/report-sonarr-season.test.ts` |
+| PEG-SEASONREPORT-002 | Incomplete season report configuration fails before network access | `src/report-sonarr-season.test.ts` |
 
 ## Explicit manual gaps
 

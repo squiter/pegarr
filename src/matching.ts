@@ -76,10 +76,13 @@ export function assessLanguage(
     searchedLanguages.some((language) => normalizeLanguage(language) === normalizedLanguage),
   );
   const unavailableProviders = relevantProviderResults.filter(({ status }) => status !== "success");
-  const mediaLanguageCandidates = relevantProviderResults
+  const mediaIdentityCandidates = relevantProviderResults
     .flatMap(({ subtitles }) => subtitles)
     .filter((candidate) => normalizeLanguage(candidate.language) === normalizedLanguage)
-    .filter((candidate) => mediaMatches(item, candidate));
+    .filter((candidate) => mediaIdentityMatches(item, candidate));
+  const mediaLanguageCandidates = mediaIdentityCandidates.filter((candidate) =>
+    coverageMatches(item, candidate),
+  );
   const matchingCandidates = mediaLanguageCandidates
     .filter((candidate) => subtitleTypeMatches(requirement, candidate))
     .map((candidate) => scoreCandidate(release, candidate))
@@ -114,6 +117,26 @@ export function assessLanguage(
         ...new Set(
           incompleteTypeEvidence.map(
             ({ provider }) => `${provider} did not report the required subtitle-type evidence`,
+          ),
+        ),
+      ],
+    };
+  }
+
+  const incompleteCoverageEvidence = mediaIdentityCandidates.filter(
+    (candidate) => item.kind === "season" && candidate.fullSeason === undefined,
+  );
+  if (incompleteCoverageEvidence.length > 0) {
+    return {
+      language: requirement.code,
+      required: requirement.required,
+      confidence: "unknown",
+      providerCount: new Set(incompleteCoverageEvidence.map(({ provider }) => provider)).size,
+      warnings: [
+        ...warnings,
+        ...new Set(
+          incompleteCoverageEvidence.map(
+            ({ provider }) => `${provider} did not report full-season coverage evidence`,
           ),
         ),
       ],
@@ -187,8 +210,10 @@ function scoreCandidate(release: ArrReleaseCandidate, candidate: SubtitleCandida
     return { candidate, score: 100, confidence: "confirmed", reasons: ["Exact normalized release name"] };
   }
 
-  let score = 50;
-  reasons.push("Correct media item, episode, and language");
+  let score = candidate.fullSeason === true ? 45 : 50;
+  reasons.push(candidate.fullSeason === true
+    ? "Full-season subtitle pack covers the requested season or episode"
+    : "Correct media item, episode, and language");
 
   if (sameDefined(video.releaseGroup, subtitle.releaseGroup)) {
     score += 20;
@@ -231,22 +256,39 @@ function scoreCandidate(release: ArrReleaseCandidate, candidate: SubtitleCandida
   };
 }
 
-function mediaMatches(item: MediaIdentity, candidate: SubtitleCandidate): boolean {
+function mediaIdentityMatches(item: MediaIdentity, candidate: SubtitleCandidate): boolean {
   if (item.kind === "episode") {
     if (candidate.season !== undefined && candidate.season !== item.season) {
       return false;
     }
-    if (candidate.episode !== undefined && candidate.episode !== item.episode) {
+    if (
+      candidate.fullSeason !== true &&
+      candidate.episode !== undefined &&
+      candidate.episode !== item.episode
+    ) {
       return false;
     }
+  }
+  if (item.kind === "season" && candidate.season !== undefined && candidate.season !== item.season) {
+    return false;
   }
 
   const candidateIds = Object.entries(candidate.mediaIds);
   if (candidateIds.length === 0) {
-    return item.kind === "episode" && candidate.season === item.season && candidate.episode === item.episode;
+    return (
+      item.kind === "episode" &&
+      candidate.season === item.season &&
+      (candidate.fullSeason === true || candidate.episode === item.episode)
+    ) || (
+      item.kind === "season" && candidate.season === item.season
+    );
   }
 
   return candidateIds.some(([namespace, id]) => item.ids[namespace] === id);
+}
+
+function coverageMatches(item: MediaIdentity, candidate: SubtitleCandidate): boolean {
+  return item.kind !== "season" || candidate.fullSeason === true;
 }
 
 function overallConfidence(languages: readonly LanguageAssessment[]): SubtitleConfidence {

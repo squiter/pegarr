@@ -108,6 +108,37 @@ export class SonarrClient {
     }
   }
 
+  async searchSeasonReleases(
+    seriesId: number,
+    seasonNumber: number,
+  ): Promise<readonly ArrReleaseCandidate[]> {
+    const normalizedSeriesId = boundedInteger(seriesId, 1, Number.MAX_SAFE_INTEGER, "seriesId");
+    const normalizedSeasonNumber = boundedInteger(seasonNumber, 0, 10_000, "seasonNumber");
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/release",
+      query: {
+        seriesId: String(normalizedSeriesId),
+        seasonNumber: String(normalizedSeasonNumber),
+      },
+      headers: {
+        accept: "application/json",
+        "x-api-key": this.#apiKey,
+      },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: this.#maxResponseBytes,
+    });
+
+    assertSuccessfulStatus(response, "season release search");
+    try {
+      return mapSonarrReleaseResponse(response.body, this.#instanceId);
+    } catch {
+      throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid season release response", {
+        status: response.status,
+      });
+    }
+  }
+
   async listMissingEpisodes(query: MissingItemQuery = {}): Promise<MissingItemPage> {
     const page = boundedInteger(query.page ?? 1, 1, Number.MAX_SAFE_INTEGER, "page");
     const pageSize = boundedInteger(query.pageSize ?? 50, 1, 100, "pageSize");
@@ -301,6 +332,9 @@ function mapRelease(value: unknown, index: number, instanceId: string): ArrRelea
     ...optionalNumberField("ageHours", row.ageHours),
     ...optionalNumberField("seeders", row.seeders),
     ...optionalNumberField("leechers", row.leechers),
+    ...optionalBooleanField("fullSeason", row.fullSeason, `release[${index}].fullSeason`),
+    ...optionalIntegerEvidenceField("seasonNumber", row.seasonNumber, 0, 10_000, `release[${index}].seasonNumber`),
+    ...optionalIntegerArrayEvidenceField("episodeNumbers", row.episodeNumbers, 0, 100_000, `release[${index}].episodeNumbers`),
   };
   const traits: ReleaseTraits = {
     ...(qualitySource === undefined ? {} : { source: qualitySource }),
@@ -499,6 +533,42 @@ function optionalNumberField<Key extends NumericEvidenceField>(
 ): Partial<Pick<ArrReleaseEvidence, Key>> {
   const number = optionalNumber(value);
   return number === undefined ? {} : ({ [key]: number } as Partial<Pick<ArrReleaseEvidence, Key>>);
+}
+
+function optionalBooleanField(
+  key: "fullSeason",
+  value: unknown,
+  field: string,
+): { readonly fullSeason?: boolean } {
+  const boolean = optionalBoolean(value, field);
+  return boolean === undefined ? {} : { [key]: boolean };
+}
+
+function optionalIntegerEvidenceField(
+  key: "seasonNumber",
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  field: string,
+): { readonly seasonNumber?: number } {
+  if (value === undefined || value === null) return {};
+  return { [key]: boundedInteger(requiredNumber(value, field), minimum, maximum, field) };
+}
+
+function optionalIntegerArrayEvidenceField(
+  key: "episodeNumbers",
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  field: string,
+): { readonly episodeNumbers?: readonly number[] } {
+  if (value === undefined || value === null) return {};
+  if (!Array.isArray(value)) throw new TypeError(`${field} must be an array`);
+  return {
+    [key]: value.map((entry, index) =>
+      boundedInteger(requiredNumber(entry, `${field}[${index}]`), minimum, maximum, `${field}[${index}]`),
+    ),
+  };
 }
 
 function boundedInteger(value: number, minimum: number, maximum: number, field: string): number {

@@ -136,8 +136,10 @@ export class SubdlClient {
       languages: window.providerCode,
       subs_per_page: "30",
     };
-    if (window.season !== undefined && window.episode !== undefined) {
+    if (window.season !== undefined) {
       query.season = String(window.season);
+    }
+    if (window.episode !== undefined) {
       query.episode = String(window.episode);
     }
 
@@ -252,7 +254,9 @@ export function mapSubdlSearchResponse(
       releaseName,
       mediaIds: window.mediaIds,
       ...(window.season === undefined ? {} : { season: season ?? window.season }),
-      ...(window.episode === undefined ? {} : { episode: episode ?? window.episode }),
+      ...(episode === undefined && window.episode === undefined
+        ? {}
+        : { episode: episode ?? window.episode }),
       ...(hearingImpaired === undefined ? {} : { hearingImpaired }),
       ...(forced === undefined ? {} : { forced }),
       ...(fullSeason === undefined ? {} : { fullSeason }),
@@ -287,7 +291,9 @@ function normalizeSearchWindow(window: SubdlSearchWindow): NormalizedSearchWindo
         season: boundedInteger(window.item.season ?? 0, 1, 100_000, "season"),
         episode: boundedInteger(window.item.episode ?? 0, 1, 100_000, "episode"),
       }
-    : {};
+    : window.item.kind === "season"
+      ? { season: boundedInteger(window.item.season ?? 0, 1, 100_000, "season") }
+      : {};
   const rawKey = JSON.stringify({
     kind: window.item.kind,
     identifier,

@@ -35,7 +35,7 @@ The command reads `PEGARR_MOVIE_REPORT_REQUEST_FILE`, which must be an absolute 
 }
 ```
 
-The Radarr movie ID selects the upstream release search and Bazarr assignment. The media identity is the provider matching identity. Language mappings are explicit because Bazarr policy codes and SubDL provider codes are separate contracts. A missing mapping remains `Unknown` for only that language and does not trigger a provider request.
+The Radarr movie ID selects the upstream release search and Bazarr assignment. The media identity is the provider matching identity. Language mappings are explicit because Bazarr policy codes and SubDL provider codes are separate contracts. A missing mapping remains `Unknown` for only that language and does not trigger a provider request. The installed Bazarr code `pb` is canonically equivalent to `pt-BR`, so users do not need duplicate `pb` and `pt-BR` rows.
 
 Keep this file outside the repository with mode `0600`. It contains private library metadata even though it is not an API credential.
 

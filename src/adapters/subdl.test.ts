@@ -5,6 +5,7 @@ import type { MediaIdentity } from "../domain.js";
 import {
   syntheticSubdlV2EpisodeSearchResponse,
   syntheticSubdlV2MovieSearchResponse,
+  syntheticSubdlV2SeasonSearchResponse,
 } from "../fixtures/subdl-v2-subtitle-search.js";
 import {
   JsonTransportError,
@@ -51,6 +52,13 @@ const movie: MediaIdentity = {
   title: "Synthetic Movie",
   year: 2025,
   ids: { tmdb: "84" },
+};
+
+const season: MediaIdentity = {
+  kind: "season",
+  title: "Synthetic Show — Season 3",
+  season: 3,
+  ids: { imdb: "tt9000005", tmdb: "900005" },
 };
 
 function client(
@@ -277,4 +285,37 @@ test("PEG-SUBDL-005 one stable item-language window uses one request until expir
     language: { policyCode: "es", providerCode: "ES" },
   });
   assert.equal(transport.requests.length, 3);
+});
+
+test("PEG-SUBDL-006 season searches omit episode and retain explicit pack coverage", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: syntheticSubdlV2SeasonSearchResponse };
+
+  const result = await client(transport).search({
+    item: season,
+    language: { policyCode: "pt-BR", providerCode: "PT-BR" },
+  });
+
+  assert.deepEqual(transport.requests[0], {
+    method: "GET",
+    path: "/api/v2/subtitles/search",
+    query: {
+      imdb_id: "tt9000005",
+      type: "tv",
+      languages: "PT-BR",
+      subs_per_page: "30",
+      season: "3",
+    },
+    headers: { accept: "application/json", authorization: "Bearer synthetic-api-key" },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  });
+  assert.equal(result.status, "success");
+  assert.equal(result.subtitles.length, 2);
+  assert.equal(result.subtitles[0]?.fullSeason, true);
+  assert.equal(result.subtitles[0]?.season, 3);
+  assert.equal(result.subtitles[0]?.episode, undefined);
+  assert.equal(result.subtitles[1]?.fullSeason, false);
+  assert.equal(result.subtitles[1]?.episode, 5);
+  assert.doesNotMatch(JSON.stringify(result), /private|\.zip/iu);
 });

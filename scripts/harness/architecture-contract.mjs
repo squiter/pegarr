@@ -98,6 +98,16 @@ if (
   issues.push("The Phase 0 movie feasibility flow must compose only read and search operations");
 }
 
+const seasonFlow = readFileSync(resolve(repoRoot, "src/season-feasibility.ts"), "utf8");
+if (
+  !seasonFlow.includes("searchSeasonReleases") ||
+  !seasonFlow.includes("readSeriesAssignment") ||
+  !seasonFlow.includes("listLanguageProfiles") ||
+  /\b(?:grab|download|delete)\b/iu.test(seasonFlow)
+) {
+  issues.push("The Phase 0 season feasibility flow must compose only read and search operations");
+}
+
 const fetchTransport = readFileSync(
   resolve(repoRoot, "src/adapters/fetch-json-transport.ts"),
   "utf8",
@@ -195,6 +205,9 @@ if (packageJson.scripts?.["report:sonarr-episode"] !== "node dist/report-sonarr-
 }
 if (packageJson.scripts?.["report:radarr-movie"] !== "node dist/report-radarr-movie.js") {
   issues.push("package.json script report:radarr-movie must remain the read-only packaged report");
+}
+if (packageJson.scripts?.["report:sonarr-season"] !== "node dist/report-sonarr-season.js") {
+  issues.push("package.json script report:sonarr-season must remain the read-only packaged report");
 }
 if (packageJson.scripts?.["inventory:missing"] !== "node dist/inventory-missing.js") {
   issues.push("package.json script inventory:missing must remain the read-only packaged inventory");

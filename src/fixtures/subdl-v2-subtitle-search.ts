@@ -54,3 +54,29 @@ export const syntheticSubdlV2MovieSearchResponse = {
   ],
   subtitles: [],
 };
+
+export const syntheticSubdlV2SeasonSearchResponse = {
+  status: true,
+  subtitles: [
+    {
+      n_id: "synthetic-subtitle-season-pack",
+      release_name: "Example.Show.S03.1080p.WEB-DL.H264-GROUP",
+      language: "PT-BR",
+      season: 3,
+      hi: true,
+      forced: false,
+      full_season: true,
+      url: "/subtitle/private-season-pack.zip",
+    },
+    {
+      n_id: "synthetic-subtitle-single-episode",
+      release_name: "Example.Show.S03E05.1080p.WEB-DL.H264-OTHER",
+      language: "PT-BR",
+      season: 3,
+      episode: 5,
+      hi: false,
+      forced: false,
+      full_season: false,
+    },
+  ],
+};

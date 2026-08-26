@@ -15,6 +15,7 @@ test("PEG-MATCH-001 normalization keeps evidence while canonicalizing common ali
   assert.equal(release.codec, "h265");
   assert.equal(release.releaseGroup, "group");
   assert.equal(normalizeLanguage("PT_BR"), "pt-br");
+  assert.equal(normalizeLanguage("pb"), "pt-br");
 });
 
 test("PEG-MATCH-002 demo report associates subtitle evidence with every Arr release", () => {
@@ -190,4 +191,80 @@ test("PEG-MATCH-008 provider searches are scoped to the language actually querie
   assert.equal(portuguese.confidence, "no_match_found");
   assert.equal(english.confidence, "unknown");
   assert.deepEqual(english.warnings, ["No provider search covered this language"]);
+});
+
+test("PEG-MATCH-009 full-season subtitle packs cover an episode with explicit evidence", () => {
+  const release = demoFeasibilityInput.releases[1]!;
+  const result = assessLanguage(
+    demoFeasibilityInput.item,
+    release,
+    demoFeasibilityInput.policy.languages[0]!,
+    [{
+      provider: "subdl",
+      status: "success",
+      subtitles: [{
+        id: "season-pack",
+        provider: "subdl",
+        language: "pt-BR",
+        releaseName: "Example.Show.S03.1080p.WEB-DL.H264-GROUP",
+        mediaIds: demoFeasibilityInput.item.ids,
+        season: 3,
+        fullSeason: true,
+        hearingImpaired: false,
+        forced: false,
+      }],
+    }],
+  );
+
+  assert.notEqual(result.confidence, "no_match_found");
+  assert.ok(result.evidence?.reasons.includes(
+    "Full-season subtitle pack covers the requested season or episode",
+  ));
+});
+
+test("PEG-MATCH-010 season matching requires explicit full-season coverage", () => {
+  const seasonItem = {
+    kind: "season" as const,
+    title: "Example Show — Season 3",
+    season: 3,
+    ids: demoFeasibilityInput.item.ids,
+  };
+  const requirement = demoFeasibilityInput.policy.languages[0]!;
+  const release = {
+    ...demoFeasibilityInput.releases[0]!,
+    title: "Example.Show.S03.1080p.WEB-DL.H264-GROUP",
+  };
+  const baseCandidate = {
+    id: "season-coverage",
+    provider: "subdl",
+    language: "pt-BR",
+    releaseName: release.title,
+    mediaIds: seasonItem.ids,
+    season: 3,
+    hearingImpaired: false,
+    forced: false,
+  };
+
+  const individual = assessLanguage(seasonItem, release, requirement, [{
+    provider: "subdl",
+    status: "success",
+    subtitles: [{ ...baseCandidate, episode: 5, fullSeason: false }],
+  }]);
+  const unreported = assessLanguage(seasonItem, release, requirement, [{
+    provider: "subdl",
+    status: "success",
+    subtitles: [baseCandidate],
+  }]);
+  const seasonPack = assessLanguage(seasonItem, release, requirement, [{
+    provider: "subdl",
+    status: "success",
+    subtitles: [{ ...baseCandidate, fullSeason: true }],
+  }]);
+
+  assert.equal(individual.confidence, "no_match_found");
+  assert.equal(unreported.confidence, "unknown");
+  assert.deepEqual(unreported.warnings, [
+    "subdl did not report full-season coverage evidence",
+  ]);
+  assert.equal(seasonPack.confidence, "confirmed");
 });

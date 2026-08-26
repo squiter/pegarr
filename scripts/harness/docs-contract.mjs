@@ -16,6 +16,7 @@ const requiredDocs = [
   "docs/episode-feasibility-report.md",
   "docs/movie-feasibility-report.md",
   "docs/missing-item-inventory.md",
+  "docs/season-feasibility-report.md",
   "docs/contracts/sonarr-v3-release-search.md",
   "docs/contracts/sonarr-v3-system-status.md",
   "docs/contracts/radarr-v3-release-search.md",

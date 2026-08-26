@@ -349,6 +349,12 @@
       "boundary": "Synthetic sibling services and two secrets; local Docker architecture only"
     },
     {
+      "id": "PEG-DOCKER-009",
+      "title": "Packaged season report preserves full-season coverage on an internal-only network",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling services, request file, and three secrets; local Docker architecture only"
+    },
+    {
       "id": "PEG-BAZARR-001",
       "title": "Bazarr policy reads are bounded GETs authenticated only by header",
       "evidence": "src/adapters/bazarr.test.ts",
@@ -539,6 +545,60 @@
       "title": "Disabled and invalid inventory configuration fails before network access",
       "evidence": "src/inventory-missing.test.ts",
       "boundary": "In-memory environment and fetch spy"
+    },
+    {
+      "id": "PEG-SONARR-009",
+      "title": "Season search preserves full-season and episode coverage evidence",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Sanitized season release fixture and injected transport; installed request shape separately verified"
+    },
+    {
+      "id": "PEG-SUBDL-006",
+      "title": "Season searches omit episode and retain explicit pack coverage",
+      "evidence": "src/adapters/subdl.test.ts",
+      "boundary": "Sanitized provider response and injected transport; no network"
+    },
+    {
+      "id": "PEG-MATCH-009",
+      "title": "Full-season subtitle packs cover episodes with explicit evidence",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching over synthetic pack evidence"
+    },
+    {
+      "id": "PEG-MATCH-010",
+      "title": "Season matching requires explicit full-season coverage",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching over true, false, and missing pack evidence"
+    },
+    {
+      "id": "PEG-SEASONFLOW-001",
+      "title": "Season releases and full-season subtitle evidence produce one report",
+      "evidence": "src/season-feasibility.test.ts",
+      "boundary": "Injected Sonarr, Bazarr, and SubDL sources over sanitized fixtures"
+    },
+    {
+      "id": "PEG-SEASONFLOW-002",
+      "title": "Unresolved series policy stops season provider work",
+      "evidence": "src/season-feasibility.test.ts",
+      "boundary": "Injected unassigned series response; provider source is not called"
+    },
+    {
+      "id": "PEG-SEASONFLOW-003",
+      "title": "Sonarr season failure remains classified and stops provider work",
+      "evidence": "src/season-feasibility.test.ts",
+      "boundary": "Injected rate-limit error and deterministic request counters"
+    },
+    {
+      "id": "PEG-SEASONREPORT-001",
+      "title": "Packaged season report composes all three read-only integrations",
+      "evidence": "src/report-sonarr-season.test.ts",
+      "boundary": "Temporary request and secret files with one injected fetch boundary"
+    },
+    {
+      "id": "PEG-SEASONREPORT-002",
+      "title": "Incomplete season report configuration fails before network access",
+      "evidence": "src/report-sonarr-season.test.ts",
+      "boundary": "In-memory environment and fetch spy; no filesystem read or network"
     }
   ],
   "manualGaps": [

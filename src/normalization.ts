@@ -44,7 +44,8 @@ export function normalizeRelease(title: string, explicitTraits: ReleaseTraits = 
 }
 
 export function normalizeLanguage(code: string): string {
-  return code.trim().toLowerCase().replace("_", "-");
+  const normalized = code.trim().toLowerCase().replace("_", "-");
+  return normalized === "pb" ? "pt-br" : normalized;
 }
 
 function inferReleaseGroup(title: string): string | undefined {
