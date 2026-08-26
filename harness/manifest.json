@@ -337,6 +337,12 @@
       "boundary": "Synthetic sibling services, request file, and three secrets; local Docker architecture only"
     },
     {
+      "id": "PEG-DOCKER-007",
+      "title": "Packaged movie report composes three integrations on an internal-only network",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling services, request file, and three secrets; local Docker architecture only"
+    },
+    {
       "id": "PEG-BAZARR-001",
       "title": "Bazarr policy reads are bounded GETs authenticated only by header",
       "evidence": "src/adapters/bazarr.test.ts",
@@ -454,6 +460,36 @@
       "id": "PEG-REPORT-002",
       "title": "Invalid report configuration fails before network access",
       "evidence": "src/report-sonarr-episode.test.ts",
+      "boundary": "In-memory environment and fetch spy; no filesystem read or network"
+    },
+    {
+      "id": "PEG-MOVIEFLOW-001",
+      "title": "Radarr releases and Bazarr movie policy produce one report",
+      "evidence": "src/movie-feasibility.test.ts",
+      "boundary": "Injected Radarr, Bazarr, and SubDL sources over sanitized fixtures"
+    },
+    {
+      "id": "PEG-MOVIEFLOW-002",
+      "title": "Unassigned Bazarr movie stops provider work without assumed policy",
+      "evidence": "src/movie-feasibility.test.ts",
+      "boundary": "Injected unassigned movie response; provider source is not called"
+    },
+    {
+      "id": "PEG-MOVIEFLOW-003",
+      "title": "Radarr failures remain classified and stop provider work",
+      "evidence": "src/movie-feasibility.test.ts",
+      "boundary": "Injected rate-limit error and deterministic request counters"
+    },
+    {
+      "id": "PEG-MOVIEREPORT-001",
+      "title": "Packaged movie report composes all three read-only integrations",
+      "evidence": "src/report-radarr-movie.test.ts",
+      "boundary": "Temporary request and secret files with one injected fetch boundary"
+    },
+    {
+      "id": "PEG-MOVIEREPORT-002",
+      "title": "Invalid movie report configuration fails before network access",
+      "evidence": "src/report-radarr-movie.test.ts",
       "boundary": "In-memory environment and fetch spy; no filesystem read or network"
     }
   ],

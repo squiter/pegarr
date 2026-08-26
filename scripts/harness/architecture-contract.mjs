@@ -88,6 +88,16 @@ if (
   issues.push("The Phase 0 episode feasibility flow must compose only read and search operations");
 }
 
+const movieFlow = readFileSync(resolve(repoRoot, "src/movie-feasibility.ts"), "utf8");
+if (
+  !movieFlow.includes("searchMovieReleases") ||
+  !movieFlow.includes("readMovieAssignment") ||
+  !movieFlow.includes("listLanguageProfiles") ||
+  /\b(?:grab|download|delete)\b/iu.test(movieFlow)
+) {
+  issues.push("The Phase 0 movie feasibility flow must compose only read and search operations");
+}
+
 const fetchTransport = readFileSync(
   resolve(repoRoot, "src/adapters/fetch-json-transport.ts"),
   "utf8",
@@ -182,6 +192,9 @@ if (packageJson.scripts?.["probe:subdl"] !== "node dist/probe-subdl.js") {
 }
 if (packageJson.scripts?.["report:sonarr-episode"] !== "node dist/report-sonarr-episode.js") {
   issues.push("package.json script report:sonarr-episode must remain the read-only packaged report");
+}
+if (packageJson.scripts?.["report:radarr-movie"] !== "node dist/report-radarr-movie.js") {
+  issues.push("package.json script report:radarr-movie must remain the read-only packaged report");
 }
 
 const ciWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/ci.yml"), "utf8");

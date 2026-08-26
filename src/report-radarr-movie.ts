@@ -3,13 +3,13 @@ import { pathToFileURL } from "node:url";
 import { BazarrClient } from "./adapters/bazarr.js";
 import type { FetchImplementation } from "./adapters/fetch-json-transport.js";
 import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
-import { SonarrClient } from "./adapters/sonarr.js";
+import { RadarrClient } from "./adapters/radarr.js";
 import { SubdlClient } from "./adapters/subdl.js";
 import { loadRuntimeConfiguration } from "./config.js";
 import {
-  SonarrEpisodeFeasibilityService,
-  type SonarrEpisodeFeasibilityRequest,
-} from "./episode-feasibility.js";
+  RadarrMovieFeasibilityService,
+  type RadarrMovieFeasibilityRequest,
+} from "./movie-feasibility.js";
 import {
   readBoundedJsonRequest,
   requestLanguageMappings,
@@ -19,20 +19,18 @@ import {
   requestString,
 } from "./report-request.js";
 
-export interface SonarrEpisodeReportOptions {
+export interface RadarrMovieReportOptions {
   readonly environment: Readonly<Record<string, string | undefined>>;
   readonly fetchImplementation?: FetchImplementation;
   readonly now?: () => number;
   readonly write: (value: string) => void;
 }
 
-export async function runSonarrEpisodeReport(
-  options: SonarrEpisodeReportOptions,
-): Promise<number> {
+export async function runRadarrMovieReport(options: RadarrMovieReportOptions): Promise<number> {
   try {
     const configuration = await loadRuntimeConfiguration(options.environment);
     if (
-      configuration.sonarr === undefined ||
+      configuration.radarr === undefined ||
       configuration.bazarr === undefined ||
       configuration.subdl === undefined
     ) {
@@ -40,16 +38,16 @@ export async function runSonarrEpisodeReport(
       return 2;
     }
     const request = parseRequest(await readBoundedJsonRequest(
-      options.environment.PEGARR_EPISODE_REPORT_REQUEST_FILE,
-      "PEGARR_EPISODE_REPORT_REQUEST_FILE",
+      options.environment.PEGARR_MOVIE_REPORT_REQUEST_FILE,
+      "PEGARR_MOVIE_REPORT_REQUEST_FILE",
     ));
     const fetchOption = options.fetchImplementation === undefined
       ? {}
       : { fetchImplementation: options.fetchImplementation };
-    const sonarrTransport = new FetchJsonTransport({
-      baseUrl: configuration.sonarr.baseUrl,
-      allowedHosts: configuration.sonarr.allowedHosts,
-      allowInsecureHttp: configuration.sonarr.allowInsecureHttp,
+    const radarrTransport = new FetchJsonTransport({
+      baseUrl: configuration.radarr.baseUrl,
+      allowedHosts: configuration.radarr.allowedHosts,
+      allowInsecureHttp: configuration.radarr.allowInsecureHttp,
       ...fetchOption,
     });
     const bazarrTransport = new FetchJsonTransport({
@@ -64,14 +62,14 @@ export async function runSonarrEpisodeReport(
       allowInsecureHttp: configuration.subdl.allowInsecureHttp,
       ...fetchOption,
     });
-    const service = new SonarrEpisodeFeasibilityService({
-      sonarr: new SonarrClient(
+    const service = new RadarrMovieFeasibilityService({
+      radarr: new RadarrClient(
         {
-          instanceId: configuration.sonarr.instanceId,
-          apiKey: configuration.sonarr.apiKey.reveal(),
+          instanceId: configuration.radarr.instanceId,
+          apiKey: configuration.radarr.apiKey.reveal(),
           timeoutMs: 60_000,
         },
-        sonarrTransport,
+        radarrTransport,
       ),
       bazarr: new BazarrClient(
         {
@@ -87,7 +85,7 @@ export async function runSonarrEpisodeReport(
       ...(options.now === undefined ? {} : { now: options.now }),
     });
     const outcome = await service.build(request);
-    options.write(`${JSON.stringify({ kind: "sonarr-episode-feasibility", ...outcome })}\n`);
+    options.write(`${JSON.stringify({ kind: "radarr-movie-feasibility", ...outcome })}\n`);
     return outcome.status === "ready" ? 0 : 1;
   } catch {
     writeState(options, "invalid_configuration");
@@ -95,18 +93,16 @@ export async function runSonarrEpisodeReport(
   }
 }
 
-function parseRequest(value: unknown): SonarrEpisodeFeasibilityRequest {
+function parseRequest(value: unknown): RadarrMovieFeasibilityRequest {
   const request = requestRecord(value);
   const item = requestRecord(request.item);
 
   return {
-    episodeId: requestPositiveInteger(request.episodeId),
-    sonarrSeriesId: requestPositiveInteger(request.sonarrSeriesId),
+    movieId: requestPositiveInteger(request.movieId),
     item: {
-      kind: item.kind === "episode" ? "episode" : invalidKind(),
+      kind: item.kind === "movie" ? "movie" : invalidKind(),
       title: requestString(item.title),
-      season: requestPositiveInteger(item.season),
-      episode: requestPositiveInteger(item.episode),
+      ...(item.year === undefined ? {} : { year: requestPositiveInteger(item.year) }),
       ids: requestMediaIds(item.ids),
     },
     subdlLanguages: requestLanguageMappings(request.subdlLanguages),
@@ -114,22 +110,22 @@ function parseRequest(value: unknown): SonarrEpisodeFeasibilityRequest {
 }
 
 function invalidKind(): never {
-  throw new TypeError("Episode report request kind must be episode");
+  throw new TypeError("Movie report request kind must be movie");
 }
 
 function writeState(
-  options: SonarrEpisodeReportOptions,
+  options: RadarrMovieReportOptions,
   status: "disabled" | "invalid_configuration",
 ): void {
   options.write(`${JSON.stringify({
-    kind: "sonarr-episode-feasibility",
+    kind: "radarr-movie-feasibility",
     mode: "read_only",
     status,
   })}\n`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = await runSonarrEpisodeReport({
+  process.exitCode = await runRadarrMovieReport({
     environment: process.env,
     write: (value) => process.stdout.write(value),
   });

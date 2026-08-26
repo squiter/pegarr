@@ -4,12 +4,8 @@ import {
   type BazarrProfileAssignment,
   resolveBazarrPolicy,
 } from "./adapters/bazarr.js";
-import { SonarrAdapterError } from "./adapters/sonarr.js";
-import type {
-  ArrReleaseCandidate,
-  FeasibilityReport,
-  MediaIdentity,
-} from "./domain.js";
+import { RadarrAdapterError } from "./adapters/radarr.js";
+import type { ArrReleaseCandidate, FeasibilityReport, MediaIdentity } from "./domain.js";
 import { buildFeasibilityReport } from "./matching.js";
 import {
   searchSubdlPolicy,
@@ -18,103 +14,98 @@ import {
   type SubdlWindowSource,
 } from "./provider-policy-search.js";
 
-export type { ProviderLanguageMapping, SubdlWindowSource } from "./provider-policy-search.js";
-
-export interface SonarrEpisodeReleaseSource {
-  searchEpisodeReleases(episodeId: number): Promise<readonly ArrReleaseCandidate[]>;
+export interface RadarrMovieReleaseSource {
+  searchMovieReleases(movieId: number): Promise<readonly ArrReleaseCandidate[]>;
 }
 
-export interface BazarrEpisodePolicySource {
+export interface BazarrMoviePolicySource {
   listLanguageProfiles(): Promise<readonly BazarrLanguageProfileEvidence[]>;
-  readSeriesAssignment(sonarrSeriesId: number): Promise<BazarrProfileAssignment>;
+  readMovieAssignment(radarrId: number): Promise<BazarrProfileAssignment>;
 }
 
-export interface SonarrEpisodeFeasibilityRequest {
-  readonly episodeId: number;
-  readonly sonarrSeriesId: number;
+export interface RadarrMovieFeasibilityRequest {
+  readonly movieId: number;
   readonly item: MediaIdentity;
   readonly subdlLanguages: readonly ProviderLanguageMapping[];
 }
 
-export interface EpisodeFeasibilityMetrics {
-  readonly sonarrRequests: 1;
+export interface MovieFeasibilityMetrics {
+  readonly radarrRequests: 1;
   readonly bazarrRequests: 2;
   readonly providerRequests: number;
   readonly elapsedMs: number;
 }
 
-export type IntegrationFailureState =
+export type MovieIntegrationFailureState =
   | "unauthorized"
   | "rate_limited"
   | "unavailable"
   | "unexpected_status"
   | "invalid_response";
 
-export interface EpisodeIntegrationFailure {
-  readonly integration: "sonarr" | "bazarr";
+export interface MovieIntegrationFailure {
+  readonly integration: "radarr" | "bazarr";
   readonly operation: "release_search" | "profile_list" | "profile_assignment";
-  readonly state: IntegrationFailureState;
+  readonly state: MovieIntegrationFailureState;
   readonly retryAfterSeconds?: number;
 }
 
-export type SonarrEpisodeFeasibilityOutcome =
+export type RadarrMovieFeasibilityOutcome =
   | {
       readonly status: "ready";
       readonly mode: "read_only";
       readonly report: FeasibilityReport;
-      readonly metrics: EpisodeFeasibilityMetrics;
+      readonly metrics: MovieFeasibilityMetrics;
     }
   | {
       readonly status: "policy_unresolved";
       readonly mode: "read_only";
       readonly reason: "media_not_found" | "unassigned" | "profile_missing";
       readonly releases: readonly ArrReleaseCandidate[];
-      readonly metrics: EpisodeFeasibilityMetrics;
+      readonly metrics: MovieFeasibilityMetrics;
     }
   | {
       readonly status: "integration_failure";
       readonly mode: "read_only";
-      readonly failures: readonly EpisodeIntegrationFailure[];
+      readonly failures: readonly MovieIntegrationFailure[];
       readonly releases: readonly ArrReleaseCandidate[];
-      readonly metrics: EpisodeFeasibilityMetrics;
+      readonly metrics: MovieFeasibilityMetrics;
     };
 
-export interface SonarrEpisodeFeasibilityServiceOptions {
-  readonly sonarr: SonarrEpisodeReleaseSource;
-  readonly bazarr: BazarrEpisodePolicySource;
+export interface RadarrMovieFeasibilityServiceOptions {
+  readonly radarr: RadarrMovieReleaseSource;
+  readonly bazarr: BazarrMoviePolicySource;
   readonly subdl: SubdlWindowSource;
   readonly now?: () => number;
 }
 
-export class SonarrEpisodeFeasibilityService {
-  readonly #sonarr: SonarrEpisodeReleaseSource;
-  readonly #bazarr: BazarrEpisodePolicySource;
+export class RadarrMovieFeasibilityService {
+  readonly #radarr: RadarrMovieReleaseSource;
+  readonly #bazarr: BazarrMoviePolicySource;
   readonly #subdl: SubdlWindowSource;
   readonly #now: () => number;
 
-  constructor(options: SonarrEpisodeFeasibilityServiceOptions) {
-    this.#sonarr = options.sonarr;
+  constructor(options: RadarrMovieFeasibilityServiceOptions) {
+    this.#radarr = options.radarr;
     this.#bazarr = options.bazarr;
     this.#subdl = options.subdl;
     this.#now = options.now ?? Date.now;
   }
 
-  async build(
-    request: SonarrEpisodeFeasibilityRequest,
-  ): Promise<SonarrEpisodeFeasibilityOutcome> {
+  async build(request: RadarrMovieFeasibilityRequest): Promise<RadarrMovieFeasibilityOutcome> {
     const validated = validateRequest(request);
     const startedAt = this.#now();
     const [releaseResult, profileResult, assignmentResult] = await Promise.allSettled([
-      this.#sonarr.searchEpisodeReleases(validated.episodeId),
+      this.#radarr.searchMovieReleases(validated.movieId),
       this.#bazarr.listLanguageProfiles(),
-      this.#bazarr.readSeriesAssignment(validated.sonarrSeriesId),
+      this.#bazarr.readMovieAssignment(validated.movieId),
     ]);
     const releases = releaseResult.status === "fulfilled" ? releaseResult.value : [];
     const failures = [
-      failureFrom(releaseResult, "sonarr", "release_search"),
+      failureFrom(releaseResult, "radarr", "release_search"),
       failureFrom(profileResult, "bazarr", "profile_list"),
       failureFrom(assignmentResult, "bazarr", "profile_assignment"),
-    ].filter((failure): failure is EpisodeIntegrationFailure => failure !== undefined);
+    ].filter((failure): failure is MovieIntegrationFailure => failure !== undefined);
     if (failures.length > 0) {
       return {
         status: "integration_failure",
@@ -145,12 +136,11 @@ export class SonarrEpisodeFeasibilityService {
       mappings: validated.subdlLanguages,
       subdl: this.#subdl,
     });
-
     return {
       status: "ready",
       mode: "read_only",
       report: buildFeasibilityReport({
-        fixture: "orchestrated-sonarr-episode-v1",
+        fixture: "orchestrated-radarr-movie-v1",
         item: validated.item,
         policy: resolution.policy,
         releases,
@@ -161,18 +151,16 @@ export class SonarrEpisodeFeasibilityService {
   }
 }
 
-function validateRequest(
-  request: SonarrEpisodeFeasibilityRequest,
-): SonarrEpisodeFeasibilityRequest {
-  positiveInteger(request.episodeId, "episodeId");
-  positiveInteger(request.sonarrSeriesId, "sonarrSeriesId");
-  if (request.item.kind !== "episode") {
-    throw new TypeError("Sonarr episode feasibility requires an episode item");
+function validateRequest(request: RadarrMovieFeasibilityRequest): RadarrMovieFeasibilityRequest {
+  positiveInteger(request.movieId, "movieId");
+  if (request.item.kind !== "movie") {
+    throw new TypeError("Radarr movie feasibility requires a movie item");
   }
-  positiveInteger(request.item.season ?? 0, "item.season");
-  positiveInteger(request.item.episode ?? 0, "item.episode");
   if (!request.item.title.trim() || request.item.title.length > 1_024) {
     throw new TypeError("item.title must be a non-empty bounded string");
+  }
+  if (request.item.year !== undefined) {
+    positiveInteger(request.item.year, "item.year");
   }
   validateLanguageMappings(request.subdlLanguages);
   return request;
@@ -180,14 +168,14 @@ function validateRequest(
 
 function failureFrom(
   result: PromiseSettledResult<unknown>,
-  integration: "sonarr" | "bazarr",
-  operation: EpisodeIntegrationFailure["operation"],
-): EpisodeIntegrationFailure | undefined {
+  integration: "radarr" | "bazarr",
+  operation: MovieIntegrationFailure["operation"],
+): MovieIntegrationFailure | undefined {
   if (result.status === "fulfilled") {
     return undefined;
   }
   const error = result.reason;
-  const adapterError = error instanceof SonarrAdapterError || error instanceof BazarrAdapterError
+  const adapterError = error instanceof RadarrAdapterError || error instanceof BazarrAdapterError
     ? error
     : undefined;
   return {
@@ -204,11 +192,11 @@ function metrics(
   providerRequests: number,
   startedAt: number,
   completedAt: number,
-): EpisodeFeasibilityMetrics {
+): MovieFeasibilityMetrics {
   const elapsedMs = Number.isFinite(startedAt) && Number.isFinite(completedAt)
     ? Math.max(0, Math.min(180_000, Math.round(completedAt - startedAt)))
     : 0;
-  return { sonarrRequests: 1, bazarrRequests: 2, providerRequests, elapsedMs };
+  return { radarrRequests: 1, bazarrRequests: 2, providerRequests, elapsedMs };
 }
 
 function positiveInteger(value: number, field: string): number {

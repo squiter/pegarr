@@ -17,6 +17,7 @@
     "probe:bazarr": "node dist/probe-bazarr.js",
     "probe:subdl": "node dist/probe-subdl.js",
     "report:sonarr-episode": "node dist/report-sonarr-episode.js",
+    "report:radarr-movie": "node dist/report-radarr-movie.js",
     "dev": "node --watch --experimental-strip-types src/index.ts",
     "test": "npm run build && npm run test:unit",
     "test:unit": "node --test --test-concurrency=1 scripts/harness/*.test.mjs dist/*.test.js dist/**/*.test.js",

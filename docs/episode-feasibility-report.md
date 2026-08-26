@@ -6,6 +6,10 @@ Status: packaged, read-only, and fixture-proven; live SubDL verification remains
 
 It does not expose a browser route and cannot Grab, download, update, or delete anything.
 
+## Current provider boundary
+
+Bazarr supplies the subtitle policy, but Pegarr does not reuse Bazarr's configured providers or credentials. Phase 0 supports only a separately configured direct SubDL connection, so users who also enable SubDL in Bazarr currently configure it twice. This is a known temporary setup limitation; Pegarr does not make Bazarr provider internals a core runtime dependency.
+
 ## Request file
 
 The command reads `PEGARR_EPISODE_REPORT_REQUEST_FILE`, which must be an absolute in-container path to a JSON file no larger than 64 KiB:

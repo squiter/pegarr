@@ -541,6 +541,144 @@ async function packagedEpisodeReportSmokeTest() {
   }
 }
 
+async function packagedMovieReportSmokeTest() {
+  const scenario = "PEG-DOCKER-007";
+  const suffix = `${process.pid}`;
+  const networkName = `pegarr-harness-movie-report-internal-${suffix}`;
+  const fixtureName = `pegarr-harness-movie-report-${suffix}`;
+  const artifactsDirectory = resolve(".artifacts");
+  mkdirSync(artifactsDirectory, { recursive: true });
+  const fixtureDirectory = mkdtempSync(join(artifactsDirectory, "pegarr-synthetic-movie-docker-"));
+  const keys = {
+    radarr: "synthetic-movie-report-radarr-key",
+    bazarr: "synthetic-movie-report-bazarr-key",
+    subdl: "synthetic-movie-report-subdl-key",
+  };
+  const paths = {
+    radarr: join(fixtureDirectory, "radarr_api_key"),
+    bazarr: join(fixtureDirectory, "bazarr_api_key"),
+    subdl: join(fixtureDirectory, "subdl_api_key"),
+    request: join(fixtureDirectory, "movie-report.json"),
+  };
+  writeFileSync(paths.radarr, keys.radarr, { mode: 0o444 });
+  writeFileSync(paths.bazarr, keys.bazarr, { mode: 0o444 });
+  writeFileSync(paths.subdl, keys.subdl, { mode: 0o444 });
+  writeFileSync(paths.request, JSON.stringify({
+    movieId: 84,
+    item: {
+      kind: "movie",
+      title: "Synthetic Movie",
+      year: 2024,
+      ids: { imdb: "tt9000084", tmdb: "900084" },
+    },
+    subdlLanguages: [
+      { policyCode: "en", providerCode: "EN" },
+      { policyCode: "pt-BR", providerCode: "PT-BR" },
+    ],
+  }), { mode: 0o444 });
+
+  const network = docker([
+    "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
+  ]);
+  if (network.status !== 0) {
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+    throw new Error(`${scenario} could not create an internal network:\n${outputOf(network)}`);
+  }
+
+  const fixtureScript = [
+    "const { createServer } = require('node:http');",
+    `const keys = ${JSON.stringify(keys)};`,
+    "const release = [{ guid: 'synthetic-movie-guid', indexerId: 1, title: 'Synthetic.Movie.2024.1080p.BluRay.x265-GROUP', indexer: 'Synthetic Movie Indexer', protocol: 'torrent', downloadAllowed: true, rejections: [], customFormatScore: 100, languages: [], customFormats: [], releaseGroup: 'GROUP', edition: '', quality: { quality: { name: 'Bluray-1080p', source: 'bluray', resolution: 1080 } } }];",
+    "const profiles = [{ profileId: 7, name: 'Synthetic multilingual', cutoff: 2, items: [{ id: 1, language: 'en', hi: 'False', forced: 'False', audio_exclude: 'False', audio_only_include: 'False' }, { id: 2, language: 'pt-BR', hi: 'True', forced: 'False', audio_exclude: 'False', audio_only_include: 'False' }], mustContain: [], mustNotContain: [], originalFormat: 0, tag: null }];",
+    "const assignment = { data: [{ radarrId: 84, profileId: 7 }], total: 1 };",
+    "const subtitle = { status: true, subtitles: [{ id: 1, language: 'Portuguese (BR)', release_name: 'Synthetic.Movie.2024.1080p.BluRay.x265-GROUP', hi: true, forced: false }] };",
+    "createServer((request, response) => {",
+    "  const host = String(request.headers.host || '').split(':')[0];",
+    "  const url = new URL(request.url || '/', 'http://fixture.invalid');",
+    "  let body;",
+    "  if (request.method !== 'GET') { response.writeHead(405); response.end('{}'); return; }",
+    "  if (host === 'radarr-fixture' && url.pathname === '/api/v3/release' && url.searchParams.get('movieId') === '84' && request.headers['x-api-key'] === keys.radarr) body = release;",
+    "  else if (host === 'bazarr-fixture' && url.pathname === '/api/system/languages/profiles' && request.headers['x-api-key'] === keys.bazarr) body = profiles;",
+    "  else if (host === 'bazarr-fixture' && url.pathname === '/api/movies' && url.searchParams.getAll('radarrid[]')[0] === '84' && request.headers['x-api-key'] === keys.bazarr) body = assignment;",
+    "  else if (host === 'subdl-fixture' && url.pathname === '/api/v2/subtitles/search' && request.headers.authorization === 'Bearer ' + keys.subdl) body = url.searchParams.get('languages') === 'PT-BR' ? subtitle : { status: true, subtitles: [] };",
+    "  else { response.writeHead(401, { 'content-type': 'application/json' }); response.end('{}'); return; }",
+    "  response.writeHead(200, { 'content-type': 'application/json', 'x-ratelimit-remaining': '1999' });",
+    "  response.end(JSON.stringify(body));",
+    "}).listen(8082, '0.0.0.0');",
+  ].join("\n");
+
+  try {
+    const fixture = docker([
+      "run", "--detach", "--name", fixtureName, "--label", "pegarr.harness=true",
+      "--network", networkName,
+      "--network-alias", "radarr-fixture",
+      "--network-alias", "bazarr-fixture",
+      "--network-alias", "subdl-fixture",
+      "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "pegarr:harness", "node", "-e", fixtureScript,
+    ]);
+    if (fixture.status !== 0) {
+      throw new Error(`${scenario} could not start the synthetic movie report fixture:\n${outputOf(fixture)}`);
+    }
+
+    const runArgs = [
+      "run", "--rm", "--network", networkName, "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "--mount", `type=bind,source=${paths.radarr},target=/run/secrets/radarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.bazarr},target=/run/secrets/bazarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.subdl},target=/run/secrets/subdl_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.request},target=/run/pegarr/movie-report.json,readonly`,
+      "--env", "PEGARR_RADARR_URL=http://radarr-fixture:8082",
+      "--env", "PEGARR_RADARR_ALLOWED_HOSTS=radarr-fixture",
+      "--env", "PEGARR_RADARR_API_KEY_FILE=/run/secrets/radarr_api_key",
+      "--env", "PEGARR_RADARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_BAZARR_URL=http://bazarr-fixture:8082",
+      "--env", "PEGARR_BAZARR_ALLOWED_HOSTS=bazarr-fixture",
+      "--env", "PEGARR_BAZARR_API_KEY_FILE=/run/secrets/bazarr_api_key",
+      "--env", "PEGARR_BAZARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_SUBDL_URL=http://subdl-fixture:8082",
+      "--env", "PEGARR_SUBDL_ALLOWED_HOSTS=subdl-fixture",
+      "--env", "PEGARR_SUBDL_API_KEY_FILE=/run/secrets/subdl_api_key",
+      "--env", "PEGARR_SUBDL_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_MOVIE_REPORT_REQUEST_FILE=/run/pegarr/movie-report.json",
+      "pegarr:harness", "npm", "run", "--silent", "report:radarr-movie",
+    ];
+    let report;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      report = docker(runArgs);
+      if (report.status === 0) break;
+      await delay(250);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(report?.stdout ?? "");
+    } catch {
+      parsed = undefined;
+    }
+    if (
+      report?.status !== 0 ||
+      parsed?.kind !== "radarr-movie-feasibility" ||
+      parsed?.status !== "ready" ||
+      parsed?.mode !== "read_only" ||
+      parsed?.metrics?.providerRequests !== 2 ||
+      parsed?.report?.releases?.length !== 1 ||
+      parsed?.report?.releases?.[0]?.subtitle?.languages?.[1]?.confidence !== "confirmed" ||
+      /synthetic-movie-report-(?:radarr|bazarr|subdl)-key|(?:radarr|bazarr|subdl)-fixture|\/run\/secrets/iu.test(report?.stdout ?? "")
+    ) {
+      throw new Error(`${scenario} packaged movie report failed:\n${outputOf(report)}`);
+    }
+    const inspection = docker(["network", "inspect", "--format", "{{.Internal}}", networkName]);
+    if (inspection.status !== 0 || inspection.stdout.trim() !== "true") {
+      throw new Error(`${scenario} network is not internal-only: ${outputOf(inspection).trim()}`);
+    }
+    process.stdout.write(`${scenario} packaged movie report=ready (three integrations, secret-files, read-only, internal-network)\n`);
+  } finally {
+    docker(["rm", "--force", fixtureName]);
+    docker(["network", "rm", networkName]);
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+}
+
 export async function main() {
   const first = build();
   const firstOutput = outputOf(first);
@@ -564,6 +702,7 @@ export async function main() {
     await configuredBazarrProbeSmokeTest();
     await configuredSubdlProbeSmokeTest();
     await packagedEpisodeReportSmokeTest();
+    await packagedMovieReportSmokeTest();
     return;
   }
 
@@ -596,6 +735,7 @@ export async function main() {
     await configuredBazarrProbeSmokeTest();
     await configuredSubdlProbeSmokeTest();
     await packagedEpisodeReportSmokeTest();
+    await packagedMovieReportSmokeTest();
     return;
   }
 

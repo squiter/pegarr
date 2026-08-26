@@ -61,6 +61,7 @@
 | PEG-DOCKER-004 | The packaged Bazarr profile probe uses a secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-005 | The packaged SubDL probe makes one redacted search on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-006 | The packaged episode report composes three integrations on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-007 | The packaged movie report composes three integrations on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-BAZARR-001 | Policy reads are bounded GETs authenticated only by header | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-002 | Profiles retain original multilingual and conditional semantics | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
@@ -81,6 +82,11 @@
 | PEG-FLOW-004 | Provider failure stops further searches and keeps every language Unknown | `src/episode-feasibility.test.ts` |
 | PEG-REPORT-001 | Packaged episode report composes all three read-only integrations | `src/report-sonarr-episode.test.ts` |
 | PEG-REPORT-002 | Invalid report configuration fails before network access | `src/report-sonarr-episode.test.ts` |
+| PEG-MOVIEFLOW-001 | Radarr releases and Bazarr movie policy produce one report | `src/movie-feasibility.test.ts` |
+| PEG-MOVIEFLOW-002 | Unassigned Bazarr movie stops provider work without assumed policy | `src/movie-feasibility.test.ts` |
+| PEG-MOVIEFLOW-003 | Radarr failures remain classified and stop provider work | `src/movie-feasibility.test.ts` |
+| PEG-MOVIEREPORT-001 | Packaged movie report composes all three read-only integrations | `src/report-radarr-movie.test.ts` |
+| PEG-MOVIEREPORT-002 | Invalid movie report configuration fails before network access | `src/report-radarr-movie.test.ts` |
 
 ## Explicit manual gaps
 
