@@ -163,6 +163,12 @@
       "boundary": "In-memory Response bodies and headers"
     },
     {
+      "id": "PEG-HTTP-005",
+      "title": "Bazarr array query keys are encoded without widening the URL boundary",
+      "evidence": "src/adapters/fetch-json-transport.test.ts",
+      "boundary": "Bazarr client over an injected fetch implementation; no DNS or network"
+    },
+    {
       "id": "PEG-CONFIG-001",
       "title": "Disabled Sonarr configuration stays disabled and partial input fails safely",
       "evidence": "src/config.test.ts",
@@ -265,6 +271,12 @@
       "boundary": "Synthetic secret in a temporary local directory"
     },
     {
+      "id": "PEG-CONFIG-005",
+      "title": "SubDL credentials use an independent bounded secret-file contract",
+      "evidence": "src/config.test.ts",
+      "boundary": "Synthetic secret in a temporary local directory"
+    },
+    {
       "id": "PEG-RUNTIME-005",
       "title": "Configured Radarr status returns measured browser-safe evidence",
       "evidence": "src/runtime.test.ts",
@@ -305,6 +317,12 @@
       "title": "Packaged Bazarr profile probe uses a secret file on an internal-only network",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Synthetic sibling container, profile, and secret; local Docker architecture only"
+    },
+    {
+      "id": "PEG-DOCKER-005",
+      "title": "Packaged SubDL probe makes one redacted search on an internal-only network",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling container, search response, and secret; local Docker architecture only"
     },
     {
       "id": "PEG-BAZARR-001",
@@ -377,18 +395,30 @@
       "title": "Bazarr probe exit states stay distinct and redacted",
       "evidence": "src/probe-bazarr.test.ts",
       "boundary": "In-memory environments and injected failures; no DNS or network"
+    },
+    {
+      "id": "PEG-PROBE-007",
+      "title": "One-shot SubDL search reports only bounded aggregate evidence",
+      "evidence": "src/probe-subdl.test.ts",
+      "boundary": "Temporary synthetic secret, injected fetch, and deterministic clock"
+    },
+    {
+      "id": "PEG-PROBE-008",
+      "title": "SubDL probe states stay distinct and invalid input remains redacted",
+      "evidence": "src/probe-subdl.test.ts",
+      "boundary": "Temporary synthetic secret and injected responses; no DNS or network"
     }
   ],
   "manualGaps": [
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "Sonarr version, Docker runtime, routes, authentication enforcement, and unauthenticated latency are verified; its authenticated packaged probe and release response remain open, while Radarr release and status contracts are fixture-proven but not yet checked against the NAS"
+      "reason": "Local Colima verified the authenticated Sonarr 4.0.16.2944 packaged status probe and a 100-row episode release search on 2026-08-26; Radarr remains fixture-proven only, and NAS production validation is intentionally separate"
     },
     {
       "id": "PEG-MANUAL-002",
       "title": "Live Bazarr profile resolution and provider policy",
-      "reason": "The official v1.6.0 shapes are fixture-proven and live HTTPS routes enforce authentication; the installed version, authenticated response shapes and sizes, and sanitized live profile compatibility remain unverified"
+      "reason": "Local Colima verified the authenticated profile list and targeted series assignment shapes on 2026-08-26 without retaining policy contents; installed NAS compatibility remains intentionally untested"
     },
     {
       "id": "PEG-MANUAL-003",

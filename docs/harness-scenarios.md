@@ -32,6 +32,7 @@
 | PEG-HTTP-002 | Timeouts and network failures are stable and redacted | `src/adapters/fetch-json-transport.test.ts` |
 | PEG-HTTP-003 | Declared and streamed oversized bodies are blocked | `src/adapters/fetch-json-transport.test.ts` |
 | PEG-HTTP-004 | Invalid success JSON stays distinct from safe error metadata | `src/adapters/fetch-json-transport.test.ts` |
+| PEG-HTTP-005 | Bazarr array query keys are encoded without widening the URL boundary | `src/adapters/fetch-json-transport.test.ts` |
 | PEG-CONFIG-001 | Disabled Sonarr configuration stays disabled and partial input fails safely | `src/config.test.ts` |
 | PEG-CONFIG-002 | Sonarr credentials load only from a bounded secret file | `src/config.test.ts` |
 | PEG-SONARR-006 | System status is bounded and private upstream metadata is discarded | `src/adapters/sonarr.test.ts` |
@@ -49,6 +50,7 @@
 | PEG-RADARR-006 | Radarr system status is bounded and private metadata is discarded | `src/adapters/radarr.test.ts` |
 | PEG-CONFIG-003 | Radarr credentials use an independent bounded secret file | `src/config.test.ts` |
 | PEG-CONFIG-004 | Bazarr credentials use an independent bounded secret file | `src/config.test.ts` |
+| PEG-CONFIG-005 | SubDL credentials use an independent bounded secret file | `src/config.test.ts` |
 | PEG-RUNTIME-005 | Configured Radarr status returns measured browser-safe evidence | `src/runtime.test.ts` |
 | PEG-RUNTIME-006 | Radarr failures and refreshes stay classified and bounded | `src/runtime.test.ts` |
 | PEG-RUNTIME-007 | Radarr status is read-only and disabled without configuration | `src/app.test.ts` |
@@ -56,6 +58,7 @@
 | PEG-PROBE-004 | Radarr probe exit states stay distinct and redacted | `src/probe-radarr.test.ts` |
 | PEG-DOCKER-003 | The packaged runtime reads a Radarr secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-004 | The packaged Bazarr profile probe uses a secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-005 | The packaged SubDL probe makes one redacted search on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-BAZARR-001 | Policy reads are bounded GETs authenticated only by header | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-002 | Profiles retain original multilingual and conditional semantics | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
@@ -68,13 +71,15 @@
 | PEG-SUBDL-005 | One stable item-language window uses one request until expiry | `src/adapters/subdl.test.ts` |
 | PEG-PROBE-005 | The one-shot Bazarr profile probe reports only measured counts | `src/probe-bazarr.test.ts` |
 | PEG-PROBE-006 | Bazarr probe exit states stay distinct and redacted | `src/probe-bazarr.test.ts` |
+| PEG-PROBE-007 | The one-shot SubDL search reports only bounded aggregate evidence | `src/probe-subdl.test.ts` |
+| PEG-PROBE-008 | SubDL probe states stay distinct and invalid input remains redacted | `src/probe-subdl.test.ts` |
 
 ## Explicit manual gaps
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Sonarr version, Docker runtime, routes, authentication enforcement, and unauthenticated latency are verified; its authenticated packaged probe and release response remain open, while Radarr release and status contracts are fixture-proven but not yet checked against the NAS |
-| PEG-MANUAL-002 | Live Bazarr policy resolution | The official v1.6.0 contract and live authentication boundary are proven, but installed-version compatibility and sanitized authenticated profile evidence remain unverified |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima verified the authenticated Sonarr 4.0.16.2944 packaged status probe and a 100-row episode release search on 2026-08-26; Radarr remains fixture-proven only, and NAS production validation is intentionally separate |
+| PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima verified authenticated profile-list and targeted series-assignment shapes on 2026-08-26 without retaining policy contents; installed NAS compatibility remains intentionally untested |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside Phase 0 and require explicit confirmation |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |

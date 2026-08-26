@@ -1,7 +1,7 @@
 # SubDL v2 exact subtitle-search contract
 
 Snapshot date: 2026-08-26
-Status: official request and failure contract pinned; response mapping fixture-proven and awaiting sanitized live verification
+Status: official request and failure contract pinned; adapter and packaged probe fixture-proven, awaiting sanitized live verification
 
 ## Primary evidence
 
@@ -61,6 +61,12 @@ Pegarr returns provider-search states that keep uncertainty visible:
 
 Only a successful empty search may later contribute `No match found`. Rate limits, timeouts, outages, and malformed responses cannot.
 Likewise, when a candidate exists but SubDL omits metadata required to prove a forced or hearing-impaired policy, the result remains `Unknown` rather than becoming a false negative.
+
+## Packaged probe
+
+`npm run probe:subdl` requires secret-file configuration plus one explicit movie or episode identifier and one Bazarr-policy-to-provider language mapping. It performs exactly one GET for that stable item/language window. Its compact report contains only state, request and subtitle counts, quota evidence, transport-security category, latency, and observation time. It never emits the identifier, language codes, release names, provider response body, URL, hostname, or credential.
+
+`PEG-PROBE-007`, `PEG-PROBE-008`, and `PEG-DOCKER-005` prove this behavior with injected responses and a packaged container on an internal-only network. Those scenarios do not call SubDL or imply live provider compatibility.
 
 ## Remaining proof
 

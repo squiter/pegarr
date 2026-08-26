@@ -98,6 +98,7 @@ for (const contract of [
   'prefix: "PEGARR_SONARR"',
   'prefix: "PEGARR_RADARR"',
   'prefix: "PEGARR_BAZARR"',
+  'prefix: "PEGARR_SUBDL"',
   '`${spec.prefix}_API_KEY_FILE`',
   "maximumSecretBytes = 4_096",
   'return "[redacted]"',
@@ -126,6 +127,13 @@ if (!bazarrCompose.includes("PEGARR_BAZARR_API_KEY_FILE: /run/secrets/bazarr_api
 }
 if (/PEGARR_BAZARR_API_KEY\s*:/u.test(bazarrCompose)) {
   issues.push("The Bazarr Compose overlay may not pass the API key as an environment value");
+}
+const subdlCompose = readFileSync(resolve(repoRoot, "deploy/compose.subdl.yaml"), "utf8");
+if (!subdlCompose.includes("PEGARR_SUBDL_API_KEY_FILE: /run/secrets/subdl_api_key")) {
+  issues.push("The SubDL Compose overlay must mount the API key through a secret file");
+}
+if (/PEGARR_SUBDL_API_KEY\s*:/u.test(subdlCompose)) {
+  issues.push("The SubDL Compose overlay may not pass the API key as an environment value");
 }
 if (/PEGARR_RADARR_API_KEY\s*:/u.test(radarrCompose)) {
   issues.push("The Radarr Compose overlay may not pass the API key as an environment value");
@@ -158,6 +166,9 @@ if (packageJson.scripts?.["probe:radarr"] !== "node dist/probe-radarr.js") {
 }
 if (packageJson.scripts?.["probe:bazarr"] !== "node dist/probe-bazarr.js") {
   issues.push("package.json script probe:bazarr must remain the read-only packaged probe");
+}
+if (packageJson.scripts?.["probe:subdl"] !== "node dist/probe-subdl.js") {
+  issues.push("package.json script probe:subdl must remain the read-only packaged probe");
 }
 
 const ciWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/ci.yml"), "utf8");

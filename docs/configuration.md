@@ -1,6 +1,6 @@
 # Runtime configuration
 
-Pegarr starts with every external integration disabled. Sonarr, Radarr, and the Bazarr profile probe become available independently only when all required settings for that integration are present and valid. Partial configuration stops startup with a redacted error instead of silently running with an unexpected boundary.
+Pegarr starts with every external integration disabled. Sonarr, Radarr, Bazarr, and SubDL become available independently only when all required settings for that integration are present and valid. Partial configuration stops startup with a redacted error instead of silently running with an unexpected boundary.
 
 ## Sonarr settings
 
@@ -32,7 +32,19 @@ Pegarr starts with every external integration disabled. Sonarr, Radarr, and the 
 | `PEGARR_BAZARR_INSTANCE_ID` | No | Safe non-secret label; defaults to `bazarr` |
 | `PEGARR_BAZARR_ALLOW_INSECURE_HTTP` | No | Must be explicitly `true` to permit HTTP; defaults to `false` |
 
-Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, or `PEGARR_BAZARR_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
+## SubDL settings
+
+| Variable | Required when enabled | Meaning |
+| --- | --- | --- |
+| `PEGARR_SUBDL_URL` | Yes | SubDL API base URL; normally `https://api.subdl.com` |
+| `PEGARR_SUBDL_ALLOWED_HOSTS` | Yes | Comma-separated hostnames Pegarr may contact; normally `api.subdl.com` |
+| `PEGARR_SUBDL_API_KEY_FILE` | Yes | Absolute in-container path to a file containing only the SubDL API key |
+| `PEGARR_SUBDL_INSTANCE_ID` | No | Safe non-secret label; defaults to `subdl` |
+| `PEGARR_SUBDL_ALLOW_INSECURE_HTTP` | No | Test fixtures only; production SubDL access should remain HTTPS |
+
+The one-shot SubDL probe also requires a deliberate, representative search window. Set `PEGARR_SUBDL_PROBE_KIND` to `movie` or `episode`, provide at least one of `PEGARR_SUBDL_PROBE_IMDB_ID` or `PEGARR_SUBDL_PROBE_TMDB_ID`, and map `PEGARR_SUBDL_PROBE_POLICY_LANGUAGE` to `PEGARR_SUBDL_PROBE_PROVIDER_LANGUAGE`. Episode probes additionally require `PEGARR_SUBDL_PROBE_SEASON` and `PEGARR_SUBDL_PROBE_EPISODE`. These values are never printed by the probe.
+
+Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, `PEGARR_BAZARR_API_KEY`, or `PEGARR_SUBDL_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
 
 The base URL may use a Sonarr URL base, such as `https://media.example.invalid/sonarr`. The allowlist entry for that URL is only `media.example.invalid`.
 
@@ -44,6 +56,7 @@ Create the secret outside the repository and restrict it to the account managing
 install -m 600 /dev/null /absolute/private/path/sonarr_api_key
 install -m 600 /dev/null /absolute/private/path/radarr_api_key
 install -m 600 /dev/null /absolute/private/path/bazarr_api_key
+install -m 600 /dev/null /absolute/private/path/subdl_api_key
 ```
 
 Place the API key in that file using an editor that does not store it in shell history. Then set the non-secret variables in `.env`, including the host path used only by Docker Compose:
@@ -61,12 +74,21 @@ PEGARR_BAZARR_URL=http://bazarr:6767
 PEGARR_BAZARR_ALLOWED_HOSTS=bazarr
 PEGARR_BAZARR_ALLOW_INSECURE_HTTP=true
 PEGARR_BAZARR_API_KEY_HOST_FILE=/absolute/private/path/bazarr_api_key
+PEGARR_SUBDL_URL=https://api.subdl.com
+PEGARR_SUBDL_ALLOWED_HOSTS=api.subdl.com
+PEGARR_SUBDL_API_KEY_HOST_FILE=/absolute/private/path/subdl_api_key
+PEGARR_SUBDL_PROBE_KIND=episode
+PEGARR_SUBDL_PROBE_IMDB_ID=tt1234567
+PEGARR_SUBDL_PROBE_POLICY_LANGUAGE=en
+PEGARR_SUBDL_PROBE_PROVIDER_LANGUAGE=EN
+PEGARR_SUBDL_PROBE_SEASON=1
+PEGARR_SUBDL_PROBE_EPISODE=1
 ```
 
 Enable the opt-in overlay alongside either Compose base:
 
 ```console
-docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml -f deploy/compose.radarr.yaml -f deploy/compose.bazarr.yaml up -d
+docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml -f deploy/compose.radarr.yaml -f deploy/compose.bazarr.yaml -f deploy/compose.subdl.yaml up -d
 ```
 
 The host secrets are mounted under `/run/secrets`; only those in-container paths are passed to Pegarr. Host paths and API keys must never be committed.
@@ -90,6 +112,7 @@ For a fresh one-shot verification from the packaged container, run:
 docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml run --rm pegarr npm run --silent probe:sonarr
 docker compose -f deploy/compose.nas.yaml -f deploy/compose.radarr.yaml run --rm pegarr npm run --silent probe:radarr
 docker compose -f deploy/compose.nas.yaml -f deploy/compose.bazarr.yaml run --rm pegarr npm run --silent probe:bazarr
+docker compose -f deploy/compose.nas.yaml -f deploy/compose.subdl.yaml run --rm pegarr npm run --silent probe:subdl
 ```
 
-Each command prints one compact JSON record. Exit code `0` means its integration was available; `1` means a configured upstream failure such as unauthorized or unavailable; `2` means disabled or invalid configuration. The Bazarr probe performs only the language-profile GET and reports counts, response bytes, and timing—never profile names, tags, language values, or library metadata. The output is designed to be safe to attach to an issue, but review diagnostics before publishing it as a general precaution.
+Each command prints one compact JSON record. Exit code `0` means its integration was available; `1` means a configured upstream failure such as unauthorized or unavailable; `2` means disabled or invalid configuration. The Bazarr probe performs only the language-profile GET and reports counts, response bytes, and timing—never profile names, tags, language values, or library metadata. The SubDL probe performs exactly one search for the configured stable item/language window and reports only the result count, request count, quota evidence, and timing—never identifiers, language codes, release names, or credentials. The output is designed to be safe to attach to an issue, but review diagnostics before publishing it as a general precaution.

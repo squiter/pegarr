@@ -320,6 +320,87 @@ async function configuredBazarrProbeSmokeTest() {
   }
 }
 
+async function configuredSubdlProbeSmokeTest() {
+  const scenario = "PEG-DOCKER-005";
+  const suffix = `${process.pid}`;
+  const networkName = `pegarr-harness-subdl-internal-${suffix}`;
+  const fixtureName = `pegarr-harness-subdl-${suffix}`;
+  const artifactsDirectory = resolve(".artifacts");
+  mkdirSync(artifactsDirectory, { recursive: true });
+  const secretDirectory = mkdtempSync(join(artifactsDirectory, "pegarr-synthetic-docker-"));
+  const secretPath = join(secretDirectory, "subdl_api_key");
+  const syntheticKey = "synthetic-docker-api-key";
+  writeFileSync(secretPath, syntheticKey, { mode: 0o444 });
+
+  const network = docker([
+    "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
+  ]);
+  if (network.status !== 0) {
+    rmSync(secretDirectory, { recursive: true, force: true });
+    throw new Error(`${scenario} could not create an internal network:\n${outputOf(network)}`);
+  }
+
+  const fixtureScript = [
+    "const { createServer } = require('node:http');",
+    `const expectedAuthorization = ${JSON.stringify(`Bearer ${syntheticKey}`)};`,
+    "const expectedUrl = '/api/v2/subtitles/search?imdb_id=tt9000005&type=tv&languages=EN&subs_per_page=30&season=3&episode=5';",
+    "const body = { status: true, subtitles: [{ id: 1, language: 'English', release_name: 'private.release.name', season: 3, episode: 5 }] };",
+    "createServer((request, response) => {",
+    "  if (request.method !== 'GET' || request.url !== expectedUrl || request.headers.authorization !== expectedAuthorization) { response.writeHead(401); response.end('{}'); return; }",
+    "  response.writeHead(200, { 'content-type': 'application/json', 'x-ratelimit-limit': '2000', 'x-ratelimit-remaining': '1999' });",
+    "  response.end(JSON.stringify(body));",
+    "}).listen(8081, '0.0.0.0');",
+  ].join("\n");
+
+  try {
+    const fixture = docker([
+      "run", "--detach", "--name", fixtureName, "--label", "pegarr.harness=true",
+      "--network", networkName, "--network-alias", "subdl-fixture", "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m", "pegarr:harness", "node", "-e", fixtureScript,
+    ]);
+    if (fixture.status !== 0) {
+      throw new Error(`${scenario} could not start the synthetic SubDL container:\n${outputOf(fixture)}`);
+    }
+
+    const runArgs = [
+      "run", "--rm", "--network", networkName, "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "--mount", `type=bind,source=${secretPath},target=/run/secrets/subdl_api_key,readonly`,
+      "--env", "PEGARR_SUBDL_URL=http://subdl-fixture:8081",
+      "--env", "PEGARR_SUBDL_ALLOWED_HOSTS=subdl-fixture",
+      "--env", "PEGARR_SUBDL_API_KEY_FILE=/run/secrets/subdl_api_key",
+      "--env", "PEGARR_SUBDL_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_SUBDL_PROBE_KIND=episode",
+      "--env", "PEGARR_SUBDL_PROBE_IMDB_ID=tt9000005",
+      "--env", "PEGARR_SUBDL_PROBE_POLICY_LANGUAGE=en",
+      "--env", "PEGARR_SUBDL_PROBE_PROVIDER_LANGUAGE=EN",
+      "--env", "PEGARR_SUBDL_PROBE_SEASON=3",
+      "--env", "PEGARR_SUBDL_PROBE_EPISODE=5",
+      "pegarr:harness", "npm", "run", "--silent", "probe:subdl",
+    ];
+    let probe;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      probe = docker(runArgs);
+      if (probe.status === 0) break;
+      await delay(250);
+    }
+    if (
+      probe?.status !== 0 ||
+      !probe.stdout.includes('"state":"available"') ||
+      !probe.stdout.includes('"requestCount":1') ||
+      !probe.stdout.includes('"subtitleCount":1') ||
+      /private|synthetic-docker-api-key|subdl-fixture|tt9000005/iu.test(probe.stdout)
+    ) {
+      throw new Error(`${scenario} packaged SubDL probe failed:\n${outputOf(probe)}`);
+    }
+    process.stdout.write(`${scenario} packaged exact-search probe=available (one request, secret-file, read-only, internal-network)\n`);
+  } finally {
+    docker(["rm", "--force", fixtureName]);
+    docker(["network", "rm", networkName]);
+    rmSync(secretDirectory, { recursive: true, force: true });
+  }
+}
+
 export async function main() {
   const first = build();
   const firstOutput = outputOf(first);
@@ -341,6 +422,7 @@ export async function main() {
       port: 7878,
     });
     await configuredBazarrProbeSmokeTest();
+    await configuredSubdlProbeSmokeTest();
     return;
   }
 
@@ -371,6 +453,7 @@ export async function main() {
       port: 7878,
     });
     await configuredBazarrProbeSmokeTest();
+    await configuredSubdlProbeSmokeTest();
     return;
   }
 

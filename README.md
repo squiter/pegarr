@@ -43,6 +43,7 @@ The current repository foundation includes:
 - a measured one-shot Sonarr probe with a 30-second status cache and single-flight protection;
 - secret-file-only Radarr configuration with the same browser-safe status and measured probe contract;
 - a secret-file-only Bazarr profile probe that reports measured counts without exposing policy contents;
+- a secret-file-only SubDL exact-search probe that makes one cached-window-shaped request and reports only aggregate availability and quota evidence;
 - a non-root, read-only Docker runtime;
 - local and NAS-oriented Compose examples;
 - CI checks and Docker builds on every pull request;
@@ -85,7 +86,7 @@ docker compose -f deploy/compose.nas.yaml up -d
 docker compose -f deploy/compose.nas.yaml ps
 ```
 
-For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), and [Bazarr](deploy/compose.bazarr.yaml) Compose overlays mount API keys as Docker secrets; follow the [configuration guide](docs/configuration.md) to run the one-shot probes, and never put a key in `.env`.
+For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), and [SubDL](deploy/compose.subdl.yaml) Compose overlays mount API keys as Docker secrets; follow the [configuration guide](docs/configuration.md) to run the one-shot probes, and never put a key in `.env`.
 
 ## Container publishing
 

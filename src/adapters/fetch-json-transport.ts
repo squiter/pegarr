@@ -26,6 +26,7 @@ const safeResponseHeaders = new Set([
   "x-ratelimit-reset",
 ]);
 const maximumResponseBytes = 10 * 1024 * 1024;
+const safeQueryName = /^[a-z][a-z0-9_-]*(?:\[\])?$/iu;
 
 export class FetchJsonTransport implements JsonTransport {
   readonly #origin: string;
@@ -99,7 +100,7 @@ export class FetchJsonTransport implements JsonTransport {
     const target = new URL(this.#origin);
     target.pathname = `${this.#basePath}${path}`;
     for (const [name, value] of Object.entries(request.query)) {
-      if (!/^[a-z][a-z0-9_-]*$/iu.test(name) || isSensitiveQueryName(name)) {
+      if (!safeQueryName.test(name) || isSensitiveQueryName(name)) {
         throw new JsonTransportError("invalid_request", "Request contains a forbidden query key");
       }
       target.searchParams.append(name, value);

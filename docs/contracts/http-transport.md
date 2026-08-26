@@ -10,7 +10,7 @@ Pegarr adapters use one transport boundary so network, URL, timeout, size, and r
 - The configured hostname must appear in an explicit allowlist.
 - Base URLs cannot contain credentials, query parameters, or fragments.
 - Adapter paths must be local absolute paths and cannot contain traversal, schemes, query strings, fragments, or backslashes.
-- Query keys that resemble credentials, API keys, authorization, secrets, passwords, or tokens are rejected.
+- Query keys use simple names or a single terminal `[]` suffix for Bazarr's array filters. Indexed, nested, and credential-like keys are rejected.
 - Only `GET` is available through this interface.
 - Request headers are restricted to `Accept`, `Authorization`, `User-Agent`, and `X-Api-Key`.
 - Redirects are rejected, cookies are omitted, caching is disabled, and the referrer policy is `no-referrer`.
@@ -32,6 +32,6 @@ There are no automatic retries. Each adapter must apply its own documented idemp
 
 ## Harness boundary
 
-`PEG-HTTP-001` through `PEG-HTTP-004` inject an in-memory fetch implementation. They prove URL construction, the Sonarr-to-transport flow, timeouts, redaction, response limits, JSON behavior, and safe headers without DNS or network access.
+`PEG-HTTP-001` through `PEG-HTTP-005` inject an in-memory fetch implementation. They prove URL construction, the Sonarr- and Bazarr-to-transport flows, timeouts, redaction, response limits, JSON behavior, and safe headers without DNS or network access.
 
 The first live probe must be separately authorized, read-only, and record the installed service version, TLS mode, response size, latency, and any DNS assumptions without recording the API key or private address.

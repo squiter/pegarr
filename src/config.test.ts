@@ -148,3 +148,37 @@ test("PEG-CONFIG-004 Bazarr credentials use an independent bounded secret-file c
     },
   );
 });
+
+test("PEG-CONFIG-005 SubDL credentials use an independent bounded secret-file contract", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-subdl-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const secretPath = join(directory, "subdl-api-key");
+  const secret = "synthetic.subdl-key_value==";
+  await writeFile(secretPath, `${secret}\n`, { mode: 0o600 });
+
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_SUBDL_URL: "https://api.subdl.example.invalid",
+    PEGARR_SUBDL_ALLOWED_HOSTS: "api.subdl.example.invalid",
+    PEGARR_SUBDL_API_KEY_FILE: secretPath,
+    PEGARR_SUBDL_INSTANCE_ID: "synthetic-subdl",
+  });
+
+  assert.equal(configuration.subdl?.apiKey.reveal(), secret);
+  assert.equal(configuration.subdl?.instanceId, "synthetic-subdl");
+  assert.equal(configuration.subdl?.allowInsecureHttp, false);
+  assert.deepEqual(configuration.subdl?.allowedHosts, ["api.subdl.example.invalid"]);
+  assert.doesNotMatch(JSON.stringify(configuration), new RegExp(secret, "u"));
+
+  await assert.rejects(
+    loadRuntimeConfiguration({ PEGARR_SUBDL_API_KEY: "synthetic-direct-subdl-secret" }),
+    (error: unknown) => {
+      assert.ok(error instanceof ConfigurationError);
+      assert.match(error.message, /PEGARR_SUBDL_API_KEY_FILE/u);
+      assert.doesNotMatch(error.message, /synthetic-direct-subdl-secret/u);
+      return true;
+    },
+  );
+});

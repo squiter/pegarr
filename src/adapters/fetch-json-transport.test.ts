@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { syntheticBazarrSeriesAssignmentResponse } from "../fixtures/bazarr-language-policy.js";
 import { syntheticSonarrEpisodeReleaseResponse } from "../fixtures/sonarr-release-search.js";
+import { BazarrClient } from "./bazarr.js";
 import {
   FetchJsonTransport,
   type FetchImplementation,
@@ -179,4 +181,46 @@ test("PEG-HTTP-004 invalid success JSON stays distinct from safe error metadata"
     body: null,
     responseBytes: new TextEncoder().encode("private non-json body").byteLength,
   });
+});
+
+test("PEG-HTTP-005 Bazarr array query keys are encoded without widening the URL boundary", async () => {
+  let capturedUrl: URL | undefined;
+  const transport = new FetchJsonTransport({
+    baseUrl: "https://bazarr.example.invalid",
+    allowedHosts: ["bazarr.example.invalid"],
+    fetchImplementation: async (input) => {
+      capturedUrl = new URL(input);
+      return new Response(JSON.stringify(syntheticBazarrSeriesAssignmentResponse), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+
+  const assignment = await new BazarrClient(
+    { instanceId: "synthetic-bazarr", apiKey: "synthetic-api-key" },
+    transport,
+  ).readSeriesAssignment(42);
+
+  assert.deepEqual(assignment, {
+    status: "assigned",
+    mediaKind: "series",
+    mediaId: 42,
+    profileId: 7,
+  });
+  assert.equal(capturedUrl?.origin, "https://bazarr.example.invalid");
+  assert.equal(capturedUrl?.pathname, "/api/series");
+  assert.equal(capturedUrl?.search, "?seriesid%5B%5D=42");
+  assert.doesNotMatch(capturedUrl?.href ?? "", /api.?key|synthetic-api-key/iu);
+
+  for (const forbiddenQuery of [
+    { "seriesid[0]": "42" },
+    { "seriesid[][]": "42" },
+    { "token[]": "synthetic-secret" },
+  ]) {
+    await assert.rejects(
+      transport.requestJson({ ...directRequest, query: forbiddenQuery }),
+      (error: unknown) => error instanceof JsonTransportError && error.code === "invalid_request",
+    );
+  }
 });

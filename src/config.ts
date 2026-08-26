@@ -28,7 +28,7 @@ export class SecretValue {
   }
 }
 
-export interface ArrRuntimeConfiguration {
+export interface ServiceRuntimeConfiguration {
   readonly instanceId: string;
   readonly baseUrl: string;
   readonly allowedHosts: readonly string[];
@@ -36,22 +36,26 @@ export interface ArrRuntimeConfiguration {
   readonly apiKey: SecretValue;
 }
 
-export type SonarrRuntimeConfiguration = ArrRuntimeConfiguration;
-export type RadarrRuntimeConfiguration = ArrRuntimeConfiguration;
-export type BazarrRuntimeConfiguration = ArrRuntimeConfiguration;
+export type ArrRuntimeConfiguration = ServiceRuntimeConfiguration;
+export type SonarrRuntimeConfiguration = ServiceRuntimeConfiguration;
+export type RadarrRuntimeConfiguration = ServiceRuntimeConfiguration;
+export type BazarrRuntimeConfiguration = ServiceRuntimeConfiguration;
+export type SubdlRuntimeConfiguration = ServiceRuntimeConfiguration;
 
 export interface RuntimeConfiguration {
   readonly sonarr?: SonarrRuntimeConfiguration;
   readonly radarr?: RadarrRuntimeConfiguration;
   readonly bazarr?: BazarrRuntimeConfiguration;
+  readonly subdl?: SubdlRuntimeConfiguration;
 }
 
 const maximumSecretBytes = 4_096;
 
 interface IntegrationConfigurationSpec {
-  readonly displayName: "Sonarr" | "Radarr" | "Bazarr";
-  readonly prefix: "PEGARR_SONARR" | "PEGARR_RADARR" | "PEGARR_BAZARR";
-  readonly defaultInstanceId: "sonarr" | "radarr" | "bazarr";
+  readonly displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL";
+  readonly prefix: "PEGARR_SONARR" | "PEGARR_RADARR" | "PEGARR_BAZARR" | "PEGARR_SUBDL";
+  readonly defaultInstanceId: "sonarr" | "radarr" | "bazarr" | "subdl";
+  readonly secretFormat: "arr" | "bearer";
 }
 
 export async function loadRuntimeConfiguration(
@@ -61,29 +65,39 @@ export async function loadRuntimeConfiguration(
     displayName: "Sonarr",
     prefix: "PEGARR_SONARR",
     defaultInstanceId: "sonarr",
+    secretFormat: "arr",
   });
   const radarr = await loadIntegrationConfiguration(environment, {
     displayName: "Radarr",
     prefix: "PEGARR_RADARR",
     defaultInstanceId: "radarr",
+    secretFormat: "arr",
   });
   const bazarr = await loadIntegrationConfiguration(environment, {
     displayName: "Bazarr",
     prefix: "PEGARR_BAZARR",
     defaultInstanceId: "bazarr",
+    secretFormat: "arr",
+  });
+  const subdl = await loadIntegrationConfiguration(environment, {
+    displayName: "SubDL",
+    prefix: "PEGARR_SUBDL",
+    defaultInstanceId: "subdl",
+    secretFormat: "bearer",
   });
 
   return {
     ...(sonarr === undefined ? {} : { sonarr }),
     ...(radarr === undefined ? {} : { radarr }),
     ...(bazarr === undefined ? {} : { bazarr }),
+    ...(subdl === undefined ? {} : { subdl }),
   };
 }
 
 async function loadIntegrationConfiguration(
   environment: Readonly<Record<string, string | undefined>>,
   spec: IntegrationConfigurationSpec,
-): Promise<ArrRuntimeConfiguration | undefined> {
+): Promise<ServiceRuntimeConfiguration | undefined> {
   const directKeyName = `${spec.prefix}_API_KEY`;
   const urlName = `${spec.prefix}_URL`;
   const allowedHostsName = `${spec.prefix}_ALLOWED_HOSTS`;
@@ -122,7 +136,12 @@ async function loadIntegrationConfiguration(
     environment[allowInsecureHttpName],
     allowInsecureHttpName,
   );
-  const apiKey = await readSecret(apiKeyFile as string, spec.displayName, apiKeyFileName);
+  const apiKey = await readSecret(
+    apiKeyFile as string,
+    spec.displayName,
+    apiKeyFileName,
+    spec.secretFormat,
+  );
 
   return {
     instanceId,
@@ -168,8 +187,9 @@ function parseBoolean(value: string | undefined, name: string): boolean {
 
 async function readSecret(
   path: string,
-  displayName: "Sonarr" | "Radarr" | "Bazarr",
+  displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL",
   apiKeyFileName: string,
+  secretFormat: "arr" | "bearer",
 ): Promise<SecretValue> {
   if (!isAbsolute(path)) {
     throw new ConfigurationError(`${apiKeyFileName} must be an absolute path`);
@@ -184,7 +204,10 @@ async function readSecret(
       throw new ConfigurationError(`${displayName} API key file exceeds the 4096-byte limit`);
     }
     const value = buffer.subarray(0, bytesRead).toString("utf8").trim();
-    if (!/^[a-z0-9_-]{16,256}$/iu.test(value)) {
+    const valid = secretFormat === "arr"
+      ? /^[a-z0-9_-]{16,256}$/iu.test(value)
+      : /^[a-z0-9._~+/=-]{16,4096}$/iu.test(value);
+    if (!valid) {
       throw new ConfigurationError(`${displayName} API key file does not contain one valid API key`);
     }
     return new SecretValue(value);
