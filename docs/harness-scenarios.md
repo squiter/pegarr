@@ -62,6 +62,7 @@
 | PEG-DOCKER-005 | The packaged SubDL probe makes one redacted search on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-006 | The packaged episode report composes three integrations on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-007 | The packaged movie report composes three integrations on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-008 | The packaged missing inventory reads both Arr services on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-BAZARR-001 | Policy reads are bounded GETs authenticated only by header | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-002 | Profiles retain original multilingual and conditional semantics | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
@@ -87,6 +88,13 @@
 | PEG-MOVIEFLOW-003 | Radarr failures remain classified and stop provider work | `src/movie-feasibility.test.ts` |
 | PEG-MOVIEREPORT-001 | Packaged movie report composes all three read-only integrations | `src/report-radarr-movie.test.ts` |
 | PEG-MOVIEREPORT-002 | Invalid movie report configuration fails before network access | `src/report-radarr-movie.test.ts` |
+| PEG-SONARR-007 | Missing episodes are bounded, monitored, and mapped into safe item evidence | `src/adapters/sonarr.test.ts` |
+| PEG-SONARR-008 | Malformed missing episodes stay distinct and private metadata is discarded | `src/adapters/sonarr.test.ts` |
+| PEG-RADARR-007 | Missing movies are bounded, monitored, and mapped into safe item evidence | `src/adapters/radarr.test.ts` |
+| PEG-RADARR-008 | Malformed missing movies stay distinct and private metadata is discarded | `src/adapters/radarr.test.ts` |
+| PEG-INVENTORY-001 | Packaged inventory reads one bounded page from each configured Arr | `src/inventory-missing.test.ts` |
+| PEG-INVENTORY-002 | One unavailable Arr produces usable partial inventory | `src/inventory-missing.test.ts` |
+| PEG-INVENTORY-003 | Disabled and invalid inventory configuration fails before network access | `src/inventory-missing.test.ts` |
 
 ## Explicit manual gaps
 

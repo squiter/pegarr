@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { syntheticRadarrMissingItemsResponse } from "../fixtures/radarr-missing-items.js";
 import { syntheticRadarrMovieReleaseResponse } from "../fixtures/radarr-release-search.js";
 import { syntheticRadarrSystemStatusResponse } from "../fixtures/radarr-system-status.js";
 import {
@@ -11,6 +12,7 @@ import {
 } from "./http.js";
 import {
   mapRadarrReleaseResponse,
+  mapRadarrMissingResponse,
   mapRadarrSystemStatus,
   RadarrAdapterError,
   RadarrClient,
@@ -180,6 +182,58 @@ test("PEG-RADARR-006 system status is bounded and discards private upstream meta
   transport.response = { status: 200, headers: {}, body: { appName: "Not Radarr", version: "1" } };
   await assert.rejects(
     client(transport).readSystemStatus(),
+    (error: unknown) => error instanceof RadarrAdapterError && error.code === "invalid_response",
+  );
+});
+
+test("PEG-RADARR-007 missing movies are paged, monitored, and mapped into safe item evidence", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: syntheticRadarrMissingItemsResponse };
+
+  const result = await client(transport).listMissingMovies({ page: 1, pageSize: 2 });
+
+  assert.deepEqual(transport.requests, [{
+    method: "GET",
+    path: "/api/v3/wanted/missing",
+    query: {
+      page: "1",
+      pageSize: "2",
+      sortKey: "releaseDate",
+      sortDirection: "descending",
+      monitored: "true",
+    },
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  }]);
+  assert.equal(result.totalRecords, 2);
+  assert.deepEqual(result.items[0], {
+    application: "radarr",
+    instanceId: "synthetic-radarr",
+    kind: "movie",
+    itemId: 84,
+    title: "Synthetic Movie",
+    year: 2024,
+    monitored: true,
+    hasFile: false,
+    availableAt: "2024-05-12T00:00:00.000Z",
+    ids: { imdb: "tt9000084", tmdb: "900084" },
+  });
+  await assert.rejects(client(transport).listMissingMovies({ page: 0 }), /page/u);
+  assert.equal(transport.requests.length, 1);
+});
+
+test("PEG-RADARR-008 missing-item mapping rejects malformed envelopes and drops private metadata", async () => {
+  const serialized = JSON.stringify(mapRadarrMissingResponse(
+    syntheticRadarrMissingItemsResponse,
+    "synthetic-radarr",
+  ));
+  assert.doesNotMatch(serialized, /private|overview|path|images|fanart/iu);
+
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: { records: [] } };
+  await assert.rejects(
+    client(transport).listMissingMovies(),
     (error: unknown) => error instanceof RadarrAdapterError && error.code === "invalid_response",
   );
 });

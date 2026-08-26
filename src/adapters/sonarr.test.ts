@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { syntheticSonarrMissingItemsResponse } from "../fixtures/sonarr-missing-items.js";
 import { syntheticSonarrEpisodeReleaseResponse } from "../fixtures/sonarr-release-search.js";
 import { syntheticSonarrSystemStatusResponse } from "../fixtures/sonarr-system-status.js";
 import {
@@ -11,6 +12,7 @@ import {
 } from "./http.js";
 import {
   mapSonarrReleaseResponse,
+  mapSonarrMissingResponse,
   mapSonarrSystemStatus,
   SonarrAdapterError,
   SonarrClient,
@@ -174,6 +176,63 @@ test("PEG-SONARR-006 system status is bounded and discards private upstream meta
   transport.response = { status: 200, headers: {}, body: { appName: "Not Sonarr", version: "1" } };
   await assert.rejects(
     client(transport).readSystemStatus(),
+    (error: unknown) => error instanceof SonarrAdapterError && error.code === "invalid_response",
+  );
+});
+
+test("PEG-SONARR-007 missing episodes are paged, monitored, and mapped into safe item evidence", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: syntheticSonarrMissingItemsResponse };
+
+  const result = await client(transport).listMissingEpisodes({ page: 1, pageSize: 2 });
+
+  assert.deepEqual(transport.requests, [{
+    method: "GET",
+    path: "/api/v3/wanted/missing",
+    query: {
+      page: "1",
+      pageSize: "2",
+      sortKey: "airDateUtc",
+      sortDirection: "descending",
+      monitored: "true",
+      includeSeries: "true",
+    },
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  }]);
+  assert.equal(result.totalRecords, 2);
+  assert.deepEqual(result.items[0], {
+    application: "sonarr",
+    instanceId: "synthetic-sonarr",
+    kind: "episode",
+    itemId: 305,
+    parentId: 42,
+    title: "Synthetic Episode Five",
+    parentTitle: "Synthetic Show",
+    year: 2022,
+    season: 3,
+    episode: 5,
+    monitored: true,
+    hasFile: false,
+    availableAt: "2024-03-05T20:00:00.000Z",
+    ids: { imdb: "tt9000005", tmdb: "900005", tvdb: "9000305" },
+  });
+  await assert.rejects(client(transport).listMissingEpisodes({ pageSize: 101 }), /pageSize/u);
+  assert.equal(transport.requests.length, 1);
+});
+
+test("PEG-SONARR-008 missing-item mapping rejects malformed envelopes and drops private metadata", async () => {
+  const serialized = JSON.stringify(mapSonarrMissingResponse(
+    syntheticSonarrMissingItemsResponse,
+    "synthetic-sonarr",
+  ));
+  assert.doesNotMatch(serialized, /private|overview|path|images|poster/iu);
+
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: { records: [] } };
+  await assert.rejects(
+    client(transport).listMissingEpisodes(),
     (error: unknown) => error instanceof SonarrAdapterError && error.code === "invalid_response",
   );
 });

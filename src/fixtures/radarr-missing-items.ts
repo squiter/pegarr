@@ -1,0 +1,32 @@
+export const syntheticRadarrMissingItemsResponse = {
+  page: 1,
+  pageSize: 2,
+  sortKey: "releaseDate",
+  sortDirection: "descending",
+  totalRecords: 2,
+  records: [
+    {
+      id: 84,
+      title: "Synthetic Movie",
+      year: 2024,
+      tmdbId: 900084,
+      imdbId: "tt9000084",
+      monitored: true,
+      hasFile: false,
+      digitalRelease: "2024-05-12T00:00:00Z",
+      path: "/private/movies/synthetic-movie",
+      overview: "Private synthetic overview that must not enter inventory evidence",
+      images: [{ remoteUrl: "https://private.invalid/fanart.jpg" }],
+    },
+    {
+      id: 85,
+      title: "Second Synthetic Movie",
+      year: 2023,
+      tmdbId: 900085,
+      imdbId: "tt9000085",
+      monitored: true,
+      hasFile: false,
+      physicalRelease: "2024-01-18T00:00:00Z",
+    },
+  ],
+};

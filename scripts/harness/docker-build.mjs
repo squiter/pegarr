@@ -679,6 +679,117 @@ async function packagedMovieReportSmokeTest() {
   }
 }
 
+async function packagedMissingInventorySmokeTest() {
+  const scenario = "PEG-DOCKER-008";
+  const suffix = `${process.pid}`;
+  const networkName = `pegarr-harness-inventory-internal-${suffix}`;
+  const fixtureName = `pegarr-harness-inventory-${suffix}`;
+  const artifactsDirectory = resolve(".artifacts");
+  mkdirSync(artifactsDirectory, { recursive: true });
+  const fixtureDirectory = mkdtempSync(join(artifactsDirectory, "pegarr-synthetic-inventory-docker-"));
+  const keys = {
+    sonarr: "synthetic-inventory-sonarr-key",
+    radarr: "synthetic-inventory-radarr-key",
+  };
+  const paths = {
+    sonarr: join(fixtureDirectory, "sonarr_api_key"),
+    radarr: join(fixtureDirectory, "radarr_api_key"),
+  };
+  writeFileSync(paths.sonarr, keys.sonarr, { mode: 0o444 });
+  writeFileSync(paths.radarr, keys.radarr, { mode: 0o444 });
+
+  const network = docker([
+    "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
+  ]);
+  if (network.status !== 0) {
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+    throw new Error(`${scenario} could not create an internal network:\n${outputOf(network)}`);
+  }
+
+  const fixtureScript = [
+    "const { createServer } = require('node:http');",
+    `const keys = ${JSON.stringify(keys)};`,
+    "const sonarr = { page: 1, pageSize: 2, totalRecords: 2, records: [{ id: 305, seriesId: 42, tvdbId: 9000305, title: 'Synthetic Episode Five', airDateUtc: '2024-03-05T20:00:00Z', seasonNumber: 3, episodeNumber: 5, monitored: true, hasFile: false, series: { id: 42, title: 'Synthetic Show', year: 2022, imdbId: 'tt9000005', tmdbId: 900005 } }, { id: 306, seriesId: 42, tvdbId: 9000306, title: 'Synthetic Episode Six', airDateUtc: '2024-03-12T20:00:00Z', seasonNumber: 3, episodeNumber: 6, monitored: true, hasFile: false, series: { id: 42, title: 'Synthetic Show', year: 2022, imdbId: 'tt9000005', tmdbId: 900005 } }] };",
+    "const radarr = { page: 1, pageSize: 2, totalRecords: 2, records: [{ id: 84, title: 'Synthetic Movie', year: 2024, tmdbId: 900084, imdbId: 'tt9000084', monitored: true, hasFile: false, digitalRelease: '2024-05-12T00:00:00Z' }, { id: 85, title: 'Second Synthetic Movie', year: 2023, tmdbId: 900085, imdbId: 'tt9000085', monitored: true, hasFile: false, physicalRelease: '2024-01-18T00:00:00Z' }] };",
+    "createServer((request, response) => {",
+    "  const host = String(request.headers.host || '').split(':')[0];",
+    "  const url = new URL(request.url || '/', 'http://fixture.invalid');",
+    "  let body;",
+    "  if (request.method !== 'GET' || url.pathname !== '/api/v3/wanted/missing' || url.searchParams.get('pageSize') !== '2' || url.searchParams.get('monitored') !== 'true') { response.writeHead(405); response.end('{}'); return; }",
+    "  if (host === 'sonarr-fixture' && request.headers['x-api-key'] === keys.sonarr) body = sonarr;",
+    "  else if (host === 'radarr-fixture' && request.headers['x-api-key'] === keys.radarr) body = radarr;",
+    "  else { response.writeHead(401, { 'content-type': 'application/json' }); response.end('{}'); return; }",
+    "  response.writeHead(200, { 'content-type': 'application/json' });",
+    "  response.end(JSON.stringify(body));",
+    "}).listen(8082, '0.0.0.0');",
+  ].join("\n");
+
+  try {
+    const fixture = docker([
+      "run", "--detach", "--name", fixtureName, "--label", "pegarr.harness=true",
+      "--network", networkName,
+      "--network-alias", "sonarr-fixture",
+      "--network-alias", "radarr-fixture",
+      "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "pegarr:harness", "node", "-e", fixtureScript,
+    ]);
+    if (fixture.status !== 0) {
+      throw new Error(`${scenario} could not start the synthetic inventory fixture:\n${outputOf(fixture)}`);
+    }
+
+    const runArgs = [
+      "run", "--rm", "--network", networkName, "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "--mount", `type=bind,source=${paths.sonarr},target=/run/secrets/sonarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.radarr},target=/run/secrets/radarr_api_key,readonly`,
+      "--env", "PEGARR_SONARR_URL=http://sonarr-fixture:8082",
+      "--env", "PEGARR_SONARR_ALLOWED_HOSTS=sonarr-fixture",
+      "--env", "PEGARR_SONARR_API_KEY_FILE=/run/secrets/sonarr_api_key",
+      "--env", "PEGARR_SONARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_RADARR_URL=http://radarr-fixture:8082",
+      "--env", "PEGARR_RADARR_ALLOWED_HOSTS=radarr-fixture",
+      "--env", "PEGARR_RADARR_API_KEY_FILE=/run/secrets/radarr_api_key",
+      "--env", "PEGARR_RADARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_MISSING_PAGE_SIZE=2",
+      "pegarr:harness", "npm", "run", "--silent", "inventory:missing",
+    ];
+    let inventory;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      inventory = docker(runArgs);
+      if (inventory.status === 0) break;
+      await delay(250);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(inventory?.stdout ?? "");
+    } catch {
+      parsed = undefined;
+    }
+    if (
+      inventory?.status !== 0 ||
+      parsed?.kind !== "missing-item-inventory" ||
+      parsed?.status !== "ready" ||
+      parsed?.mode !== "read_only" ||
+      parsed?.metrics?.requestCount !== 2 ||
+      parsed?.metrics?.itemCount !== 4 ||
+      parsed?.sources?.[0]?.page?.items?.[0]?.kind !== "episode" ||
+      parsed?.sources?.[1]?.page?.items?.[0]?.kind !== "movie" ||
+      /synthetic-inventory-(?:sonarr|radarr)-key|(?:sonarr|radarr)-fixture|\/run\/secrets/iu.test(inventory?.stdout ?? "")
+    ) {
+      throw new Error(`${scenario} packaged missing inventory failed:\n${outputOf(inventory)}`);
+    }
+    const inspection = docker(["network", "inspect", "--format", "{{.Internal}}", networkName]);
+    if (inspection.status !== 0 || inspection.stdout.trim() !== "true") {
+      throw new Error(`${scenario} network is not internal-only: ${outputOf(inspection).trim()}`);
+    }
+    process.stdout.write(`${scenario} packaged missing inventory=ready (two requests, secret-files, read-only, internal-network)\n`);
+  } finally {
+    docker(["rm", "--force", fixtureName]);
+    docker(["network", "rm", networkName]);
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+}
+
 export async function main() {
   const first = build();
   const firstOutput = outputOf(first);
@@ -703,6 +814,7 @@ export async function main() {
     await configuredSubdlProbeSmokeTest();
     await packagedEpisodeReportSmokeTest();
     await packagedMovieReportSmokeTest();
+    await packagedMissingInventorySmokeTest();
     return;
   }
 
@@ -736,6 +848,7 @@ export async function main() {
     await configuredSubdlProbeSmokeTest();
     await packagedEpisodeReportSmokeTest();
     await packagedMovieReportSmokeTest();
+    await packagedMissingInventorySmokeTest();
     return;
   }
 

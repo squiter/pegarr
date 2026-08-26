@@ -343,6 +343,12 @@
       "boundary": "Synthetic sibling services, request file, and three secrets; local Docker architecture only"
     },
     {
+      "id": "PEG-DOCKER-008",
+      "title": "Packaged missing inventory reads both Arr services on an internal-only network",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling services and two secrets; local Docker architecture only"
+    },
+    {
       "id": "PEG-BAZARR-001",
       "title": "Bazarr policy reads are bounded GETs authenticated only by header",
       "evidence": "src/adapters/bazarr.test.ts",
@@ -491,13 +497,55 @@
       "title": "Invalid movie report configuration fails before network access",
       "evidence": "src/report-radarr-movie.test.ts",
       "boundary": "In-memory environment and fetch spy; no filesystem read or network"
+    },
+    {
+      "id": "PEG-SONARR-007",
+      "title": "Missing episodes are bounded, monitored, and mapped into safe item evidence",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Sanitized paginated response and injected transport; no network"
+    },
+    {
+      "id": "PEG-SONARR-008",
+      "title": "Malformed missing episodes remain distinct and private metadata is discarded",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Sanitized malformed and metadata-rich fixtures"
+    },
+    {
+      "id": "PEG-RADARR-007",
+      "title": "Missing movies are bounded, monitored, and mapped into safe item evidence",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Sanitized paginated response and injected transport; no network"
+    },
+    {
+      "id": "PEG-RADARR-008",
+      "title": "Malformed missing movies remain distinct and private metadata is discarded",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Sanitized malformed and metadata-rich fixtures"
+    },
+    {
+      "id": "PEG-INVENTORY-001",
+      "title": "Packaged inventory reads one bounded page from each configured Arr",
+      "evidence": "src/inventory-missing.test.ts",
+      "boundary": "Temporary secret files and one injected fetch boundary"
+    },
+    {
+      "id": "PEG-INVENTORY-002",
+      "title": "One unavailable Arr produces usable partial inventory",
+      "evidence": "src/inventory-missing.test.ts",
+      "boundary": "Injected success and service failure; no network"
+    },
+    {
+      "id": "PEG-INVENTORY-003",
+      "title": "Disabled and invalid inventory configuration fails before network access",
+      "evidence": "src/inventory-missing.test.ts",
+      "boundary": "In-memory environment and fetch spy"
     }
   ],
   "manualGaps": [
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "Local Colima verified the authenticated Sonarr 4.0.16.2944 packaged status probe and a 100-row episode release search on 2026-08-26; Radarr remains fixture-proven only, and NAS production validation is intentionally separate"
+      "reason": "Local Colima verified the authenticated Sonarr 4.0.16.2944 packaged status probe, a 100-row episode release search, and the monitored missing-episode envelope on 2026-08-26 without retaining private records; Radarr remains fixture-proven only, and NAS production validation is intentionally separate"
     },
     {
       "id": "PEG-MANUAL-002",

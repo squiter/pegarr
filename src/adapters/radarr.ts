@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 
-import type { ArrReleaseCandidate, ArrReleaseEvidence, ReleaseTraits } from "../domain.js";
+import type {
+  ArrReleaseCandidate,
+  ArrReleaseEvidence,
+  MissingItemPage,
+  MissingItemQuery,
+  MissingMediaItem,
+  ReleaseTraits,
+} from "../domain.js";
 import {
   JsonTransportError,
   type JsonResponse,
@@ -101,6 +108,37 @@ export class RadarrClient {
     }
   }
 
+  async listMissingMovies(query: MissingItemQuery = {}): Promise<MissingItemPage> {
+    const page = boundedInteger(query.page ?? 1, 1, Number.MAX_SAFE_INTEGER, "page");
+    const pageSize = boundedInteger(query.pageSize ?? 50, 1, 100, "pageSize");
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/wanted/missing",
+      query: {
+        page: String(page),
+        pageSize: String(pageSize),
+        sortKey: "releaseDate",
+        sortDirection: "descending",
+        monitored: "true",
+      },
+      headers: {
+        accept: "application/json",
+        "x-api-key": this.#apiKey,
+      },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: this.#maxResponseBytes,
+    });
+
+    assertSuccessfulStatus(response, "missing movie list");
+    try {
+      return mapRadarrMissingResponse(response.body, this.#instanceId);
+    } catch {
+      throw new RadarrAdapterError("invalid_response", "Radarr returned an invalid missing movie response", {
+        status: response.status,
+      });
+    }
+  }
+
   async readSystemStatus(): Promise<RadarrSystemStatus> {
     const response = await this.#requestJson({
       method: "GET",
@@ -177,6 +215,44 @@ export function mapRadarrReleaseResponse(
   }
 
   return body.map((value, index) => mapRelease(value, index, instanceId));
+}
+
+export function mapRadarrMissingResponse(
+  body: unknown,
+  instanceId = "radarr",
+): MissingItemPage {
+  const envelope = record(body, "missing movie response");
+  if (!Array.isArray(envelope.records)) {
+    throw new TypeError("missing movie response.records must be an array");
+  }
+  return {
+    page: boundedInteger(requiredNumber(envelope.page, "missing movie response.page"), 1, Number.MAX_SAFE_INTEGER, "missing movie response.page"),
+    pageSize: boundedInteger(requiredNumber(envelope.pageSize, "missing movie response.pageSize"), 1, 100, "missing movie response.pageSize"),
+    totalRecords: boundedInteger(requiredNumber(envelope.totalRecords, "missing movie response.totalRecords"), 0, Number.MAX_SAFE_INTEGER, "missing movie response.totalRecords"),
+    items: envelope.records.map((value, index) => mapMissingMovie(value, index, instanceId)),
+  };
+}
+
+function mapMissingMovie(value: unknown, index: number, instanceId: string): MissingMediaItem {
+  const row = record(value, `missing movie[${index}]`);
+  const imdb = optionalImdbIdentifier(row.imdbId, `missing movie[${index}].imdbId`);
+  const tmdb = optionalNumericIdentifier(row.tmdbId, `missing movie[${index}].tmdbId`);
+  const availableAt = row.digitalRelease ?? row.physicalRelease ?? row.inCinemas;
+  return {
+    application: "radarr",
+    instanceId,
+    kind: "movie",
+    itemId: boundedInteger(requiredNumber(row.id, `missing movie[${index}].id`), 1, Number.MAX_SAFE_INTEGER, `missing movie[${index}].id`),
+    title: boundedRequiredString(row.title, `missing movie[${index}].title`),
+    ...optionalPositiveIntegerField("year", row.year, `missing movie[${index}].year`),
+    monitored: requiredBoolean(row.monitored, `missing movie[${index}].monitored`),
+    hasFile: requiredBoolean(row.hasFile, `missing movie[${index}].hasFile`),
+    ...optionalTimestampField("availableAt", availableAt, `missing movie[${index}].releaseDate`),
+    ids: {
+      ...(imdb === undefined ? {} : { imdb }),
+      ...(tmdb === undefined ? {} : { tmdb }),
+    },
+  };
 }
 
 function mapRelease(value: unknown, index: number, instanceId: string): ArrReleaseCandidate {
@@ -299,6 +375,48 @@ function requiredString(value: unknown, field: string): string {
     throw new TypeError(`${field} must be a non-empty string`);
   }
   return value;
+}
+
+function boundedRequiredString(value: unknown, field: string): string {
+  const result = requiredString(value, field);
+  if (result.length > 1_024) {
+    throw new TypeError(`${field} must be at most 1024 characters`);
+  }
+  return result;
+}
+
+function optionalImdbIdentifier(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const identifier = boundedRequiredString(value, field);
+  if (!/^tt\d{5,12}$/u.test(identifier)) throw new TypeError(`${field} is invalid`);
+  return identifier;
+}
+
+function optionalNumericIdentifier(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === 0 || value === "") return undefined;
+  const number = typeof value === "string" ? Number(value) : requiredNumber(value, field);
+  return String(boundedInteger(number, 1, Number.MAX_SAFE_INTEGER, field));
+}
+
+function optionalPositiveIntegerField(
+  key: "year",
+  value: unknown,
+  field: string,
+): { readonly year?: number } {
+  if (value === undefined || value === null || value === 0) return {};
+  return { [key]: boundedInteger(requiredNumber(value, field), 1, 9999, field) };
+}
+
+function optionalTimestampField(
+  key: "availableAt",
+  value: unknown,
+  field: string,
+): { readonly availableAt?: string } {
+  if (value === undefined || value === null || value === "") return {};
+  const timestamp = boundedRequiredString(value, field);
+  const milliseconds = Date.parse(timestamp);
+  if (!Number.isFinite(milliseconds)) throw new TypeError(`${field} is invalid`);
+  return { [key]: new Date(milliseconds).toISOString() };
 }
 
 function optionalString(value: unknown): string | undefined {

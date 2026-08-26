@@ -24,6 +24,35 @@ export interface MediaIdentity {
   readonly ids: Readonly<Record<string, string>>;
 }
 
+export interface MissingItemQuery {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface MissingMediaItem {
+  readonly application: "sonarr" | "radarr";
+  readonly instanceId: string;
+  readonly kind: "episode" | "movie";
+  readonly itemId: number;
+  readonly parentId?: number;
+  readonly title: string;
+  readonly parentTitle?: string;
+  readonly year?: number;
+  readonly season?: number;
+  readonly episode?: number;
+  readonly monitored: boolean;
+  readonly hasFile: boolean;
+  readonly availableAt?: string;
+  readonly ids: Readonly<Record<string, string>>;
+}
+
+export interface MissingItemPage {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly totalRecords: number;
+  readonly items: readonly MissingMediaItem[];
+}
+
 export interface ReleaseTraits {
   readonly source?: string;
   readonly resolution?: string;

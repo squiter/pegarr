@@ -196,6 +196,18 @@ if (packageJson.scripts?.["report:sonarr-episode"] !== "node dist/report-sonarr-
 if (packageJson.scripts?.["report:radarr-movie"] !== "node dist/report-radarr-movie.js") {
   issues.push("package.json script report:radarr-movie must remain the read-only packaged report");
 }
+if (packageJson.scripts?.["inventory:missing"] !== "node dist/inventory-missing.js") {
+  issues.push("package.json script inventory:missing must remain the read-only packaged inventory");
+}
+
+const missingInventory = readFileSync(resolve(repoRoot, "src/inventory-missing.ts"), "utf8");
+if (
+  !missingInventory.includes("listMissingEpisodes") ||
+  !missingInventory.includes("listMissingMovies") ||
+  /\b(?:grab|download|delete|update)\b/iu.test(missingInventory)
+) {
+  issues.push("The missing-item inventory must compose only bounded read operations");
+}
 
 const ciWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/ci.yml"), "utf8");
 if (!ciWorkflow.includes("run: npm run check")) {

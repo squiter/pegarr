@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 
-import type { ArrReleaseCandidate, ArrReleaseEvidence, ReleaseTraits } from "../domain.js";
+import type {
+  ArrReleaseCandidate,
+  ArrReleaseEvidence,
+  MissingItemPage,
+  MissingItemQuery,
+  MissingMediaItem,
+  ReleaseTraits,
+} from "../domain.js";
 import {
   JsonTransportError,
   type JsonResponse,
@@ -101,6 +108,38 @@ export class SonarrClient {
     }
   }
 
+  async listMissingEpisodes(query: MissingItemQuery = {}): Promise<MissingItemPage> {
+    const page = boundedInteger(query.page ?? 1, 1, Number.MAX_SAFE_INTEGER, "page");
+    const pageSize = boundedInteger(query.pageSize ?? 50, 1, 100, "pageSize");
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/wanted/missing",
+      query: {
+        page: String(page),
+        pageSize: String(pageSize),
+        sortKey: "airDateUtc",
+        sortDirection: "descending",
+        monitored: "true",
+        includeSeries: "true",
+      },
+      headers: {
+        accept: "application/json",
+        "x-api-key": this.#apiKey,
+      },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: this.#maxResponseBytes,
+    });
+
+    assertSuccessfulStatus(response, "missing episode list");
+    try {
+      return mapSonarrMissingResponse(response.body, this.#instanceId);
+    } catch {
+      throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid missing episode response", {
+        status: response.status,
+      });
+    }
+  }
+
   async readSystemStatus(): Promise<SonarrSystemStatus> {
     const response = await this.#requestJson({
       method: "GET",
@@ -177,6 +216,50 @@ export function mapSonarrReleaseResponse(
   }
 
   return body.map((value, index) => mapRelease(value, index, instanceId));
+}
+
+export function mapSonarrMissingResponse(
+  body: unknown,
+  instanceId = "sonarr",
+): MissingItemPage {
+  const envelope = record(body, "missing episode response");
+  if (!Array.isArray(envelope.records)) {
+    throw new TypeError("missing episode response.records must be an array");
+  }
+  return {
+    page: boundedInteger(requiredNumber(envelope.page, "missing episode response.page"), 1, Number.MAX_SAFE_INTEGER, "missing episode response.page"),
+    pageSize: boundedInteger(requiredNumber(envelope.pageSize, "missing episode response.pageSize"), 1, 100, "missing episode response.pageSize"),
+    totalRecords: boundedInteger(requiredNumber(envelope.totalRecords, "missing episode response.totalRecords"), 0, Number.MAX_SAFE_INTEGER, "missing episode response.totalRecords"),
+    items: envelope.records.map((value, index) => mapMissingEpisode(value, index, instanceId)),
+  };
+}
+
+function mapMissingEpisode(value: unknown, index: number, instanceId: string): MissingMediaItem {
+  const row = record(value, `missing episode[${index}]`);
+  const series = record(row.series, `missing episode[${index}].series`);
+  const imdb = optionalImdbIdentifier(series.imdbId, `missing episode[${index}].series.imdbId`);
+  const tmdb = optionalNumericIdentifier(series.tmdbId, `missing episode[${index}].series.tmdbId`);
+  const tvdb = optionalNumericIdentifier(row.tvdbId, `missing episode[${index}].tvdbId`);
+  return {
+    application: "sonarr",
+    instanceId,
+    kind: "episode",
+    itemId: boundedInteger(requiredNumber(row.id, `missing episode[${index}].id`), 1, Number.MAX_SAFE_INTEGER, `missing episode[${index}].id`),
+    parentId: boundedInteger(requiredNumber(row.seriesId, `missing episode[${index}].seriesId`), 1, Number.MAX_SAFE_INTEGER, `missing episode[${index}].seriesId`),
+    title: boundedRequiredString(row.title, `missing episode[${index}].title`),
+    parentTitle: boundedRequiredString(series.title, `missing episode[${index}].series.title`),
+    ...optionalPositiveIntegerField("year", series.year, `missing episode[${index}].series.year`),
+    season: boundedInteger(requiredNumber(row.seasonNumber, `missing episode[${index}].seasonNumber`), 0, 10_000, `missing episode[${index}].seasonNumber`),
+    episode: boundedInteger(requiredNumber(row.episodeNumber, `missing episode[${index}].episodeNumber`), 0, 100_000, `missing episode[${index}].episodeNumber`),
+    monitored: requiredBoolean(row.monitored, `missing episode[${index}].monitored`),
+    hasFile: requiredBoolean(row.hasFile, `missing episode[${index}].hasFile`),
+    ...optionalTimestampField("availableAt", row.airDateUtc, `missing episode[${index}].airDateUtc`),
+    ids: {
+      ...(imdb === undefined ? {} : { imdb }),
+      ...(tmdb === undefined ? {} : { tmdb }),
+      ...(tvdb === undefined ? {} : { tvdb }),
+    },
+  };
 }
 
 function mapRelease(value: unknown, index: number, instanceId: string): ArrReleaseCandidate {
@@ -297,6 +380,48 @@ function requiredString(value: unknown, field: string): string {
     throw new TypeError(`${field} must be a non-empty string`);
   }
   return value;
+}
+
+function boundedRequiredString(value: unknown, field: string): string {
+  const result = requiredString(value, field);
+  if (result.length > 1_024) {
+    throw new TypeError(`${field} must be at most 1024 characters`);
+  }
+  return result;
+}
+
+function optionalImdbIdentifier(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const identifier = boundedRequiredString(value, field);
+  if (!/^tt\d{5,12}$/u.test(identifier)) throw new TypeError(`${field} is invalid`);
+  return identifier;
+}
+
+function optionalNumericIdentifier(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === 0 || value === "") return undefined;
+  const number = typeof value === "string" ? Number(value) : requiredNumber(value, field);
+  return String(boundedInteger(number, 1, Number.MAX_SAFE_INTEGER, field));
+}
+
+function optionalPositiveIntegerField(
+  key: "year",
+  value: unknown,
+  field: string,
+): { readonly year?: number } {
+  if (value === undefined || value === null || value === 0) return {};
+  return { [key]: boundedInteger(requiredNumber(value, field), 1, 9999, field) };
+}
+
+function optionalTimestampField(
+  key: "availableAt",
+  value: unknown,
+  field: string,
+): { readonly availableAt?: string } {
+  if (value === undefined || value === null || value === "") return {};
+  const timestamp = boundedRequiredString(value, field);
+  const milliseconds = Date.parse(timestamp);
+  if (!Number.isFinite(milliseconds)) throw new TypeError(`${field} is invalid`);
+  return { [key]: new Date(milliseconds).toISOString() };
 }
 
 function optionalString(value: unknown): string | undefined {
