@@ -48,12 +48,14 @@
 | PEG-RADARR-005 | Radarr selection secrets never enter release evidence | `src/adapters/radarr.test.ts` |
 | PEG-RADARR-006 | Radarr system status is bounded and private metadata is discarded | `src/adapters/radarr.test.ts` |
 | PEG-CONFIG-003 | Radarr credentials use an independent bounded secret file | `src/config.test.ts` |
+| PEG-CONFIG-004 | Bazarr credentials use an independent bounded secret file | `src/config.test.ts` |
 | PEG-RUNTIME-005 | Configured Radarr status returns measured browser-safe evidence | `src/runtime.test.ts` |
 | PEG-RUNTIME-006 | Radarr failures and refreshes stay classified and bounded | `src/runtime.test.ts` |
 | PEG-RUNTIME-007 | Radarr status is read-only and disabled without configuration | `src/app.test.ts` |
 | PEG-PROBE-003 | The one-shot Radarr probe reports measured safe evidence | `src/probe-radarr.test.ts` |
 | PEG-PROBE-004 | Radarr probe exit states stay distinct and redacted | `src/probe-radarr.test.ts` |
 | PEG-DOCKER-003 | The packaged runtime reads a Radarr secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-004 | The packaged Bazarr profile probe uses a secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-BAZARR-001 | Policy reads are bounded GETs authenticated only by header | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-002 | Profiles retain original multilingual and conditional semantics | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
@@ -64,6 +66,8 @@
 | PEG-SUBDL-003 | Successful empty and malformed searches remain distinct | `src/adapters/subdl.test.ts` |
 | PEG-SUBDL-004 | Quota, timeout, outage, auth, and malformed data stay classified | `src/adapters/subdl.test.ts` |
 | PEG-SUBDL-005 | One stable item-language window uses one request until expiry | `src/adapters/subdl.test.ts` |
+| PEG-PROBE-005 | The one-shot Bazarr profile probe reports only measured counts | `src/probe-bazarr.test.ts` |
+| PEG-PROBE-006 | Bazarr probe exit states stay distinct and redacted | `src/probe-bazarr.test.ts` |
 
 ## Explicit manual gaps
 

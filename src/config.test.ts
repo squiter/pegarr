@@ -113,3 +113,38 @@ test("PEG-CONFIG-003 Radarr credentials use an independent bounded secret-file c
     },
   );
 });
+
+test("PEG-CONFIG-004 Bazarr credentials use an independent bounded secret-file contract", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-bazarr-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const secretPath = join(directory, "bazarr-api-key");
+  const secret = "synthetic-bazarr-key-value";
+  await writeFile(secretPath, `${secret}\n`, { mode: 0o600 });
+
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_BAZARR_URL: "http://bazarr.example.invalid:6767",
+    PEGARR_BAZARR_ALLOWED_HOSTS: "bazarr.example.invalid",
+    PEGARR_BAZARR_API_KEY_FILE: secretPath,
+    PEGARR_BAZARR_ALLOW_INSECURE_HTTP: "true",
+    PEGARR_BAZARR_INSTANCE_ID: "synthetic-bazarr",
+  });
+
+  assert.equal(configuration.bazarr?.apiKey.reveal(), secret);
+  assert.equal(configuration.bazarr?.instanceId, "synthetic-bazarr");
+  assert.equal(configuration.bazarr?.allowInsecureHttp, true);
+  assert.deepEqual(configuration.bazarr?.allowedHosts, ["bazarr.example.invalid"]);
+  assert.doesNotMatch(JSON.stringify(configuration), new RegExp(secret, "u"));
+
+  await assert.rejects(
+    loadRuntimeConfiguration({ PEGARR_BAZARR_API_KEY: "synthetic-direct-bazarr-secret" }),
+    (error: unknown) => {
+      assert.ok(error instanceof ConfigurationError);
+      assert.match(error.message, /PEGARR_BAZARR_API_KEY_FILE/u);
+      assert.doesNotMatch(error.message, /synthetic-direct-bazarr-secret/u);
+      return true;
+    },
+  );
+});

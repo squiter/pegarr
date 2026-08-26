@@ -1,0 +1,14 @@
+services:
+  pegarr:
+    environment:
+      PEGARR_BAZARR_URL: ${PEGARR_BAZARR_URL:?set PEGARR_BAZARR_URL}
+      PEGARR_BAZARR_ALLOWED_HOSTS: ${PEGARR_BAZARR_ALLOWED_HOSTS:?set PEGARR_BAZARR_ALLOWED_HOSTS}
+      PEGARR_BAZARR_API_KEY_FILE: /run/secrets/bazarr_api_key
+      PEGARR_BAZARR_INSTANCE_ID: ${PEGARR_BAZARR_INSTANCE_ID:-bazarr}
+      PEGARR_BAZARR_ALLOW_INSECURE_HTTP: ${PEGARR_BAZARR_ALLOW_INSECURE_HTTP:-false}
+    secrets:
+      - bazarr_api_key
+
+secrets:
+  bazarr_api_key:
+    file: ${PEGARR_BAZARR_API_KEY_HOST_FILE:?set an absolute PEGARR_BAZARR_API_KEY_HOST_FILE}

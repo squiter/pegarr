@@ -1,6 +1,6 @@
 # Runtime configuration
 
-Pegarr starts with every external integration disabled. Sonarr and Radarr become available independently only when all required settings for that integration are present and valid. Partial configuration stops startup with a redacted error instead of silently running with an unexpected boundary.
+Pegarr starts with every external integration disabled. Sonarr, Radarr, and the Bazarr profile probe become available independently only when all required settings for that integration are present and valid. Partial configuration stops startup with a redacted error instead of silently running with an unexpected boundary.
 
 ## Sonarr settings
 
@@ -22,7 +22,17 @@ Pegarr starts with every external integration disabled. Sonarr and Radarr become
 | `PEGARR_RADARR_INSTANCE_ID` | No | Safe non-secret label; defaults to `radarr` |
 | `PEGARR_RADARR_ALLOW_INSECURE_HTTP` | No | Must be explicitly `true` to permit HTTP; defaults to `false` |
 
-Pegarr deliberately does not accept `PEGARR_SONARR_API_KEY` or `PEGARR_RADARR_API_KEY`. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
+## Bazarr settings
+
+| Variable | Required when enabled | Meaning |
+| --- | --- | --- |
+| `PEGARR_BAZARR_URL` | Yes | Bazarr base URL, including an existing URL base when used |
+| `PEGARR_BAZARR_ALLOWED_HOSTS` | Yes | Comma-separated hostnames Pegarr may contact, without schemes, paths, credentials, or ports |
+| `PEGARR_BAZARR_API_KEY_FILE` | Yes | Absolute in-container path to a file containing only the Bazarr API key |
+| `PEGARR_BAZARR_INSTANCE_ID` | No | Safe non-secret label; defaults to `bazarr` |
+| `PEGARR_BAZARR_ALLOW_INSECURE_HTTP` | No | Must be explicitly `true` to permit HTTP; defaults to `false` |
+
+Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, or `PEGARR_BAZARR_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
 
 The base URL may use a Sonarr URL base, such as `https://media.example.invalid/sonarr`. The allowlist entry for that URL is only `media.example.invalid`.
 
@@ -33,6 +43,7 @@ Create the secret outside the repository and restrict it to the account managing
 ```console
 install -m 600 /dev/null /absolute/private/path/sonarr_api_key
 install -m 600 /dev/null /absolute/private/path/radarr_api_key
+install -m 600 /dev/null /absolute/private/path/bazarr_api_key
 ```
 
 Place the API key in that file using an editor that does not store it in shell history. Then set the non-secret variables in `.env`, including the host path used only by Docker Compose:
@@ -46,15 +57,19 @@ PEGARR_RADARR_URL=http://radarr:7878
 PEGARR_RADARR_ALLOWED_HOSTS=radarr
 PEGARR_RADARR_ALLOW_INSECURE_HTTP=true
 PEGARR_RADARR_API_KEY_HOST_FILE=/absolute/private/path/radarr_api_key
+PEGARR_BAZARR_URL=http://bazarr:6767
+PEGARR_BAZARR_ALLOWED_HOSTS=bazarr
+PEGARR_BAZARR_ALLOW_INSECURE_HTTP=true
+PEGARR_BAZARR_API_KEY_HOST_FILE=/absolute/private/path/bazarr_api_key
 ```
 
 Enable the opt-in overlay alongside either Compose base:
 
 ```console
-docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml -f deploy/compose.radarr.yaml up -d
+docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml -f deploy/compose.radarr.yaml -f deploy/compose.bazarr.yaml up -d
 ```
 
-The host secrets are mounted at `/run/secrets/sonarr_api_key` and `/run/secrets/radarr_api_key`; only those in-container paths are passed to Pegarr. Host paths and API keys must never be committed.
+The host secrets are mounted under `/run/secrets`; only those in-container paths are passed to Pegarr. Host paths and API keys must never be committed.
 
 ## Read-only verification
 
@@ -74,6 +89,7 @@ For a fresh one-shot verification from the packaged container, run:
 ```console
 docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml run --rm pegarr npm run --silent probe:sonarr
 docker compose -f deploy/compose.nas.yaml -f deploy/compose.radarr.yaml run --rm pegarr npm run --silent probe:radarr
+docker compose -f deploy/compose.nas.yaml -f deploy/compose.bazarr.yaml run --rm pegarr npm run --silent probe:bazarr
 ```
 
-Each command prints one compact JSON record. Exit code `0` means its integration was available; `1` means a configured upstream failure such as unauthorized or unavailable; `2` means disabled or invalid configuration. The output is designed to be safe to attach to an issue, but review diagnostics before publishing it as a general precaution.
+Each command prints one compact JSON record. Exit code `0` means its integration was available; `1` means a configured upstream failure such as unauthorized or unavailable; `2` means disabled or invalid configuration. The Bazarr probe performs only the language-profile GET and reports counts, response bytes, and timing—never profile names, tags, language values, or library metadata. The output is designed to be safe to attach to an issue, but review diagnostics before publishing it as a general precaution.

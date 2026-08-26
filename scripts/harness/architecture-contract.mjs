@@ -97,6 +97,7 @@ const configuration = readFileSync(resolve(repoRoot, "src/config.ts"), "utf8");
 for (const contract of [
   'prefix: "PEGARR_SONARR"',
   'prefix: "PEGARR_RADARR"',
+  'prefix: "PEGARR_BAZARR"',
   '`${spec.prefix}_API_KEY_FILE`',
   "maximumSecretBytes = 4_096",
   'return "[redacted]"',
@@ -117,6 +118,14 @@ if (/PEGARR_SONARR_API_KEY\s*:/u.test(sonarrCompose)) {
 const radarrCompose = readFileSync(resolve(repoRoot, "deploy/compose.radarr.yaml"), "utf8");
 if (!radarrCompose.includes("PEGARR_RADARR_API_KEY_FILE: /run/secrets/radarr_api_key")) {
   issues.push("The Radarr Compose overlay must mount the API key through a secret file");
+}
+
+const bazarrCompose = readFileSync(resolve(repoRoot, "deploy/compose.bazarr.yaml"), "utf8");
+if (!bazarrCompose.includes("PEGARR_BAZARR_API_KEY_FILE: /run/secrets/bazarr_api_key")) {
+  issues.push("The Bazarr Compose overlay must mount the API key through a secret file");
+}
+if (/PEGARR_BAZARR_API_KEY\s*:/u.test(bazarrCompose)) {
+  issues.push("The Bazarr Compose overlay may not pass the API key as an environment value");
 }
 if (/PEGARR_RADARR_API_KEY\s*:/u.test(radarrCompose)) {
   issues.push("The Radarr Compose overlay may not pass the API key as an environment value");
@@ -146,6 +155,9 @@ if (packageJson.scripts?.["probe:sonarr"] !== "node dist/probe-sonarr.js") {
 }
 if (packageJson.scripts?.["probe:radarr"] !== "node dist/probe-radarr.js") {
   issues.push("package.json script probe:radarr must remain the read-only packaged probe");
+}
+if (packageJson.scripts?.["probe:bazarr"] !== "node dist/probe-bazarr.js") {
+  issues.push("package.json script probe:bazarr must remain the read-only packaged probe");
 }
 
 const ciWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/ci.yml"), "utf8");

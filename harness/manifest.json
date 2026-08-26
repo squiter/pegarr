@@ -259,6 +259,12 @@
       "boundary": "Synthetic secret in a temporary local directory"
     },
     {
+      "id": "PEG-CONFIG-004",
+      "title": "Bazarr credentials use an independent bounded secret-file contract",
+      "evidence": "src/config.test.ts",
+      "boundary": "Synthetic secret in a temporary local directory"
+    },
+    {
       "id": "PEG-RUNTIME-005",
       "title": "Configured Radarr status returns measured browser-safe evidence",
       "evidence": "src/runtime.test.ts",
@@ -293,6 +299,12 @@
       "title": "Packaged runtime reads a Radarr secret file on an internal-only network",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Synthetic sibling container and secret; local Docker architecture only"
+    },
+    {
+      "id": "PEG-DOCKER-004",
+      "title": "Packaged Bazarr profile probe uses a secret file on an internal-only network",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling container, profile, and secret; local Docker architecture only"
     },
     {
       "id": "PEG-BAZARR-001",
@@ -353,6 +365,18 @@
       "title": "One stable SubDL item-language window uses one request until expiry",
       "evidence": "src/adapters/subdl.test.ts",
       "boundary": "Injected transport, promise gate, and deterministic clock"
+    },
+    {
+      "id": "PEG-PROBE-005",
+      "title": "One-shot Bazarr profile probe reports only measured counts",
+      "evidence": "src/probe-bazarr.test.ts",
+      "boundary": "Temporary synthetic secret, injected fetch, and deterministic clock"
+    },
+    {
+      "id": "PEG-PROBE-006",
+      "title": "Bazarr probe exit states stay distinct and redacted",
+      "evidence": "src/probe-bazarr.test.ts",
+      "boundary": "In-memory environments and injected failures; no DNS or network"
     }
   ],
   "manualGaps": [

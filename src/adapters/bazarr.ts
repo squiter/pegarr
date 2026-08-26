@@ -59,6 +59,11 @@ export interface BazarrLanguageProfileEvidence {
   readonly tag?: string;
 }
 
+export interface BazarrLanguageProfileSnapshot {
+  readonly profiles: readonly BazarrLanguageProfileEvidence[];
+  readonly responseBytes?: number;
+}
+
 export type BazarrMediaKind = "series" | "movie";
 
 export interface BazarrAssignedProfile {
@@ -132,6 +137,10 @@ export class BazarrClient {
   }
 
   async listLanguageProfiles(): Promise<readonly BazarrLanguageProfileEvidence[]> {
+    return (await this.readLanguageProfileSnapshot()).profiles;
+  }
+
+  async readLanguageProfileSnapshot(): Promise<BazarrLanguageProfileSnapshot> {
     const response = await this.#get(
       "/api/system/languages/profiles",
       {},
@@ -139,7 +148,16 @@ export class BazarrClient {
     );
     assertSuccessfulStatus(response, "language profile read");
     try {
-      return mapBazarrLanguageProfiles(response.body);
+      const responseBytes = optionalBoundedInteger(
+        response.responseBytes,
+        0,
+        profileResponseLimit,
+        "language profile responseBytes",
+      );
+      return {
+        profiles: mapBazarrLanguageProfiles(response.body),
+        ...(responseBytes === undefined ? {} : { responseBytes }),
+      };
     } catch {
       throw invalidResponse(response.status);
     }
@@ -459,4 +477,13 @@ function boundedInteger(value: number, minimum: number, maximum: number, field: 
     throw new TypeError(`${field} must be an integer between ${minimum} and ${maximum}`);
   }
   return value;
+}
+
+function optionalBoundedInteger(
+  value: number | undefined,
+  minimum: number,
+  maximum: number,
+  field: string,
+): number | undefined {
+  return value === undefined ? undefined : boundedInteger(value, minimum, maximum, field);
 }

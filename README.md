@@ -9,7 +9,7 @@
 Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It is designed to compare interactive-search releases with subtitle-provider evidence, explain the confidence of each match, and eventually let an authorized user grab the best-informed release.
 
 > [!IMPORTANT]
-> Pegarr is in its API-feasibility phase. The container exposes a synthetic, read-only feasibility report and an opt-in Sonarr status probe. It does not perform Grab operations.
+> Pegarr is in its API-feasibility phase. The container exposes a synthetic, read-only feasibility report plus opt-in Sonarr, Radarr, and Bazarr probes. It does not perform Grab operations.
 
 ## Why Pegarr?
 
@@ -42,6 +42,7 @@ The current repository foundation includes:
 - secret-file-only Sonarr configuration and a browser-safe version/status route;
 - a measured one-shot Sonarr probe with a 30-second status cache and single-flight protection;
 - secret-file-only Radarr configuration with the same browser-safe status and measured probe contract;
+- a secret-file-only Bazarr profile probe that reports measured counts without exposing policy contents;
 - a non-root, read-only Docker runtime;
 - local and NAS-oriented Compose examples;
 - CI checks and Docker builds on every pull request;
@@ -84,7 +85,7 @@ docker compose -f deploy/compose.nas.yaml up -d
 docker compose -f deploy/compose.nas.yaml ps
 ```
 
-For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [Sonarr](deploy/compose.sonarr.yaml) and [Radarr](deploy/compose.radarr.yaml) Compose overlays mount API keys as Docker secrets; follow the [configuration guide](docs/configuration.md) to run the one-shot status probes, and never put a key in `.env`.
+For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), and [Bazarr](deploy/compose.bazarr.yaml) Compose overlays mount API keys as Docker secrets; follow the [configuration guide](docs/configuration.md) to run the one-shot probes, and never put a key in `.env`.
 
 ## Container publishing
 

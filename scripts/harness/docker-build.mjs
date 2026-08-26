@@ -247,6 +247,79 @@ async function configuredArrSmokeTest({ scenario, integration, appName, version,
   }
 }
 
+async function configuredBazarrProbeSmokeTest() {
+  const scenario = "PEG-DOCKER-004";
+  const suffix = `${process.pid}`;
+  const networkName = `pegarr-harness-bazarr-internal-${suffix}`;
+  const fixtureName = `pegarr-harness-bazarr-${suffix}`;
+  const artifactsDirectory = resolve(".artifacts");
+  mkdirSync(artifactsDirectory, { recursive: true });
+  const secretDirectory = mkdtempSync(join(artifactsDirectory, "pegarr-synthetic-docker-"));
+  const secretPath = join(secretDirectory, "bazarr_api_key");
+  const syntheticKey = "synthetic-docker-api-key";
+  writeFileSync(secretPath, syntheticKey, { mode: 0o444 });
+
+  const network = docker([
+    "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
+  ]);
+  if (network.status !== 0) {
+    rmSync(secretDirectory, { recursive: true, force: true });
+    throw new Error(`${scenario} could not create an internal network:\n${outputOf(network)}`);
+  }
+
+  const fixtureScript = [
+    "const { createServer } = require('node:http');",
+    `const expectedKey = ${JSON.stringify(syntheticKey)};`,
+    "const body = [{ profileId: 7, name: 'private profile', cutoff: 1, items: [{ id: 1, language: 'en', hi: 'False', forced: 'False', audio_exclude: 'False', audio_only_include: 'False' }], mustContain: [], mustNotContain: [], originalFormat: 0, tag: null }];",
+    "createServer((request, response) => {",
+    "  if (request.method !== 'GET' || request.url !== '/api/system/languages/profiles' || request.headers['x-api-key'] !== expectedKey) { response.writeHead(401); response.end('{}'); return; }",
+    "  response.writeHead(200, { 'content-type': 'application/json' });",
+    "  response.end(JSON.stringify(body));",
+    "}).listen(6767, '0.0.0.0');",
+  ].join("\n");
+
+  try {
+    const fixture = docker([
+      "run", "--detach", "--name", fixtureName, "--label", "pegarr.harness=true",
+      "--network", networkName, "--network-alias", "bazarr-fixture", "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m", "pegarr:harness", "node", "-e", fixtureScript,
+    ]);
+    if (fixture.status !== 0) {
+      throw new Error(`${scenario} could not start the synthetic Bazarr container:\n${outputOf(fixture)}`);
+    }
+
+    const runArgs = [
+      "run", "--rm", "--network", networkName, "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "--mount", `type=bind,source=${secretPath},target=/run/secrets/bazarr_api_key,readonly`,
+      "--env", "PEGARR_BAZARR_URL=http://bazarr-fixture:6767",
+      "--env", "PEGARR_BAZARR_ALLOWED_HOSTS=bazarr-fixture",
+      "--env", "PEGARR_BAZARR_API_KEY_FILE=/run/secrets/bazarr_api_key",
+      "--env", "PEGARR_BAZARR_ALLOW_INSECURE_HTTP=true",
+      "pegarr:harness", "npm", "run", "--silent", "probe:bazarr",
+    ];
+    let probe;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      probe = docker(runArgs);
+      if (probe.status === 0) break;
+      await delay(250);
+    }
+    if (
+      probe?.status !== 0 ||
+      !probe.stdout.includes('"state":"available"') ||
+      !probe.stdout.includes('"profileCount":1') ||
+      /private|synthetic-docker-api-key|bazarr-fixture/iu.test(probe.stdout)
+    ) {
+      throw new Error(`${scenario} packaged Bazarr probe failed:\n${outputOf(probe)}`);
+    }
+    process.stdout.write(`${scenario} packaged profile probe=available (secret-file, read-only, internal-network)\n`);
+  } finally {
+    docker(["rm", "--force", fixtureName]);
+    docker(["network", "rm", networkName]);
+    rmSync(secretDirectory, { recursive: true, force: true });
+  }
+}
+
 export async function main() {
   const first = build();
   const firstOutput = outputOf(first);
@@ -267,6 +340,7 @@ export async function main() {
       version: "6.0.0.0",
       port: 7878,
     });
+    await configuredBazarrProbeSmokeTest();
     return;
   }
 
@@ -296,6 +370,7 @@ export async function main() {
       version: "6.0.0.0",
       port: 7878,
     });
+    await configuredBazarrProbeSmokeTest();
     return;
   }
 

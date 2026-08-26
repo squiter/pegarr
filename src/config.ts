@@ -38,18 +38,20 @@ export interface ArrRuntimeConfiguration {
 
 export type SonarrRuntimeConfiguration = ArrRuntimeConfiguration;
 export type RadarrRuntimeConfiguration = ArrRuntimeConfiguration;
+export type BazarrRuntimeConfiguration = ArrRuntimeConfiguration;
 
 export interface RuntimeConfiguration {
   readonly sonarr?: SonarrRuntimeConfiguration;
   readonly radarr?: RadarrRuntimeConfiguration;
+  readonly bazarr?: BazarrRuntimeConfiguration;
 }
 
 const maximumSecretBytes = 4_096;
 
 interface IntegrationConfigurationSpec {
-  readonly displayName: "Sonarr" | "Radarr";
-  readonly prefix: "PEGARR_SONARR" | "PEGARR_RADARR";
-  readonly defaultInstanceId: "sonarr" | "radarr";
+  readonly displayName: "Sonarr" | "Radarr" | "Bazarr";
+  readonly prefix: "PEGARR_SONARR" | "PEGARR_RADARR" | "PEGARR_BAZARR";
+  readonly defaultInstanceId: "sonarr" | "radarr" | "bazarr";
 }
 
 export async function loadRuntimeConfiguration(
@@ -65,10 +67,16 @@ export async function loadRuntimeConfiguration(
     prefix: "PEGARR_RADARR",
     defaultInstanceId: "radarr",
   });
+  const bazarr = await loadIntegrationConfiguration(environment, {
+    displayName: "Bazarr",
+    prefix: "PEGARR_BAZARR",
+    defaultInstanceId: "bazarr",
+  });
 
   return {
     ...(sonarr === undefined ? {} : { sonarr }),
     ...(radarr === undefined ? {} : { radarr }),
+    ...(bazarr === undefined ? {} : { bazarr }),
   };
 }
 
@@ -160,7 +168,7 @@ function parseBoolean(value: string | undefined, name: string): boolean {
 
 async function readSecret(
   path: string,
-  displayName: "Sonarr" | "Radarr",
+  displayName: "Sonarr" | "Radarr" | "Bazarr",
   apiKeyFileName: string,
 ): Promise<SecretValue> {
   if (!isAbsolute(path)) {

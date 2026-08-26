@@ -60,4 +60,6 @@ Transport exception details are replaced with stable Pegarr messages. The key is
 
 On 2026-08-26, a read-only check without credentials confirmed that all three HTTPS routes are reachable and enforce authentication with `401` responses. Each response was 236 bytes and completed in approximately 33–38 ms. No body, key, private address, library ID, or library content was retained.
 
-`PEG-MANUAL-002` remains open until a separately authorized, authenticated read-only probe verifies the installed Bazarr version, bounded response sizes and latency, and a sanitized copy of the live profile and assignment shapes. Provider internals and subtitle downloads are outside this adapter.
+The packaged `probe:bazarr` command is now hermetically exercised against a synthetic sibling container on an internal-only Docker network. It reports only profile count, total language-item count, bounded response bytes, transport category, latency, and observation time.
+
+`PEG-MANUAL-002` remains open until that probe is run against the installed Bazarr and a separately authorized read verifies a sanitized copy of the live assignment shapes. Provider internals and subtitle downloads are outside this adapter.
