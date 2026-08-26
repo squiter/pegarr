@@ -32,10 +32,11 @@ export function buildFeasibilityReport(input: FeasibilityInput): FeasibilityRepo
     mode: "read_only",
     item: input.item,
     policy: input.policy,
-    providerStatus: input.providerResults.map(({ provider, status, detail }) => ({
+    providerStatus: input.providerResults.map(({ provider, status, detail, quota }) => ({
       provider,
       status,
       ...(detail === undefined ? {} : { detail }),
+      ...(quota === undefined ? {} : { quota }),
     })),
     releases: input.releases.map((release) => assessRelease(input, release)),
   };
@@ -70,10 +71,12 @@ export function assessLanguage(
 ): LanguageAssessment {
   const normalizedLanguage = normalizeLanguage(requirement.code);
   const unavailableProviders = providerResults.filter(({ status }) => status !== "success");
-  const matchingCandidates = providerResults
+  const mediaLanguageCandidates = providerResults
     .flatMap(({ subtitles }) => subtitles)
     .filter((candidate) => normalizeLanguage(candidate.language) === normalizedLanguage)
-    .filter((candidate) => mediaMatches(item, candidate))
+    .filter((candidate) => mediaMatches(item, candidate));
+  const matchingCandidates = mediaLanguageCandidates
+    .filter((candidate) => subtitleTypeMatches(requirement, candidate))
     .map((candidate) => scoreCandidate(release, candidate))
     .sort((left, right) => right.score - left.score);
   const best = matchingCandidates[0];
@@ -89,6 +92,26 @@ export function assessLanguage(
       providerCount: new Set(matchingCandidates.map(({ candidate }) => candidate.provider)).size,
       evidence: toEvidence(best),
       warnings,
+    };
+  }
+
+  const incompleteTypeEvidence = mediaLanguageCandidates.filter((candidate) =>
+    subtitleTypeEvidenceMissing(requirement, candidate),
+  );
+  if (incompleteTypeEvidence.length > 0) {
+    return {
+      language: requirement.code,
+      required: requirement.required,
+      confidence: "unknown",
+      providerCount: new Set(incompleteTypeEvidence.map(({ provider }) => provider)).size,
+      warnings: [
+        ...warnings,
+        ...new Set(
+          incompleteTypeEvidence.map(
+            ({ provider }) => `${provider} did not report the required subtitle-type evidence`,
+          ),
+        ),
+      ],
     };
   }
 
@@ -109,6 +132,35 @@ export function assessLanguage(
     providerCount: 0,
     warnings: [],
   };
+}
+
+function subtitleTypeEvidenceMissing(
+  requirement: SubtitleLanguageRequirement,
+  candidate: SubtitleCandidate,
+): boolean {
+  if (requirement.forced && candidate.forced === undefined) {
+    return true;
+  }
+  return (
+    (requirement.hearingImpaired === "required" || requirement.hearingImpaired === "avoid") &&
+    candidate.hearingImpaired === undefined
+  );
+}
+
+function subtitleTypeMatches(
+  requirement: SubtitleLanguageRequirement,
+  candidate: SubtitleCandidate,
+): boolean {
+  if (requirement.forced ? candidate.forced !== true : candidate.forced === true) {
+    return false;
+  }
+  if (requirement.hearingImpaired === "required") {
+    return candidate.hearingImpaired === true;
+  }
+  if (requirement.hearingImpaired === "avoid") {
+    return candidate.hearingImpaired !== true;
+  }
+  return true;
 }
 
 function scoreCandidate(release: ArrReleaseCandidate, candidate: SubtitleCandidate): ScoredCandidate {

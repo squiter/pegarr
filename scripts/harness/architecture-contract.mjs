@@ -15,6 +15,7 @@ const adapterImports = {
   "src/adapters/sonarr.ts": ["node:crypto", "../domain.js", "./http.js"],
   "src/adapters/radarr.ts": ["node:crypto", "../domain.js", "./http.js"],
   "src/adapters/bazarr.ts": ["../domain.js", "./http.js"],
+  "src/adapters/subdl.ts": ["node:crypto", "../domain.js", "./http.js"],
 };
 
 for (const [file, allowedImports] of Object.entries(coreImports)) {
@@ -63,6 +64,18 @@ if (
   bazarrAdapter.includes('method: "DELETE"')
 ) {
   issues.push("The Phase 0 Bazarr adapter must remain read-only");
+}
+
+const subdlAdapter = readFileSync(resolve(repoRoot, "src/adapters/subdl.ts"), "utf8");
+if (
+  !subdlAdapter.includes('method: "GET"') ||
+  subdlAdapter.includes('method: "POST"') ||
+  subdlAdapter.includes('/download')
+) {
+  issues.push("The Phase 0 SubDL adapter must remain search-only and read-only");
+}
+if (!subdlAdapter.includes("authorization: `Bearer ${this.#apiKey}`") || /api_key/u.test(subdlAdapter)) {
+  issues.push("The SubDL API key must remain in the authorization header and out of URLs");
 }
 
 const fetchTransport = readFileSync(

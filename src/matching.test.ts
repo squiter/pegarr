@@ -86,3 +86,79 @@ test("PEG-MATCH-005 wrong episodes are rejected before release scoring", () => {
 
   assert.equal(buildFeasibilityReport(input).releases[0]?.subtitle.confidence, "no_match_found");
 });
+
+test("PEG-MATCH-006 forced and hearing-impaired requirements filter candidates locally", () => {
+  const baseCandidate = {
+    id: "subtitle-type",
+    provider: "subdl",
+    language: "en",
+    releaseName: demoFeasibilityInput.releases[0]!.title,
+    mediaIds: demoFeasibilityInput.item.ids,
+    season: 3,
+    episode: 5,
+  };
+  const providerResults: readonly ProviderSearchResult[] = [
+    {
+      provider: "subdl",
+      status: "success",
+      subtitles: [
+        { ...baseCandidate, id: "normal", hearingImpaired: false, forced: false },
+        { ...baseCandidate, id: "hi", hearingImpaired: true, forced: false },
+        { ...baseCandidate, id: "forced", hearingImpaired: false, forced: true },
+      ],
+    },
+  ];
+
+  const normal = assessLanguage(
+    demoFeasibilityInput.item,
+    demoFeasibilityInput.releases[0]!,
+    { code: "en", required: true, forced: false, hearingImpaired: "avoid" },
+    providerResults,
+  );
+  const hearingImpaired = assessLanguage(
+    demoFeasibilityInput.item,
+    demoFeasibilityInput.releases[0]!,
+    { code: "en", required: true, forced: false, hearingImpaired: "required" },
+    providerResults,
+  );
+  const forced = assessLanguage(
+    demoFeasibilityInput.item,
+    demoFeasibilityInput.releases[0]!,
+    { code: "en", required: true, forced: true, hearingImpaired: "either" },
+    providerResults,
+  );
+
+  assert.equal(normal.evidence?.subtitleId, "normal");
+  assert.equal(hearingImpaired.evidence?.subtitleId, "hi");
+  assert.equal(forced.evidence?.subtitleId, "forced");
+});
+
+test("PEG-MATCH-007 missing required subtitle-type metadata remains Unknown", () => {
+  const result = assessLanguage(
+    demoFeasibilityInput.item,
+    demoFeasibilityInput.releases[0]!,
+    { code: "en", required: true, forced: true, hearingImpaired: "either" },
+    [
+      {
+        provider: "subdl",
+        status: "success",
+        subtitles: [
+          {
+            id: "type-unreported",
+            provider: "subdl",
+            language: "en",
+            releaseName: demoFeasibilityInput.releases[0]!.title,
+            mediaIds: demoFeasibilityInput.item.ids,
+            season: 3,
+            episode: 5,
+          },
+        ],
+      },
+    ],
+  );
+
+  assert.equal(result.confidence, "unknown");
+  assert.deepEqual(result.warnings, [
+    "subdl did not report the required subtitle-type evidence",
+  ]);
+});

@@ -16,6 +16,8 @@
 | PEG-MATCH-003 | Provider failure becomes Unknown | `src/matching.test.ts` |
 | PEG-MATCH-004 | Successful empty search becomes No match found | `src/matching.test.ts` |
 | PEG-MATCH-005 | Wrong episodes are rejected before scoring | `src/matching.test.ts` |
+| PEG-MATCH-006 | Forced and hearing-impaired requirements filter candidates locally | `src/matching.test.ts` |
+| PEG-MATCH-007 | Missing required subtitle-type metadata remains Unknown | `src/matching.test.ts` |
 | PEG-HARNESS-001 | Changed paths select the intended sensors | `scripts/harness/run-checks.test.mjs` |
 | PEG-HARNESS-002 | Noisy failures become compact signals | `scripts/harness/run-checks.test.mjs` |
 | PEG-HARNESS-003 | Docker frontend timeouts use one bounded fallback | `scripts/harness/run-checks.test.mjs` |
@@ -57,6 +59,11 @@
 | PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-004 | Missing and unassigned policies remain explicitly unresolved | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-005 | Failures are classified and malformed responses stay distinct | `src/adapters/bazarr.test.ts` |
+| PEG-SUBDL-001 | Exact searches are bounded GETs with header-only authentication | `src/adapters/subdl.test.ts` |
+| PEG-SUBDL-002 | Release evidence remains local-matchable while download handles are discarded | `src/adapters/subdl.test.ts` |
+| PEG-SUBDL-003 | Successful empty and malformed searches remain distinct | `src/adapters/subdl.test.ts` |
+| PEG-SUBDL-004 | Quota, timeout, outage, auth, and malformed data stay classified | `src/adapters/subdl.test.ts` |
+| PEG-SUBDL-005 | One stable item-language window uses one request until expiry | `src/adapters/subdl.test.ts` |
 
 ## Explicit manual gaps
 
@@ -66,5 +73,6 @@
 | PEG-MANUAL-002 | Live Bazarr policy resolution | The official v1.6.0 contract and live authentication boundary are proven, but installed-version compatibility and sanitized authenticated profile evidence remain unverified |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside Phase 0 and require explicit confirmation |
+| PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.

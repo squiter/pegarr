@@ -77,11 +77,21 @@ export interface SubtitleCandidate {
   readonly id: string;
   readonly provider: string;
   readonly language: string;
+  readonly providerLanguage?: string;
   readonly releaseName: string;
   readonly mediaIds: Readonly<Record<string, string>>;
   readonly season?: number;
   readonly episode?: number;
+  readonly hearingImpaired?: boolean;
+  readonly forced?: boolean;
+  readonly fullSeason?: boolean;
   readonly traits?: ReleaseTraits;
+}
+
+export interface ProviderQuotaEvidence {
+  readonly limit?: number;
+  readonly remaining?: number;
+  readonly resetAtEpochSeconds?: number;
 }
 
 export interface ProviderSearchResult {
@@ -89,6 +99,7 @@ export interface ProviderSearchResult {
   readonly status: ProviderSearchStatus;
   readonly subtitles: readonly SubtitleCandidate[];
   readonly detail?: string;
+  readonly quota?: ProviderQuotaEvidence;
 }
 
 export interface FeasibilityInput {
@@ -140,6 +151,7 @@ export interface FeasibilityReport {
     readonly provider: string;
     readonly status: ProviderSearchStatus;
     readonly detail?: string;
+    readonly quota?: ProviderQuotaEvidence;
   }[];
   readonly releases: readonly ReleaseAssessment[];
 }

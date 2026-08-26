@@ -67,6 +67,18 @@
       "boundary": "Pure deterministic matching"
     },
     {
+      "id": "PEG-MATCH-006",
+      "title": "Forced and hearing-impaired requirements filter candidates locally",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching over synthetic subtitle-type evidence"
+    },
+    {
+      "id": "PEG-MATCH-007",
+      "title": "Missing required subtitle-type metadata remains Unknown",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching over incomplete synthetic provider evidence"
+    },
+    {
       "id": "PEG-HARNESS-001",
       "title": "Affected paths select the narrow deterministic sensor set",
       "evidence": "scripts/harness/run-checks.test.mjs",
@@ -311,6 +323,36 @@
       "title": "Bazarr failures are classified and malformed responses stay distinct",
       "evidence": "src/adapters/bazarr.test.ts",
       "boundary": "Injected status, transport, and response failures; no retries or network"
+    },
+    {
+      "id": "PEG-SUBDL-001",
+      "title": "SubDL exact searches are bounded GETs with header-only authentication",
+      "evidence": "src/adapters/subdl.test.ts",
+      "boundary": "Injected transport and synthetic API key; no network"
+    },
+    {
+      "id": "PEG-SUBDL-002",
+      "title": "SubDL release evidence is local-matchable and download handles are discarded",
+      "evidence": "src/adapters/subdl.test.ts",
+      "boundary": "Sanitized synthetic v2-shaped episode response"
+    },
+    {
+      "id": "PEG-SUBDL-003",
+      "title": "Successful empty and malformed SubDL searches remain distinct",
+      "evidence": "src/adapters/subdl.test.ts",
+      "boundary": "Injected response bodies; no network"
+    },
+    {
+      "id": "PEG-SUBDL-004",
+      "title": "SubDL quota, timeout, outage, auth, and malformed data stay classified",
+      "evidence": "src/adapters/subdl.test.ts",
+      "boundary": "Injected statuses and transport failures; no retries or network"
+    },
+    {
+      "id": "PEG-SUBDL-005",
+      "title": "One stable SubDL item-language window uses one request until expiry",
+      "evidence": "src/adapters/subdl.test.ts",
+      "boundary": "Injected transport, promise gate, and deterministic clock"
     }
   ],
   "manualGaps": [
@@ -333,6 +375,11 @@
       "id": "PEG-MANUAL-004",
       "title": "Any future Grab confirmation flow",
       "reason": "Mutating behavior is outside Phase 0 and must never run against a live service automatically"
+    },
+    {
+      "id": "PEG-MANUAL-005",
+      "title": "Live SubDL v2 search and language-code compatibility",
+      "reason": "The official request, quota contract, live route, and authentication boundary are pinned, but an authenticated sanitized response and Bazarr-to-SubDL language mapping have not been verified"
     }
   ]
 }
