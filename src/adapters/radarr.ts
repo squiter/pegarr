@@ -40,6 +40,13 @@ export interface RadarrClientOptions {
   readonly maxResponseBytes?: number;
 }
 
+export interface RadarrSystemStatus {
+  readonly appName: "Radarr";
+  readonly version: string;
+  readonly isDocker?: boolean;
+  readonly responseBytes?: number;
+}
+
 const defaultTimeoutMs = 15_000;
 const defaultMaxResponseBytes = 5 * 1024 * 1024;
 
@@ -94,6 +101,39 @@ export class RadarrClient {
     }
   }
 
+  async readSystemStatus(): Promise<RadarrSystemStatus> {
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/system/status",
+      query: {},
+      headers: {
+        accept: "application/json",
+        "x-api-key": this.#apiKey,
+      },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: Math.min(this.#maxResponseBytes, 256 * 1024),
+    });
+
+    assertSuccessfulStatus(response, "status probe");
+    try {
+      const status = mapRadarrSystemStatus(response.body);
+      const responseBytes = optionalBoundedInteger(
+        response.responseBytes,
+        0,
+        256 * 1024,
+        "system status responseBytes",
+      );
+      return {
+        ...status,
+        ...(responseBytes === undefined ? {} : { responseBytes }),
+      };
+    } catch {
+      throw new RadarrAdapterError("invalid_response", "Radarr returned an invalid status response", {
+        status: response.status,
+      });
+    }
+  }
+
   async #requestJson(request: ReadonlyJsonRequest): Promise<JsonResponse> {
     try {
       return await this.#transport.requestJson(request);
@@ -107,6 +147,25 @@ export class RadarrClient {
       throw new RadarrAdapterError("unavailable", "Radarr request transport failed");
     }
   }
+}
+
+export function mapRadarrSystemStatus(body: unknown): RadarrSystemStatus {
+  const status = record(body, "system status");
+  const appName = requiredString(status.appName, "system status.appName");
+  if (appName.toLowerCase() !== "radarr") {
+    throw new TypeError("system status.appName must identify Radarr");
+  }
+  const version = requiredString(status.version, "system status.version");
+  if (!/^[0-9][0-9a-z._+-]{0,63}$/iu.test(version)) {
+    throw new TypeError("system status.version must be a safe version label");
+  }
+  const isDocker = optionalBoolean(status.isDocker, "system status.isDocker");
+
+  return {
+    appName: "Radarr",
+    version,
+    ...(isDocker === undefined ? {} : { isDocker }),
+  };
 }
 
 export function mapRadarrReleaseResponse(
@@ -264,6 +323,13 @@ function requiredBoolean(value: unknown, field: string): boolean {
   return value;
 }
 
+function optionalBoolean(value: unknown, field: string): boolean | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return requiredBoolean(value, field);
+}
+
 function stringArray(value: unknown, field: string): readonly string[] {
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
     throw new TypeError(`${field} must be an array of strings`);
@@ -314,4 +380,13 @@ function boundedInteger(value: number, minimum: number, maximum: number, field: 
     throw new TypeError(`${field} must be an integer between ${minimum} and ${maximum}`);
   }
   return value;
+}
+
+function optionalBoundedInteger(
+  value: number | undefined,
+  minimum: number,
+  maximum: number,
+  field: string,
+): number | undefined {
+  return value === undefined ? undefined : boundedInteger(value, minimum, maximum, field);
 }

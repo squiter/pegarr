@@ -71,7 +71,9 @@ for (const contract of [
 
 const configuration = readFileSync(resolve(repoRoot, "src/config.ts"), "utf8");
 for (const contract of [
-  "PEGARR_SONARR_API_KEY_FILE",
+  'prefix: "PEGARR_SONARR"',
+  'prefix: "PEGARR_RADARR"',
+  '`${spec.prefix}_API_KEY_FILE`',
   "maximumSecretBytes = 4_096",
   'return "[redacted]"',
 ]) {
@@ -86,6 +88,14 @@ if (!sonarrCompose.includes("PEGARR_SONARR_API_KEY_FILE: /run/secrets/sonarr_api
 }
 if (/PEGARR_SONARR_API_KEY\s*:/u.test(sonarrCompose)) {
   issues.push("The Sonarr Compose overlay may not pass the API key as an environment value");
+}
+
+const radarrCompose = readFileSync(resolve(repoRoot, "deploy/compose.radarr.yaml"), "utf8");
+if (!radarrCompose.includes("PEGARR_RADARR_API_KEY_FILE: /run/secrets/radarr_api_key")) {
+  issues.push("The Radarr Compose overlay must mount the API key through a secret file");
+}
+if (/PEGARR_RADARR_API_KEY\s*:/u.test(radarrCompose)) {
+  issues.push("The Radarr Compose overlay may not pass the API key as an environment value");
 }
 
 const packageJson = readJson("package.json");
@@ -110,6 +120,9 @@ for (const [name, command] of Object.entries(requiredHarnessScripts)) {
 if (packageJson.scripts?.["probe:sonarr"] !== "node dist/probe-sonarr.js") {
   issues.push("package.json script probe:sonarr must remain the read-only packaged probe");
 }
+if (packageJson.scripts?.["probe:radarr"] !== "node dist/probe-radarr.js") {
+  issues.push("package.json script probe:radarr must remain the read-only packaged probe");
+}
 
 const ciWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/ci.yml"), "utf8");
 if (!ciWorkflow.includes("run: npm run check")) {
@@ -130,6 +143,9 @@ if (manifest.phase.startsWith("phase-0")) {
   }
   if (!app.includes('"/api/v1/integrations/sonarr/status"')) {
     issues.push("Phase 0 must retain the read-only Sonarr status route");
+  }
+  if (!app.includes('"/api/v1/integrations/radarr/status"')) {
+    issues.push("Phase 0 must retain the read-only Radarr status route");
   }
 }
 

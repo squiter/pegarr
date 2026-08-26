@@ -44,12 +44,20 @@
 | PEG-RADARR-003 | Successful empty and malformed Radarr responses stay distinct | `src/adapters/radarr.test.ts` |
 | PEG-RADARR-004 | Radarr authentication, quota, outage, and transport failures are classified | `src/adapters/radarr.test.ts` |
 | PEG-RADARR-005 | Radarr selection secrets never enter release evidence | `src/adapters/radarr.test.ts` |
+| PEG-RADARR-006 | Radarr system status is bounded and private metadata is discarded | `src/adapters/radarr.test.ts` |
+| PEG-CONFIG-003 | Radarr credentials use an independent bounded secret file | `src/config.test.ts` |
+| PEG-RUNTIME-005 | Configured Radarr status returns measured browser-safe evidence | `src/runtime.test.ts` |
+| PEG-RUNTIME-006 | Radarr failures and refreshes stay classified and bounded | `src/runtime.test.ts` |
+| PEG-RUNTIME-007 | Radarr status is read-only and disabled without configuration | `src/app.test.ts` |
+| PEG-PROBE-003 | The one-shot Radarr probe reports measured safe evidence | `src/probe-radarr.test.ts` |
+| PEG-PROBE-004 | Radarr probe exit states stay distinct and redacted | `src/probe-radarr.test.ts` |
+| PEG-DOCKER-003 | The packaged runtime reads a Radarr secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Sonarr version, Docker runtime, routes, authentication enforcement, and unauthenticated latency are verified; the authenticated packaged probe and release response remain open, while Radarr is fixture-proven only |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Sonarr version, Docker runtime, routes, authentication enforcement, and unauthenticated latency are verified; its authenticated packaged probe and release response remain open, while Radarr release and status contracts are fixture-proven but not yet checked against the NAS |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | Needs a sanitized contract capture first |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside Phase 0 and require explicit confirmation |

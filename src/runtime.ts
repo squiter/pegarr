@@ -1,9 +1,18 @@
 import type { FetchImplementation } from "./adapters/fetch-json-transport.js";
 import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
-import { SonarrAdapterError, SonarrClient } from "./adapters/sonarr.js";
-import type { RuntimeConfiguration } from "./config.js";
+import {
+  RadarrAdapterError,
+  RadarrClient,
+  type RadarrSystemStatus,
+} from "./adapters/radarr.js";
+import {
+  SonarrAdapterError,
+  SonarrClient,
+  type SonarrSystemStatus,
+} from "./adapters/sonarr.js";
+import type { ArrRuntimeConfiguration, RuntimeConfiguration } from "./config.js";
 
-export type SonarrIntegrationState =
+export type ArrIntegrationState =
   | "disabled"
   | "available"
   | "unauthorized"
@@ -12,12 +21,15 @@ export type SonarrIntegrationState =
   | "unexpected_status"
   | "invalid_response";
 
-export interface SonarrIntegrationStatus {
-  readonly integration: "sonarr";
+export interface ArrIntegrationStatus<
+  Integration extends "sonarr" | "radarr",
+  AppName extends "Sonarr" | "Radarr",
+> {
+  readonly integration: Integration;
   readonly mode: "read_only";
   readonly configured: boolean;
-  readonly state: SonarrIntegrationState;
-  readonly appName?: "Sonarr";
+  readonly state: ArrIntegrationState;
+  readonly appName?: AppName;
   readonly version?: string;
   readonly isDocker?: boolean;
   readonly retryAfterSeconds?: number;
@@ -27,66 +39,148 @@ export interface SonarrIntegrationStatus {
   readonly observedAt?: string;
 }
 
+export type SonarrIntegrationStatus = ArrIntegrationStatus<"sonarr", "Sonarr">;
+export type RadarrIntegrationStatus = ArrIntegrationStatus<"radarr", "Radarr">;
+
 export interface RuntimeServices {
   readSonarrStatus(): Promise<SonarrIntegrationStatus>;
+  readRadarrStatus(): Promise<RadarrIntegrationStatus>;
 }
 
 export interface RuntimeServicesOptions {
   readonly fetchImplementation?: FetchImplementation;
   readonly now?: () => number;
   readonly sonarrStatusTtlMs?: number;
+  readonly radarrStatusTtlMs?: number;
 }
 
-const defaultSonarrStatusTtlMs = 30_000;
+interface AdapterErrorShape {
+  readonly code: Exclude<ArrIntegrationState, "disabled" | "available">;
+  readonly retryAfterSeconds: number | undefined;
+}
+
+interface StatusClient<Status> {
+  readSystemStatus(): Promise<Status>;
+}
+
+interface StatusReaderSpec<
+  Integration extends "sonarr" | "radarr",
+  AppName extends "Sonarr" | "Radarr",
+  Status extends {
+    readonly appName: AppName;
+    readonly version: string;
+    readonly isDocker?: boolean;
+    readonly responseBytes?: number;
+  },
+> {
+  readonly integration: Integration;
+  readonly configuration: ArrRuntimeConfiguration | undefined;
+  readonly createClient: (transport: FetchJsonTransport) => StatusClient<Status>;
+  readonly isAdapterError: (error: unknown) => error is AdapterErrorShape;
+  readonly fetchImplementation: FetchImplementation | undefined;
+  readonly now: () => number;
+  readonly ttlMs: number;
+}
+
+const defaultStatusTtlMs = 30_000;
 
 export function createRuntimeServices(
   configuration: RuntimeConfiguration,
   options: RuntimeServicesOptions = {},
 ): RuntimeServices {
-  const sonarrConfiguration = configuration.sonarr;
-  if (sonarrConfiguration === undefined) {
-    return {
-      async readSonarrStatus() {
-        return {
-          integration: "sonarr",
-          mode: "read_only",
-          configured: false,
-          state: "disabled",
-        };
-      },
+  const now = options.now ?? Date.now;
+  const readSonarrStatus = createStatusReader<"sonarr", "Sonarr", SonarrSystemStatus>({
+    integration: "sonarr",
+    configuration: configuration.sonarr,
+    createClient: (transport) =>
+      new SonarrClient(
+        {
+          instanceId: configuration.sonarr?.instanceId ?? "sonarr",
+          apiKey: configuration.sonarr?.apiKey.reveal() ?? "unreachable-disabled-key",
+        },
+        transport,
+      ),
+    isAdapterError: (error): error is SonarrAdapterError => error instanceof SonarrAdapterError,
+    fetchImplementation: options.fetchImplementation,
+    now,
+    ttlMs: boundedCacheTtl(
+      options.sonarrStatusTtlMs ?? defaultStatusTtlMs,
+      "sonarrStatusTtlMs",
+    ),
+  });
+  const readRadarrStatus = createStatusReader<"radarr", "Radarr", RadarrSystemStatus>({
+    integration: "radarr",
+    configuration: configuration.radarr,
+    createClient: (transport) =>
+      new RadarrClient(
+        {
+          instanceId: configuration.radarr?.instanceId ?? "radarr",
+          apiKey: configuration.radarr?.apiKey.reveal() ?? "unreachable-disabled-key",
+        },
+        transport,
+      ),
+    isAdapterError: (error): error is RadarrAdapterError => error instanceof RadarrAdapterError,
+    fetchImplementation: options.fetchImplementation,
+    now,
+    ttlMs: boundedCacheTtl(
+      options.radarrStatusTtlMs ?? defaultStatusTtlMs,
+      "radarrStatusTtlMs",
+    ),
+  });
+
+  return { readSonarrStatus, readRadarrStatus };
+}
+
+function createStatusReader<
+  Integration extends "sonarr" | "radarr",
+  AppName extends "Sonarr" | "Radarr",
+  Status extends {
+    readonly appName: AppName;
+    readonly version: string;
+    readonly isDocker?: boolean;
+    readonly responseBytes?: number;
+  },
+>(
+  spec: StatusReaderSpec<Integration, AppName, Status>,
+): () => Promise<ArrIntegrationStatus<Integration, AppName>> {
+  const integrationConfiguration = spec.configuration;
+  if (integrationConfiguration === undefined) {
+    const disabled: ArrIntegrationStatus<Integration, AppName> = {
+      integration: spec.integration,
+      mode: "read_only",
+      configured: false,
+      state: "disabled",
     };
+    return async () => disabled;
   }
 
   const transport = new FetchJsonTransport({
-    baseUrl: sonarrConfiguration.baseUrl,
-    allowedHosts: sonarrConfiguration.allowedHosts,
-    allowInsecureHttp: sonarrConfiguration.allowInsecureHttp,
-    ...(options.fetchImplementation === undefined
+    baseUrl: integrationConfiguration.baseUrl,
+    allowedHosts: integrationConfiguration.allowedHosts,
+    allowInsecureHttp: integrationConfiguration.allowInsecureHttp,
+    ...(spec.fetchImplementation === undefined
       ? {}
-      : { fetchImplementation: options.fetchImplementation }),
+      : { fetchImplementation: spec.fetchImplementation }),
   });
-  const client = new SonarrClient(
-    {
-      instanceId: sonarrConfiguration.instanceId,
-      apiKey: sonarrConfiguration.apiKey.reveal(),
-    },
-    transport,
-  );
-  const now = options.now ?? Date.now;
-  const statusTtlMs = boundedCacheTtl(options.sonarrStatusTtlMs ?? defaultSonarrStatusTtlMs);
+  const client = spec.createClient(transport);
   const transportSecurity =
-    new URL(sonarrConfiguration.baseUrl).protocol === "https:" ? "https" : "explicit_http";
+    new URL(integrationConfiguration.baseUrl).protocol === "https:" ? "https" : "explicit_http";
   let cachedStatus:
-    | { readonly value: SonarrIntegrationStatus; readonly expiresAt: number }
+    | {
+        readonly value: ArrIntegrationStatus<Integration, AppName>;
+        readonly expiresAt: number;
+      }
     | undefined;
-  let inFlight: Promise<SonarrIntegrationStatus> | undefined;
+  let inFlight: Promise<ArrIntegrationStatus<Integration, AppName>> | undefined;
 
-  const probeStatus = async (startedAt: number): Promise<SonarrIntegrationStatus> => {
-    let value: SonarrIntegrationStatus;
+  const probeStatus = async (
+    startedAt: number,
+  ): Promise<ArrIntegrationStatus<Integration, AppName>> => {
+    let value: ArrIntegrationStatus<Integration, AppName>;
     try {
       const status = await client.readSystemStatus();
       value = {
-        integration: "sonarr",
+        integration: spec.integration,
         mode: "read_only",
         configured: true,
         state: "available",
@@ -97,9 +191,9 @@ export function createRuntimeServices(
         ...(status.responseBytes === undefined ? {} : { responseBytes: status.responseBytes }),
       };
     } catch (error) {
-      if (error instanceof SonarrAdapterError) {
+      if (spec.isAdapterError(error)) {
         value = {
-          integration: "sonarr",
+          integration: spec.integration,
           mode: "read_only",
           configured: true,
           state: error.code,
@@ -110,7 +204,7 @@ export function createRuntimeServices(
         };
       } else {
         value = {
-          integration: "sonarr",
+          integration: spec.integration,
           mode: "read_only",
           configured: true,
           state: "unavailable",
@@ -118,38 +212,39 @@ export function createRuntimeServices(
         };
       }
     }
-    const completedAt = now();
-    const latencyMs = safeElapsedMilliseconds(startedAt, completedAt);
-    const measured = { ...value, latencyMs, observedAt: safeTimestamp(completedAt) };
-    cachedStatus = { value: measured, expiresAt: completedAt + statusTtlMs };
+    const completedAt = spec.now();
+    const measured = {
+      ...value,
+      latencyMs: safeElapsedMilliseconds(startedAt, completedAt),
+      observedAt: safeTimestamp(completedAt),
+    };
+    cachedStatus = { value: measured, expiresAt: completedAt + spec.ttlMs };
     return measured;
   };
 
-  return {
-    async readSonarrStatus() {
-      const requestedAt = now();
-      if (cachedStatus !== undefined && requestedAt < cachedStatus.expiresAt) {
-        return cachedStatus.value;
+  return async () => {
+    const requestedAt = spec.now();
+    if (cachedStatus !== undefined && requestedAt < cachedStatus.expiresAt) {
+      return cachedStatus.value;
+    }
+    if (inFlight !== undefined) {
+      return inFlight;
+    }
+    const currentProbe = probeStatus(requestedAt);
+    inFlight = currentProbe;
+    try {
+      return await currentProbe;
+    } finally {
+      if (inFlight === currentProbe) {
+        inFlight = undefined;
       }
-      if (inFlight !== undefined) {
-        return inFlight;
-      }
-      const currentProbe = probeStatus(requestedAt);
-      inFlight = currentProbe;
-      try {
-        return await currentProbe;
-      } finally {
-        if (inFlight === currentProbe) {
-          inFlight = undefined;
-        }
-      }
-    },
+    }
   };
 }
 
-function boundedCacheTtl(value: number): number {
+function boundedCacheTtl(value: number, name: string): number {
   if (!Number.isSafeInteger(value) || value < 0 || value > 5 * 60_000) {
-    throw new TypeError("sonarrStatusTtlMs must be an integer between 0 and 300000");
+    throw new TypeError(`${name} must be an integer between 0 and 300000`);
   }
   return value;
 }

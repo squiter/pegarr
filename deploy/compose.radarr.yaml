@@ -1,0 +1,14 @@
+services:
+  pegarr:
+    environment:
+      PEGARR_RADARR_URL: ${PEGARR_RADARR_URL:?set PEGARR_RADARR_URL}
+      PEGARR_RADARR_ALLOWED_HOSTS: ${PEGARR_RADARR_ALLOWED_HOSTS:?set PEGARR_RADARR_ALLOWED_HOSTS}
+      PEGARR_RADARR_API_KEY_FILE: /run/secrets/radarr_api_key
+      PEGARR_RADARR_INSTANCE_ID: ${PEGARR_RADARR_INSTANCE_ID:-radarr}
+      PEGARR_RADARR_ALLOW_INSECURE_HTTP: ${PEGARR_RADARR_ALLOW_INSECURE_HTTP:-false}
+    secrets:
+      - radarr_api_key
+
+secrets:
+  radarr_api_key:
+    file: ${PEGARR_RADARR_API_KEY_HOST_FILE:?set an absolute PEGARR_RADARR_API_KEY_HOST_FILE}

@@ -63,13 +63,14 @@ async function smokeTest() {
     }
 
     const probe = [
-      "const checks = ['/health/ready', '/api/v1/feasibility/demo', '/api/v1/integrations/sonarr/status'];",
+      "const checks = ['/health/ready', '/api/v1/feasibility/demo', '/api/v1/integrations/sonarr/status', '/api/v1/integrations/radarr/status'];",
       "Promise.all(checks.map(async (path) => {",
       "  const response = await fetch('http://127.0.0.1:8080' + path);",
       "  const body = await response.json();",
       "  if (response.status !== 200) throw new Error(path + ' returned ' + response.status);",
       "  if (path.endsWith('/demo') && body.mode !== 'read_only') throw new Error('demo is not read_only');",
       "  if (path.endsWith('/sonarr/status') && (body.mode !== 'read_only' || body.state !== 'disabled')) throw new Error('Sonarr status is not safely disabled');",
+      "  if (path.endsWith('/radarr/status') && (body.mode !== 'read_only' || body.state !== 'disabled')) throw new Error('Radarr status is not safely disabled');",
       "  return path + '=200';",
       "})).then((results) => console.log(results.join(', ')));",
     ].join("\n");
@@ -91,18 +92,18 @@ async function smokeTest() {
   }
 }
 
-async function configuredSonarrSmokeTest() {
-  const scenario = "PEG-DOCKER-002";
+async function configuredArrSmokeTest({ scenario, integration, appName, version, port }) {
+  const upperIntegration = integration.toUpperCase();
   const suffix = `${process.pid}`;
-  const networkName = `pegarr-harness-internal-${suffix}`;
-  const fixtureName = `pegarr-harness-sonarr-${suffix}`;
-  const pegarrName = `pegarr-harness-configured-${suffix}`;
+  const networkName = `pegarr-harness-${integration}-internal-${suffix}`;
+  const fixtureName = `pegarr-harness-${integration}-${suffix}`;
+  const pegarrName = `pegarr-harness-${integration}-configured-${suffix}`;
   const artifactsDirectory = resolve(".artifacts");
   mkdirSync(artifactsDirectory, { recursive: true });
   const secretDirectory = mkdtempSync(
     join(artifactsDirectory, "pegarr-synthetic-docker-"),
   );
-  const secretPath = join(secretDirectory, "sonarr_api_key");
+  const secretPath = join(secretDirectory, `${integration}_api_key`);
   const syntheticKey = "synthetic-docker-api-key";
   writeFileSync(secretPath, syntheticKey, { mode: 0o444 });
 
@@ -122,7 +123,7 @@ async function configuredSonarrSmokeTest() {
   const fixtureScript = [
     "const { createServer } = require('node:http');",
     `const expectedKey = ${JSON.stringify(syntheticKey)};`,
-    "const body = { appName: 'Sonarr', version: '5.0.0.0', isDocker: true, instanceName: 'private synthetic instance', startupPath: '/private/synthetic/path' };",
+    `const body = { appName: ${JSON.stringify(appName)}, version: ${JSON.stringify(version)}, isDocker: true, instanceName: 'private synthetic instance', startupPath: '/private/synthetic/path' };`,
     "createServer((request, response) => {",
     "  if (request.method !== 'GET' || request.url !== '/api/v3/system/status' || request.headers['x-api-key'] !== expectedKey) {",
     "    response.writeHead(401, { 'content-type': 'application/json' });",
@@ -131,7 +132,7 @@ async function configuredSonarrSmokeTest() {
     "  }",
     "  response.writeHead(200, { 'content-type': 'application/json' });",
     "  response.end(JSON.stringify(body));",
-    "}).listen(8989, '0.0.0.0');",
+    `}).listen(${port}, '0.0.0.0');`,
   ].join("\n");
 
   try {
@@ -145,7 +146,7 @@ async function configuredSonarrSmokeTest() {
       "--network",
       networkName,
       "--network-alias",
-      "sonarr-fixture",
+      `${integration}-fixture`,
       "--read-only",
       "--tmpfs",
       "/tmp:rw,noexec,nosuid,size=16m",
@@ -155,7 +156,7 @@ async function configuredSonarrSmokeTest() {
       fixtureScript,
     ]);
     if (fixture.status !== 0) {
-      throw new Error(`${scenario} could not start the synthetic Sonarr container:\n${outputOf(fixture)}`);
+      throw new Error(`${scenario} could not start the synthetic ${appName} container:\n${outputOf(fixture)}`);
     }
 
     const started = docker([
@@ -171,15 +172,15 @@ async function configuredSonarrSmokeTest() {
       "--tmpfs",
       "/tmp:rw,noexec,nosuid,size=16m",
       "--mount",
-      `type=bind,source=${secretPath},target=/run/secrets/sonarr_api_key,readonly`,
+      `type=bind,source=${secretPath},target=/run/secrets/${integration}_api_key,readonly`,
       "--env",
-      "PEGARR_SONARR_URL=http://sonarr-fixture:8989",
+      `PEGARR_${upperIntegration}_URL=http://${integration}-fixture:${port}`,
       "--env",
-      "PEGARR_SONARR_ALLOWED_HOSTS=sonarr-fixture",
+      `PEGARR_${upperIntegration}_ALLOWED_HOSTS=${integration}-fixture`,
       "--env",
-      "PEGARR_SONARR_API_KEY_FILE=/run/secrets/sonarr_api_key",
+      `PEGARR_${upperIntegration}_API_KEY_FILE=/run/secrets/${integration}_api_key`,
       "--env",
-      "PEGARR_SONARR_ALLOW_INSECURE_HTTP=true",
+      `PEGARR_${upperIntegration}_ALLOW_INSECURE_HTTP=true`,
       "pegarr:harness",
     ]);
     if (started.status !== 0) {
@@ -192,13 +193,13 @@ async function configuredSonarrSmokeTest() {
     }
 
     const probe = [
-      "fetch('http://127.0.0.1:8080/api/v1/integrations/sonarr/status')",
+      `fetch('http://127.0.0.1:8080/api/v1/integrations/${integration}/status')`,
       "  .then(async (response) => ({ status: response.status, body: await response.json() }))",
       "  .then(({ status, body }) => {",
-      "    if (status !== 200 || body.mode !== 'read_only' || body.state !== 'available' || body.version !== '5.0.0.0') throw new Error('unexpected Sonarr status');",
+      `    if (status !== 200 || body.mode !== 'read_only' || body.state !== 'available' || body.version !== ${JSON.stringify(version)}) throw new Error('unexpected ${appName} status');`,
       "    const serialized = JSON.stringify(body);",
-      "    if (/private|synthetic-docker-api-key|sonarr-fixture/i.test(serialized)) throw new Error('private evidence escaped');",
-      "    console.log('Sonarr status=available, version=' + body.version);",
+      "    if (/private|synthetic-docker-api-key|(?:sonarr|radarr)-fixture/i.test(serialized)) throw new Error('private evidence escaped');",
+      `    console.log('${appName} status=available, version=' + body.version);`,
       "  });",
     ].join("\n");
 
@@ -228,12 +229,12 @@ async function configuredSonarrSmokeTest() {
       "npm",
       "run",
       "--silent",
-      "probe:sonarr",
+      `probe:${integration}`,
     ]);
     if (
       packagedProbe.status !== 0 ||
       !packagedProbe.stdout.includes('"state":"available"') ||
-      /private|synthetic-docker-api-key|sonarr-fixture/iu.test(packagedProbe.stdout)
+      /private|synthetic-docker-api-key|(?:sonarr|radarr)-fixture/iu.test(packagedProbe.stdout)
     ) {
       throw new Error(`${scenario} packaged probe failed:\n${outputOf(packagedProbe)}`);
     }
@@ -252,7 +253,20 @@ export async function main() {
   if (first.status === 0) {
     process.stdout.write(firstOutput);
     await smokeTest();
-    await configuredSonarrSmokeTest();
+    await configuredArrSmokeTest({
+      scenario: "PEG-DOCKER-002",
+      integration: "sonarr",
+      appName: "Sonarr",
+      version: "5.0.0.0",
+      port: 8989,
+    });
+    await configuredArrSmokeTest({
+      scenario: "PEG-DOCKER-003",
+      integration: "radarr",
+      appName: "Radarr",
+      version: "6.0.0.0",
+      port: 7878,
+    });
     return;
   }
 
@@ -268,7 +282,20 @@ export async function main() {
   if (fallback.status === 0) {
     process.stdout.write(fallbackOutput);
     await smokeTest();
-    await configuredSonarrSmokeTest();
+    await configuredArrSmokeTest({
+      scenario: "PEG-DOCKER-002",
+      integration: "sonarr",
+      appName: "Sonarr",
+      version: "5.0.0.0",
+      port: 8989,
+    });
+    await configuredArrSmokeTest({
+      scenario: "PEG-DOCKER-003",
+      integration: "radarr",
+      appName: "Radarr",
+      version: "6.0.0.0",
+      port: 7878,
+    });
     return;
   }
 

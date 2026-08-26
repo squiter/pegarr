@@ -4,7 +4,11 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import type { RuntimeServices, SonarrIntegrationStatus } from "./runtime.js";
+import type {
+  RadarrIntegrationStatus,
+  RuntimeServices,
+  SonarrIntegrationStatus,
+} from "./runtime.js";
 
 export interface RouteResult {
   readonly statusCode: number;
@@ -52,6 +56,7 @@ export async function resolveRoute(
     "/health/ready",
     "/api/v1/feasibility/demo",
     "/api/v1/integrations/sonarr/status",
+    "/api/v1/integrations/radarr/status",
   ]);
 
   if (knownReadOnlyRoutes.has(pathname) && method !== "GET") {
@@ -87,10 +92,41 @@ export async function resolveRoute(
     };
   }
 
+  if (pathname === "/api/v1/integrations/radarr/status") {
+    return {
+      statusCode: 200,
+      body: {
+        service: "pegarr",
+        ...(await safeRadarrStatus(services)),
+      },
+    };
+  }
+
   return {
     statusCode: 404,
     body: { service: "pegarr", status: "not_found" },
   };
+}
+
+async function safeRadarrStatus(services: RuntimeServices | undefined): Promise<RadarrIntegrationStatus> {
+  if (services === undefined) {
+    return {
+      integration: "radarr",
+      mode: "read_only",
+      configured: false,
+      state: "disabled",
+    };
+  }
+  try {
+    return await services.readRadarrStatus();
+  } catch {
+    return {
+      integration: "radarr",
+      mode: "read_only",
+      configured: true,
+      state: "unavailable",
+    };
+  }
 }
 
 export function createRequestHandler(dataDirectory: string, services?: RuntimeServices) {

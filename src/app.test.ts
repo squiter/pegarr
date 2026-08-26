@@ -70,3 +70,25 @@ test("PEG-RUNTIME-002 Sonarr status is read-only and disabled without configurat
     405,
   );
 });
+
+test("PEG-RUNTIME-007 Radarr status is read-only and disabled without configuration", async () => {
+  const result = await resolveRoute(
+    "GET",
+    "/api/v1/integrations/radarr/status",
+    tmpdir(),
+  );
+  assert.deepEqual(result, {
+    statusCode: 200,
+    body: {
+      service: "pegarr",
+      integration: "radarr",
+      mode: "read_only",
+      configured: false,
+      state: "disabled",
+    },
+  });
+  assert.equal(
+    (await resolveRoute("POST", "/api/v1/integrations/radarr/status", tmpdir())).statusCode,
+    405,
+  );
+});

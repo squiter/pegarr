@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { syntheticRadarrMovieReleaseResponse } from "../fixtures/radarr-release-search.js";
+import { syntheticRadarrSystemStatusResponse } from "../fixtures/radarr-system-status.js";
 import {
   JsonTransportError,
   type JsonResponse,
@@ -10,6 +11,7 @@ import {
 } from "./http.js";
 import {
   mapRadarrReleaseResponse,
+  mapRadarrSystemStatus,
   RadarrAdapterError,
   RadarrClient,
 } from "./radarr.js";
@@ -143,4 +145,41 @@ test("PEG-RADARR-005 selection secrets never enter Pegarr movie-release evidence
     /synthetic-radarr-guid|downloadUrl|magnetUrl|infoHash|example\.invalid/iu,
   );
   assert.match(serialized, /Synthetic Movie Indexer/u);
+});
+
+test("PEG-RADARR-006 system status is bounded and discards private upstream metadata", async () => {
+  const transport = new FakeTransport();
+  transport.response = {
+    status: 200,
+    headers: {},
+    body: syntheticRadarrSystemStatusResponse,
+    responseBytes: 512,
+  };
+
+  assert.deepEqual(await client(transport).readSystemStatus(), {
+    appName: "Radarr",
+    version: "6.0.0.0",
+    isDocker: true,
+    responseBytes: 512,
+  });
+  assert.deepEqual(transport.requests, [
+    {
+      method: "GET",
+      path: "/api/v3/system/status",
+      query: {},
+      headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+      timeoutMs: 2_500,
+      maxResponseBytes: 64_000,
+    },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(mapRadarrSystemStatus(syntheticRadarrSystemStatusResponse)),
+    /instanceName|startupPath|appData|osName|branch|urlBase|database/iu,
+  );
+
+  transport.response = { status: 200, headers: {}, body: { appName: "Not Radarr", version: "1" } };
+  await assert.rejects(
+    client(transport).readSystemStatus(),
+    (error: unknown) => error instanceof RadarrAdapterError && error.code === "invalid_response",
+  );
 });
