@@ -79,6 +79,12 @@
       "boundary": "Pure deterministic matching over incomplete synthetic provider evidence"
     },
     {
+      "id": "PEG-MATCH-008",
+      "title": "Provider results apply only to the language window actually searched",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching over scoped synthetic provider evidence"
+    },
+    {
       "id": "PEG-HARNESS-001",
       "title": "Affected paths select the narrow deterministic sensor set",
       "evidence": "scripts/harness/run-checks.test.mjs",
@@ -325,6 +331,12 @@
       "boundary": "Synthetic sibling container, search response, and secret; local Docker architecture only"
     },
     {
+      "id": "PEG-DOCKER-006",
+      "title": "Packaged episode report composes three integrations on an internal-only network",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling services, request file, and three secrets; local Docker architecture only"
+    },
+    {
       "id": "PEG-BAZARR-001",
       "title": "Bazarr policy reads are bounded GETs authenticated only by header",
       "evidence": "src/adapters/bazarr.test.ts",
@@ -407,6 +419,42 @@
       "title": "SubDL probe states stay distinct and invalid input remains redacted",
       "evidence": "src/probe-subdl.test.ts",
       "boundary": "Temporary synthetic secret and injected responses; no DNS or network"
+    },
+    {
+      "id": "PEG-FLOW-001",
+      "title": "Resolved Bazarr policy drives one SubDL search per language and one report",
+      "evidence": "src/episode-feasibility.test.ts",
+      "boundary": "Injected Sonarr, Bazarr, and SubDL sources over sanitized fixtures"
+    },
+    {
+      "id": "PEG-FLOW-002",
+      "title": "Missing provider language mappings stay scoped without extra requests",
+      "evidence": "src/episode-feasibility.test.ts",
+      "boundary": "Injected sources and deterministic request counters"
+    },
+    {
+      "id": "PEG-FLOW-003",
+      "title": "Unresolved Bazarr assignment stops provider work without assumed policy",
+      "evidence": "src/episode-feasibility.test.ts",
+      "boundary": "Injected unassigned policy response; provider source is not called"
+    },
+    {
+      "id": "PEG-FLOW-004",
+      "title": "Provider failure stops further searches and keeps every language Unknown",
+      "evidence": "src/episode-feasibility.test.ts",
+      "boundary": "Injected rate-limit result and deterministic request counters"
+    },
+    {
+      "id": "PEG-REPORT-001",
+      "title": "Packaged episode report composes all three read-only integrations",
+      "evidence": "src/report-sonarr-episode.test.ts",
+      "boundary": "Temporary request and secret files with one injected fetch boundary"
+    },
+    {
+      "id": "PEG-REPORT-002",
+      "title": "Invalid report configuration fails before network access",
+      "evidence": "src/report-sonarr-episode.test.ts",
+      "boundary": "In-memory environment and fetch spy; no filesystem read or network"
     }
   ],
   "manualGaps": [

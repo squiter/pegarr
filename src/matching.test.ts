@@ -162,3 +162,32 @@ test("PEG-MATCH-007 missing required subtitle-type metadata remains Unknown", ()
     "subdl did not report the required subtitle-type evidence",
   ]);
 });
+
+test("PEG-MATCH-008 provider searches are scoped to the language actually queried", () => {
+  const release = demoFeasibilityInput.releases[0]!;
+  const providerResults: readonly ProviderSearchResult[] = [
+    {
+      provider: "subdl",
+      status: "success",
+      searchedLanguages: ["pt-BR"],
+      subtitles: [],
+    },
+  ];
+
+  const portuguese = assessLanguage(
+    demoFeasibilityInput.item,
+    release,
+    { code: "pt_br", required: true, forced: false, hearingImpaired: "either" },
+    providerResults,
+  );
+  const english = assessLanguage(
+    demoFeasibilityInput.item,
+    release,
+    { code: "en", required: true, forced: false, hearingImpaired: "either" },
+    providerResults,
+  );
+
+  assert.equal(portuguese.confidence, "no_match_found");
+  assert.equal(english.confidence, "unknown");
+  assert.deepEqual(english.warnings, ["No provider search covered this language"]);
+});

@@ -78,6 +78,16 @@ if (!subdlAdapter.includes("authorization: `Bearer ${this.#apiKey}`") || /api_ke
   issues.push("The SubDL API key must remain in the authorization header and out of URLs");
 }
 
+const episodeFlow = readFileSync(resolve(repoRoot, "src/episode-feasibility.ts"), "utf8");
+if (
+  !episodeFlow.includes("searchEpisodeReleases") ||
+  !episodeFlow.includes("readSeriesAssignment") ||
+  !episodeFlow.includes("listLanguageProfiles") ||
+  /\b(?:grab|download|delete)\b/iu.test(episodeFlow)
+) {
+  issues.push("The Phase 0 episode feasibility flow must compose only read and search operations");
+}
+
 const fetchTransport = readFileSync(
   resolve(repoRoot, "src/adapters/fetch-json-transport.ts"),
   "utf8",
@@ -169,6 +179,9 @@ if (packageJson.scripts?.["probe:bazarr"] !== "node dist/probe-bazarr.js") {
 }
 if (packageJson.scripts?.["probe:subdl"] !== "node dist/probe-subdl.js") {
   issues.push("package.json script probe:subdl must remain the read-only packaged probe");
+}
+if (packageJson.scripts?.["report:sonarr-episode"] !== "node dist/report-sonarr-episode.js") {
+  issues.push("package.json script report:sonarr-episode must remain the read-only packaged report");
 }
 
 const ciWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/ci.yml"), "utf8");

@@ -13,6 +13,7 @@ const requiredDocs = [
   "docs/harness.md",
   "docs/harness-scenarios.md",
   "docs/configuration.md",
+  "docs/episode-feasibility-report.md",
   "docs/contracts/sonarr-v3-release-search.md",
   "docs/contracts/sonarr-v3-system-status.md",
   "docs/contracts/radarr-v3-release-search.md",

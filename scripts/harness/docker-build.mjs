@@ -401,6 +401,146 @@ async function configuredSubdlProbeSmokeTest() {
   }
 }
 
+async function packagedEpisodeReportSmokeTest() {
+  const scenario = "PEG-DOCKER-006";
+  const suffix = `${process.pid}`;
+  const networkName = `pegarr-harness-report-internal-${suffix}`;
+  const fixtureName = `pegarr-harness-report-${suffix}`;
+  const artifactsDirectory = resolve(".artifacts");
+  mkdirSync(artifactsDirectory, { recursive: true });
+  const fixtureDirectory = mkdtempSync(join(artifactsDirectory, "pegarr-synthetic-docker-"));
+  const keys = {
+    sonarr: "synthetic-report-sonarr-key",
+    bazarr: "synthetic-report-bazarr-key",
+    subdl: "synthetic-report-subdl-key",
+  };
+  const paths = {
+    sonarr: join(fixtureDirectory, "sonarr_api_key"),
+    bazarr: join(fixtureDirectory, "bazarr_api_key"),
+    subdl: join(fixtureDirectory, "subdl_api_key"),
+    request: join(fixtureDirectory, "episode-report.json"),
+  };
+  writeFileSync(paths.sonarr, keys.sonarr, { mode: 0o444 });
+  writeFileSync(paths.bazarr, keys.bazarr, { mode: 0o444 });
+  writeFileSync(paths.subdl, keys.subdl, { mode: 0o444 });
+  writeFileSync(paths.request, JSON.stringify({
+    episodeId: 305,
+    sonarrSeriesId: 42,
+    item: {
+      kind: "episode",
+      title: "Synthetic Show — S03E05",
+      season: 3,
+      episode: 5,
+      ids: { imdb: "tt9000005", tmdb: "900005" },
+    },
+    subdlLanguages: [
+      { policyCode: "en", providerCode: "EN" },
+      { policyCode: "pt-BR", providerCode: "PT-BR" },
+    ],
+  }), { mode: 0o444 });
+
+  const network = docker([
+    "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
+  ]);
+  if (network.status !== 0) {
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+    throw new Error(`${scenario} could not create an internal network:\n${outputOf(network)}`);
+  }
+
+  const fixtureScript = [
+    "const { createServer } = require('node:http');",
+    `const keys = ${JSON.stringify(keys)};`,
+    "const release = [{ guid: 'synthetic-guid', indexerId: 1, title: 'Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP', indexer: 'Synthetic Indexer', protocol: 'torrent', downloadAllowed: true, rejections: [], customFormatScore: 100, languages: [], customFormats: [], releaseGroup: 'GROUP', quality: { quality: { name: 'WEBDL-1080p', source: 'webdl', resolution: 1080 } } }];",
+    "const profiles = [{ profileId: 7, name: 'Synthetic multilingual', cutoff: 2, items: [{ id: 1, language: 'en', hi: 'False', forced: 'False', audio_exclude: 'False', audio_only_include: 'False' }, { id: 2, language: 'pt-BR', hi: 'True', forced: 'False', audio_exclude: 'False', audio_only_include: 'False' }], mustContain: [], mustNotContain: [], originalFormat: 0, tag: null }];",
+    "const assignment = { data: [{ sonarrSeriesId: 42, profileId: 7 }], total: 1 };",
+    "const subtitle = { status: true, subtitles: [{ id: 1, language: 'Portuguese (BR)', release_name: 'Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP', season: 3, episode: 5, hi: true, forced: false }] };",
+    "createServer((request, response) => {",
+    "  const host = String(request.headers.host || '').split(':')[0];",
+    "  const url = new URL(request.url || '/', 'http://fixture.invalid');",
+    "  let body;",
+    "  if (request.method !== 'GET') { response.writeHead(405); response.end('{}'); return; }",
+    "  if (host === 'sonarr-fixture' && url.pathname === '/api/v3/release' && url.searchParams.get('episodeId') === '305' && request.headers['x-api-key'] === keys.sonarr) body = release;",
+    "  else if (host === 'bazarr-fixture' && url.pathname === '/api/system/languages/profiles' && request.headers['x-api-key'] === keys.bazarr) body = profiles;",
+    "  else if (host === 'bazarr-fixture' && url.pathname === '/api/series' && url.searchParams.getAll('seriesid[]')[0] === '42' && request.headers['x-api-key'] === keys.bazarr) body = assignment;",
+    "  else if (host === 'subdl-fixture' && url.pathname === '/api/v2/subtitles/search' && request.headers.authorization === 'Bearer ' + keys.subdl) body = url.searchParams.get('languages') === 'PT-BR' ? subtitle : { status: true, subtitles: [] };",
+    "  else { response.writeHead(401, { 'content-type': 'application/json' }); response.end('{}'); return; }",
+    "  response.writeHead(200, { 'content-type': 'application/json', 'x-ratelimit-remaining': '1999' });",
+    "  response.end(JSON.stringify(body));",
+    "}).listen(8082, '0.0.0.0');",
+  ].join("\n");
+
+  try {
+    const fixture = docker([
+      "run", "--detach", "--name", fixtureName, "--label", "pegarr.harness=true",
+      "--network", networkName,
+      "--network-alias", "sonarr-fixture",
+      "--network-alias", "bazarr-fixture",
+      "--network-alias", "subdl-fixture",
+      "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "pegarr:harness", "node", "-e", fixtureScript,
+    ]);
+    if (fixture.status !== 0) {
+      throw new Error(`${scenario} could not start the synthetic report fixture:\n${outputOf(fixture)}`);
+    }
+
+    const runArgs = [
+      "run", "--rm", "--network", networkName, "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "--mount", `type=bind,source=${paths.sonarr},target=/run/secrets/sonarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.bazarr},target=/run/secrets/bazarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.subdl},target=/run/secrets/subdl_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.request},target=/run/pegarr/episode-report.json,readonly`,
+      "--env", "PEGARR_SONARR_URL=http://sonarr-fixture:8082",
+      "--env", "PEGARR_SONARR_ALLOWED_HOSTS=sonarr-fixture",
+      "--env", "PEGARR_SONARR_API_KEY_FILE=/run/secrets/sonarr_api_key",
+      "--env", "PEGARR_SONARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_BAZARR_URL=http://bazarr-fixture:8082",
+      "--env", "PEGARR_BAZARR_ALLOWED_HOSTS=bazarr-fixture",
+      "--env", "PEGARR_BAZARR_API_KEY_FILE=/run/secrets/bazarr_api_key",
+      "--env", "PEGARR_BAZARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_SUBDL_URL=http://subdl-fixture:8082",
+      "--env", "PEGARR_SUBDL_ALLOWED_HOSTS=subdl-fixture",
+      "--env", "PEGARR_SUBDL_API_KEY_FILE=/run/secrets/subdl_api_key",
+      "--env", "PEGARR_SUBDL_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_EPISODE_REPORT_REQUEST_FILE=/run/pegarr/episode-report.json",
+      "pegarr:harness", "npm", "run", "--silent", "report:sonarr-episode",
+    ];
+    let report;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      report = docker(runArgs);
+      if (report.status === 0) break;
+      await delay(250);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(report?.stdout ?? "");
+    } catch {
+      parsed = undefined;
+    }
+    if (
+      report?.status !== 0 ||
+      parsed?.kind !== "sonarr-episode-feasibility" ||
+      parsed?.status !== "ready" ||
+      parsed?.mode !== "read_only" ||
+      parsed?.metrics?.providerRequests !== 2 ||
+      parsed?.report?.releases?.length !== 1 ||
+      parsed?.report?.releases?.[0]?.subtitle?.languages?.[1]?.confidence !== "confirmed" ||
+      /synthetic-report-(?:sonarr|bazarr|subdl)-key|(?:sonarr|bazarr|subdl)-fixture|\/run\/secrets/iu.test(report?.stdout ?? "")
+    ) {
+      throw new Error(`${scenario} packaged episode report failed:\n${outputOf(report)}`);
+    }
+    const inspection = docker(["network", "inspect", "--format", "{{.Internal}}", networkName]);
+    if (inspection.status !== 0 || inspection.stdout.trim() !== "true") {
+      throw new Error(`${scenario} network is not internal-only: ${outputOf(inspection).trim()}`);
+    }
+    process.stdout.write(`${scenario} packaged episode report=ready (three integrations, secret-files, read-only, internal-network)\n`);
+  } finally {
+    docker(["rm", "--force", fixtureName]);
+    docker(["network", "rm", networkName]);
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+}
+
 export async function main() {
   const first = build();
   const firstOutput = outputOf(first);
@@ -423,6 +563,7 @@ export async function main() {
     });
     await configuredBazarrProbeSmokeTest();
     await configuredSubdlProbeSmokeTest();
+    await packagedEpisodeReportSmokeTest();
     return;
   }
 
@@ -454,6 +595,7 @@ export async function main() {
     });
     await configuredBazarrProbeSmokeTest();
     await configuredSubdlProbeSmokeTest();
+    await packagedEpisodeReportSmokeTest();
     return;
   }
 

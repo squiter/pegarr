@@ -156,7 +156,7 @@ export class SubdlClient {
       });
     } catch (error) {
       if (error instanceof JsonTransportError && error.code === "timeout") {
-        return providerFailure("timeout", "SubDL search timed out");
+        return providerFailure("timeout", "SubDL search timed out", window.policyCode);
       }
       if (
         error instanceof JsonTransportError &&
@@ -164,7 +164,7 @@ export class SubdlClient {
       ) {
         throw new SubdlAdapterError("invalid_response", "SubDL returned an invalid response");
       }
-      return providerFailure("unavailable", "SubDL search transport failed");
+      return providerFailure("unavailable", "SubDL search transport failed", window.policyCode);
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -179,11 +179,16 @@ export class SubdlClient {
         retryAfter === undefined
           ? "SubDL search quota or rate limit was reached"
           : `SubDL search quota or rate limit was reached; retry after ${retryAfter} seconds`,
+        window.policyCode,
         rateLimitEvidence(response.headers),
       );
     }
     if (response.status >= 500) {
-      return providerFailure("unavailable", `SubDL search is unavailable (HTTP ${response.status})`);
+      return providerFailure(
+        "unavailable",
+        `SubDL search is unavailable (HTTP ${response.status})`,
+        window.policyCode,
+      );
     }
     if (response.status !== 200) {
       throw new SubdlAdapterError("unexpected_status", "SubDL rejected the search request", {
@@ -195,6 +200,7 @@ export class SubdlClient {
       return {
         provider: "subdl",
         status: "success",
+        searchedLanguages: [window.policyCode],
         subtitles: mapSubdlSearchResponse(response.body, window),
         ...optionalQuota(response.headers),
       };
@@ -304,11 +310,13 @@ function normalizeSearchWindow(window: SubdlSearchWindow): NormalizedSearchWindo
 function providerFailure(
   status: "rate_limited" | "timeout" | "unavailable",
   detail: string,
+  searchedLanguage: string,
   quota?: ProviderQuotaEvidence,
 ): ProviderSearchResult {
   return {
     provider: "subdl",
     status,
+    searchedLanguages: [searchedLanguage],
     subtitles: [],
     detail,
     ...(quota === undefined ? {} : { quota }),

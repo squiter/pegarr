@@ -9,7 +9,7 @@
 Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It is designed to compare interactive-search releases with subtitle-provider evidence, explain the confidence of each match, and eventually let an authorized user grab the best-informed release.
 
 > [!IMPORTANT]
-> Pegarr is in its API-feasibility phase. The container exposes a synthetic, read-only feasibility report plus opt-in Sonarr, Radarr, and Bazarr probes. It does not perform Grab operations.
+> Pegarr is in its API-feasibility phase. The container exposes a synthetic, read-only API report, opt-in integration probes, and an explicit one-shot Sonarr episode feasibility command. It does not expose a live search browser route or perform Grab operations.
 
 ## Why Pegarr?
 
@@ -26,7 +26,7 @@ Provider failures are never treated as proof that subtitles do not exist.
 
 ## Project status
 
-The first milestone is a read-only feasibility spike that will verify the live Sonarr, Radarr, Bazarr, and SubDL contracts using sanitized fixtures. See [the research and implementation proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md) for the product decisions, phases, non-goals, and open questions.
+The first milestone is a read-only feasibility spike. Its end-to-end Sonarr episode path is now fixture-proven and locally compatible with real Sonarr/Bazarr reads; authenticated live SubDL and Radarr compatibility remain explicit manual gaps. See [the research and implementation proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md) for the product decisions, phases, non-goals, and open questions.
 
 The current repository foundation includes:
 
@@ -44,6 +44,7 @@ The current repository foundation includes:
 - secret-file-only Radarr configuration with the same browser-safe status and measured probe contract;
 - a secret-file-only Bazarr profile probe that reports measured counts without exposing policy contents;
 - a secret-file-only SubDL exact-search probe that makes one cached-window-shaped request and reports only aggregate availability and quota evidence;
+- a packaged, one-shot Sonarr episode report that composes Sonarr releases, Bazarr policy, and scoped SubDL searches without exposing a quota-triggering browser route;
 - a non-root, read-only Docker runtime;
 - local and NAS-oriented Compose examples;
 - CI checks and Docker builds on every pull request;
@@ -61,13 +62,13 @@ npm start
 
 Then open <http://localhost:8080/health> or inspect the Phase 0 report at <http://localhost:8080/api/v1/feasibility/demo>. Sonarr and Radarr integration state is available at `/api/v1/integrations/<integration>/status`; each reports `disabled` until explicitly configured.
 
-The demo maps a sanitized synthetic Sonarr v3 response into four release candidates, then associates synthetic SubDL evidence with them. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly. Live release searches are not runtime-enabled yet.
+The demo maps a sanitized synthetic Sonarr v3 response into four release candidates, then associates synthetic SubDL evidence with them. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly. Live release searches are available only through the explicit one-shot command documented in the [episode feasibility report guide](docs/episode-feasibility-report.md); they are not exposed as a browser-triggerable API route.
 
 ## Development harness
 
 Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise.
 
-See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 

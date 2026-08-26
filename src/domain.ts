@@ -10,7 +10,10 @@ export type ProviderSearchStatus =
   | "rate_limited"
   | "timeout"
   | "unavailable"
-  | "unsupported";
+  | "unsupported"
+  | "unauthorized"
+  | "invalid_response"
+  | "unexpected_status";
 
 export interface MediaIdentity {
   readonly kind: "movie" | "episode";
@@ -97,6 +100,7 @@ export interface ProviderQuotaEvidence {
 export interface ProviderSearchResult {
   readonly provider: string;
   readonly status: ProviderSearchStatus;
+  readonly searchedLanguages?: readonly string[];
   readonly subtitles: readonly SubtitleCandidate[];
   readonly detail?: string;
   readonly quota?: ProviderQuotaEvidence;
@@ -150,6 +154,7 @@ export interface FeasibilityReport {
   readonly providerStatus: readonly {
     readonly provider: string;
     readonly status: ProviderSearchStatus;
+    readonly searchedLanguages?: readonly string[];
     readonly detail?: string;
     readonly quota?: ProviderQuotaEvidence;
   }[];

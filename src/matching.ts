@@ -32,9 +32,10 @@ export function buildFeasibilityReport(input: FeasibilityInput): FeasibilityRepo
     mode: "read_only",
     item: input.item,
     policy: input.policy,
-    providerStatus: input.providerResults.map(({ provider, status, detail, quota }) => ({
+    providerStatus: input.providerResults.map(({ provider, status, searchedLanguages, detail, quota }) => ({
       provider,
       status,
+      ...(searchedLanguages === undefined ? {} : { searchedLanguages }),
       ...(detail === undefined ? {} : { detail }),
       ...(quota === undefined ? {} : { quota }),
     })),
@@ -70,8 +71,12 @@ export function assessLanguage(
   providerResults: readonly ProviderSearchResult[],
 ): LanguageAssessment {
   const normalizedLanguage = normalizeLanguage(requirement.code);
-  const unavailableProviders = providerResults.filter(({ status }) => status !== "success");
-  const mediaLanguageCandidates = providerResults
+  const relevantProviderResults = providerResults.filter(({ searchedLanguages }) =>
+    searchedLanguages === undefined ||
+    searchedLanguages.some((language) => normalizeLanguage(language) === normalizedLanguage),
+  );
+  const unavailableProviders = relevantProviderResults.filter(({ status }) => status !== "success");
+  const mediaLanguageCandidates = relevantProviderResults
     .flatMap(({ subtitles }) => subtitles)
     .filter((candidate) => normalizeLanguage(candidate.language) === normalizedLanguage)
     .filter((candidate) => mediaMatches(item, candidate));
@@ -122,6 +127,16 @@ export function assessLanguage(
       confidence: "unknown",
       providerCount: 0,
       warnings,
+    };
+  }
+
+  if (relevantProviderResults.length === 0) {
+    return {
+      language: requirement.code,
+      required: requirement.required,
+      confidence: "unknown",
+      providerCount: 0,
+      warnings: ["No provider search covered this language"],
     };
   }
 
@@ -280,6 +295,12 @@ function describeProviderFailure(status: ProviderSearchResult["status"]): string
       return "was unavailable";
     case "unsupported":
       return "does not support this search";
+    case "unauthorized":
+      return "rejected the configured credentials";
+    case "invalid_response":
+      return "returned an invalid response";
+    case "unexpected_status":
+      return "rejected the search request";
     case "success":
       return "succeeded";
   }

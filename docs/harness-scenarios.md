@@ -18,6 +18,7 @@
 | PEG-MATCH-005 | Wrong episodes are rejected before scoring | `src/matching.test.ts` |
 | PEG-MATCH-006 | Forced and hearing-impaired requirements filter candidates locally | `src/matching.test.ts` |
 | PEG-MATCH-007 | Missing required subtitle-type metadata remains Unknown | `src/matching.test.ts` |
+| PEG-MATCH-008 | Provider results apply only to the language window actually searched | `src/matching.test.ts` |
 | PEG-HARNESS-001 | Changed paths select the intended sensors | `scripts/harness/run-checks.test.mjs` |
 | PEG-HARNESS-002 | Noisy failures become compact signals | `scripts/harness/run-checks.test.mjs` |
 | PEG-HARNESS-003 | Docker frontend timeouts use one bounded fallback | `scripts/harness/run-checks.test.mjs` |
@@ -59,6 +60,7 @@
 | PEG-DOCKER-003 | The packaged runtime reads a Radarr secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-004 | The packaged Bazarr profile probe uses a secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-005 | The packaged SubDL probe makes one redacted search on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-006 | The packaged episode report composes three integrations on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-BAZARR-001 | Policy reads are bounded GETs authenticated only by header | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-002 | Profiles retain original multilingual and conditional semantics | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
@@ -73,6 +75,12 @@
 | PEG-PROBE-006 | Bazarr probe exit states stay distinct and redacted | `src/probe-bazarr.test.ts` |
 | PEG-PROBE-007 | The one-shot SubDL search reports only bounded aggregate evidence | `src/probe-subdl.test.ts` |
 | PEG-PROBE-008 | SubDL probe states stay distinct and invalid input remains redacted | `src/probe-subdl.test.ts` |
+| PEG-FLOW-001 | Resolved Bazarr policy drives one SubDL search per language and one report | `src/episode-feasibility.test.ts` |
+| PEG-FLOW-002 | Missing provider language mappings stay scoped without extra requests | `src/episode-feasibility.test.ts` |
+| PEG-FLOW-003 | Unresolved Bazarr assignment stops provider work without assumed policy | `src/episode-feasibility.test.ts` |
+| PEG-FLOW-004 | Provider failure stops further searches and keeps every language Unknown | `src/episode-feasibility.test.ts` |
+| PEG-REPORT-001 | Packaged episode report composes all three read-only integrations | `src/report-sonarr-episode.test.ts` |
+| PEG-REPORT-002 | Invalid report configuration fails before network access | `src/report-sonarr-episode.test.ts` |
 
 ## Explicit manual gaps
 

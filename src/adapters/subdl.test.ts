@@ -180,7 +180,7 @@ test("PEG-SUBDL-003 successful empty and malformed searches remain distinct", as
       item: movie,
       language: { policyCode: "fr", providerCode: "FR" },
     }),
-    { provider: "subdl", status: "success", subtitles: [] },
+    { provider: "subdl", status: "success", searchedLanguages: ["fr"], subtitles: [] },
   );
 
   transport.response = { status: 200, headers: {}, body: { status: false, error: "private" } };
