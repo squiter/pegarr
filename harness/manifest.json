@@ -281,6 +281,36 @@
       "title": "Packaged runtime reads a Radarr secret file on an internal-only network",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Synthetic sibling container and secret; local Docker architecture only"
+    },
+    {
+      "id": "PEG-BAZARR-001",
+      "title": "Bazarr policy reads are bounded GETs authenticated only by header",
+      "evidence": "src/adapters/bazarr.test.ts",
+      "boundary": "Injected transport with a synthetic API key; no network"
+    },
+    {
+      "id": "PEG-BAZARR-002",
+      "title": "Bazarr profiles retain source semantics without assuming a language",
+      "evidence": "src/adapters/bazarr.test.ts",
+      "boundary": "Sanitized multilingual profile fixture pinned to the Bazarr v1.6.0 contract"
+    },
+    {
+      "id": "PEG-BAZARR-003",
+      "title": "Targeted series and movie assignments discard private library metadata",
+      "evidence": "src/adapters/bazarr.test.ts",
+      "boundary": "Sanitized assignment envelopes and injected transport; no network"
+    },
+    {
+      "id": "PEG-BAZARR-004",
+      "title": "Missing media, unassigned media, and missing profiles stay unresolved",
+      "evidence": "src/adapters/bazarr.test.ts",
+      "boundary": "Pure deterministic resolution over synthetic responses"
+    },
+    {
+      "id": "PEG-BAZARR-005",
+      "title": "Bazarr failures are classified and malformed responses stay distinct",
+      "evidence": "src/adapters/bazarr.test.ts",
+      "boundary": "Injected status, transport, and response failures; no retries or network"
     }
   ],
   "manualGaps": [
@@ -292,7 +322,7 @@
     {
       "id": "PEG-MANUAL-002",
       "title": "Live Bazarr profile resolution and provider policy",
-      "reason": "Requires sanitized contract capture before an adapter can be implemented"
+      "reason": "The official v1.6.0 shapes are fixture-proven and live HTTPS routes enforce authentication; the installed version, authenticated response shapes and sizes, and sanitized live profile compatibility remain unverified"
     },
     {
       "id": "PEG-MANUAL-003",

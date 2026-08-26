@@ -60,7 +60,10 @@ export interface SubtitleLanguageRequirement {
   readonly code: string;
   readonly required: boolean;
   readonly forced: boolean;
-  readonly hearingImpaired: "prefer" | "avoid" | "either";
+  readonly hearingImpaired: "required" | "prefer" | "avoid" | "either";
+  readonly sourceItemId?: number;
+  readonly applicability?: "always" | "audio_matches" | "audio_does_not_match";
+  readonly cutoff?: boolean;
 }
 
 export interface SubtitlePolicy {

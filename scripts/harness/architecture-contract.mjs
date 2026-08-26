@@ -14,6 +14,7 @@ const adapterImports = {
   "src/adapters/fetch-json-transport.ts": ["./http.js"],
   "src/adapters/sonarr.ts": ["node:crypto", "../domain.js", "./http.js"],
   "src/adapters/radarr.ts": ["node:crypto", "../domain.js", "./http.js"],
+  "src/adapters/bazarr.ts": ["../domain.js", "./http.js"],
 };
 
 for (const [file, allowedImports] of Object.entries(coreImports)) {
@@ -52,6 +53,16 @@ if (!sonarrAdapter.includes('method: "GET"') || sonarrAdapter.includes('method: 
 const radarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/radarr.ts"), "utf8");
 if (!radarrAdapter.includes('method: "GET"') || radarrAdapter.includes('method: "POST"')) {
   issues.push("The Phase 0 Radarr adapter must remain read-only");
+}
+
+const bazarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/bazarr.ts"), "utf8");
+if (
+  !bazarrAdapter.includes('method: "GET"') ||
+  bazarrAdapter.includes('method: "POST"') ||
+  bazarrAdapter.includes('method: "PATCH"') ||
+  bazarrAdapter.includes('method: "DELETE"')
+) {
+  issues.push("The Phase 0 Bazarr adapter must remain read-only");
 }
 
 const fetchTransport = readFileSync(

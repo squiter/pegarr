@@ -52,13 +52,18 @@
 | PEG-PROBE-003 | The one-shot Radarr probe reports measured safe evidence | `src/probe-radarr.test.ts` |
 | PEG-PROBE-004 | Radarr probe exit states stay distinct and redacted | `src/probe-radarr.test.ts` |
 | PEG-DOCKER-003 | The packaged runtime reads a Radarr secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-BAZARR-001 | Policy reads are bounded GETs authenticated only by header | `src/adapters/bazarr.test.ts` |
+| PEG-BAZARR-002 | Profiles retain original multilingual and conditional semantics | `src/adapters/bazarr.test.ts` |
+| PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
+| PEG-BAZARR-004 | Missing and unassigned policies remain explicitly unresolved | `src/adapters/bazarr.test.ts` |
+| PEG-BAZARR-005 | Failures are classified and malformed responses stay distinct | `src/adapters/bazarr.test.ts` |
 
 ## Explicit manual gaps
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
 | PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Sonarr version, Docker runtime, routes, authentication enforcement, and unauthenticated latency are verified; its authenticated packaged probe and release response remain open, while Radarr release and status contracts are fixture-proven but not yet checked against the NAS |
-| PEG-MANUAL-002 | Live Bazarr policy resolution | Needs a sanitized contract capture first |
+| PEG-MANUAL-002 | Live Bazarr policy resolution | The official v1.6.0 contract and live authentication boundary are proven, but installed-version compatibility and sanitized authenticated profile evidence remain unverified |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside Phase 0 and require explicit confirmation |
 

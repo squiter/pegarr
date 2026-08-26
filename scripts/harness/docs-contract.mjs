@@ -17,6 +17,7 @@ const requiredDocs = [
   "docs/contracts/sonarr-v3-system-status.md",
   "docs/contracts/radarr-v3-release-search.md",
   "docs/contracts/radarr-v3-system-status.md",
+  "docs/contracts/bazarr-v1-language-policy.md",
   "docs/contracts/http-transport.md",
 ];
 
