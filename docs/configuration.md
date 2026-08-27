@@ -41,8 +41,11 @@ Pegarr starts with every external integration disabled. Sonarr, Radarr, Bazarr, 
 | `PEGARR_SUBDL_API_KEY_FILE` | Yes | Absolute in-container path to a file containing only the SubDL API key |
 | `PEGARR_SUBDL_INSTANCE_ID` | No | Safe non-secret label; defaults to `subdl` |
 | `PEGARR_SUBDL_ALLOW_INSECURE_HTTP` | No | Test fixtures only; production SubDL access should remain HTTPS |
+| `PEGARR_SUBDL_LANGUAGE_MAPPINGS` | For release evidence | Comma-separated Bazarr-policy-to-SubDL pairs such as `en:EN,pt-BR:PT-BR`; no language is assumed |
 
 The one-shot SubDL probe also requires a deliberate, representative search window. Set `PEGARR_SUBDL_PROBE_KIND` to `movie` or `episode`, provide at least one of `PEGARR_SUBDL_PROBE_IMDB_ID` or `PEGARR_SUBDL_PROBE_TMDB_ID`, and map `PEGARR_SUBDL_PROBE_POLICY_LANGUAGE` to `PEGARR_SUBDL_PROBE_PROVIDER_LANGUAGE`. Episode probes additionally require `PEGARR_SUBDL_PROBE_SEASON` and `PEGARR_SUBDL_PROBE_EPISODE`. These values are never printed by the probe.
+
+The dashboard item route uses `PEGARR_SUBDL_LANGUAGE_MAPPINGS`. Each mapping is explicit because Bazarr policy codes and SubDL provider codes are separate contracts. Unmapped policy languages remain `Unknown` and cause no provider request; Pegarr never supplies a PT-BR or other language default.
 
 Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, `PEGARR_BAZARR_API_KEY`, or `PEGARR_SUBDL_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
 
@@ -99,6 +102,7 @@ PEGARR_BAZARR_API_KEY_HOST_FILE=/absolute/private/path/bazarr_api_key
 PEGARR_SUBDL_URL=https://api.subdl.com
 PEGARR_SUBDL_ALLOWED_HOSTS=api.subdl.com
 PEGARR_SUBDL_API_KEY_HOST_FILE=/absolute/private/path/subdl_api_key
+PEGARR_SUBDL_LANGUAGE_MAPPINGS=en:EN,pt-BR:PT-BR
 PEGARR_SUBDL_PROBE_KIND=episode
 PEGARR_SUBDL_PROBE_IMDB_ID=tt1234567
 PEGARR_SUBDL_PROBE_POLICY_LANGUAGE=en

@@ -1,5 +1,6 @@
 import type { FetchImplementation } from "./adapters/fetch-json-transport.js";
 import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
+import { BazarrClient } from "./adapters/bazarr.js";
 import {
   RadarrAdapterError,
   RadarrClient,
@@ -10,11 +11,19 @@ import {
   SonarrClient,
   type SonarrSystemStatus,
 } from "./adapters/sonarr.js";
+import { createConfiguredSubdlSource } from "./configured-subdl-source.js";
 import type { ArrRuntimeConfiguration, RuntimeConfiguration } from "./config.js";
+import { SonarrEpisodeFeasibilityService } from "./episode-feasibility.js";
 import {
   buildMissingInventory,
   type MissingInventoryResult,
 } from "./inventory-missing.js";
+import {
+  ItemFeasibilityService,
+  type ItemFeasibilityResult,
+  type ItemFeasibilitySelection,
+} from "./item-feasibility.js";
+import { RadarrMovieFeasibilityService } from "./movie-feasibility.js";
 
 export type ArrIntegrationState =
   | "disabled"
@@ -50,6 +59,8 @@ export interface RuntimeServices {
   readSonarrStatus(): Promise<SonarrIntegrationStatus>;
   readRadarrStatus(): Promise<RadarrIntegrationStatus>;
   readMissingInventory(): Promise<MissingInventoryResult>;
+  readItemFeasibility(selection: ItemFeasibilitySelection): Promise<ItemFeasibilityResult>;
+  close(): void;
 }
 
 export interface RuntimeServicesOptions {
@@ -59,6 +70,9 @@ export interface RuntimeServicesOptions {
   readonly radarrStatusTtlMs?: number;
   readonly missingInventoryTtlMs?: number;
   readonly missingInventoryPageSize?: number;
+  readonly itemFeasibilityTtlMs?: number;
+  readonly itemFeasibilityMaxEntries?: number;
+  readonly environment?: Readonly<Record<string, string | undefined>>;
 }
 
 interface AdapterErrorShape {
@@ -145,7 +159,116 @@ export function createRuntimeServices(
     pageSize: options.missingInventoryPageSize ?? inventoryConfiguration.missingPageSize ?? 50,
   });
 
-  return { readSonarrStatus, readRadarrStatus, readMissingInventory };
+  const fetchOption = options.fetchImplementation === undefined
+    ? {}
+    : { fetchImplementation: options.fetchImplementation };
+  const sonarrClient = configuration.sonarr === undefined
+    ? undefined
+    : new SonarrClient(
+        {
+          instanceId: configuration.sonarr.instanceId,
+          apiKey: configuration.sonarr.apiKey.reveal(),
+          timeoutMs: 60_000,
+        },
+        new FetchJsonTransport({
+          baseUrl: configuration.sonarr.baseUrl,
+          allowedHosts: configuration.sonarr.allowedHosts,
+          allowInsecureHttp: configuration.sonarr.allowInsecureHttp,
+          ...fetchOption,
+        }),
+      );
+  const radarrClient = configuration.radarr === undefined
+    ? undefined
+    : new RadarrClient(
+        {
+          instanceId: configuration.radarr.instanceId,
+          apiKey: configuration.radarr.apiKey.reveal(),
+          timeoutMs: 60_000,
+        },
+        new FetchJsonTransport({
+          baseUrl: configuration.radarr.baseUrl,
+          allowedHosts: configuration.radarr.allowedHosts,
+          allowInsecureHttp: configuration.radarr.allowInsecureHttp,
+          ...fetchOption,
+        }),
+      );
+  const bazarrClient = configuration.bazarr === undefined
+    ? undefined
+    : new BazarrClient(
+        {
+          instanceId: configuration.bazarr.instanceId,
+          apiKey: configuration.bazarr.apiKey.reveal(),
+        },
+        new FetchJsonTransport({
+          baseUrl: configuration.bazarr.baseUrl,
+          allowedHosts: configuration.bazarr.allowedHosts,
+          allowInsecureHttp: configuration.bazarr.allowInsecureHttp,
+          ...fetchOption,
+        }),
+      );
+  const managedSubdl = configuration.subdl === undefined
+    ? undefined
+    : createConfiguredSubdlSource({
+        configuration: configuration.subdl,
+        transport: new FetchJsonTransport({
+          baseUrl: configuration.subdl.baseUrl,
+          allowedHosts: configuration.subdl.allowedHosts,
+          allowInsecureHttp: configuration.subdl.allowInsecureHttp,
+          ...fetchOption,
+        }),
+        environment: options.environment ?? {},
+      });
+  const missingIntegrations = {
+    episode: [
+      ...(sonarrClient === undefined ? ["sonarr" as const] : []),
+      ...(bazarrClient === undefined ? ["bazarr" as const] : []),
+      ...(managedSubdl === undefined ? ["subdl" as const] : []),
+    ],
+    movie: [
+      ...(radarrClient === undefined ? ["radarr" as const] : []),
+      ...(bazarrClient === undefined ? ["bazarr" as const] : []),
+      ...(managedSubdl === undefined ? ["subdl" as const] : []),
+    ],
+  };
+  const itemFeasibility = new ItemFeasibilityService({
+    readInventory: readMissingInventory,
+    ...(sonarrClient === undefined || bazarrClient === undefined || managedSubdl === undefined
+      ? {}
+      : {
+          episode: new SonarrEpisodeFeasibilityService({
+            sonarr: sonarrClient,
+            bazarr: bazarrClient,
+            subdl: managedSubdl.source,
+            now,
+          }),
+        }),
+    ...(radarrClient === undefined || bazarrClient === undefined || managedSubdl === undefined
+      ? {}
+      : {
+          movie: new RadarrMovieFeasibilityService({
+            radarr: radarrClient,
+            bazarr: bazarrClient,
+            subdl: managedSubdl.source,
+            now,
+          }),
+        }),
+    subdlLanguages: configuration.subdlLanguageMappings ?? [],
+    missingIntegrations,
+    now,
+    ttlMs: boundedCacheTtl(
+      options.itemFeasibilityTtlMs ?? defaultStatusTtlMs,
+      "itemFeasibilityTtlMs",
+    ),
+    maxEntries: options.itemFeasibilityMaxEntries ?? 100,
+  });
+
+  return {
+    readSonarrStatus,
+    readRadarrStatus,
+    readMissingInventory,
+    readItemFeasibility: (selection) => itemFeasibility.read(selection),
+    close: () => managedSubdl?.close(),
+  };
 }
 
 function createMissingInventoryReader(

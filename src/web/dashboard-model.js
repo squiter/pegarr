@@ -27,6 +27,40 @@ export function selectRows(rows, options = {}) {
   });
 }
 
+export function feasibilityView(value) {
+  if (!isRecord(value) || value.kind !== "item-feasibility" || typeof value.status !== "string") {
+    return { state: "invalid", message: "Pegarr returned an unreadable feasibility report." };
+  }
+  if (value.status !== "ready") return unavailableView(value);
+  if (!isRecord(value.report) || !isRecord(value.report.item) || !isRecord(value.report.policy) || !Array.isArray(value.report.releases)) {
+    return { state: "invalid", message: "Pegarr returned an unreadable feasibility report." };
+  }
+  const item = value.report.item;
+  const policy = value.report.policy;
+  const title = typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Selected item";
+  const context = item.kind === "episode" && Number.isSafeInteger(item.season) && Number.isSafeInteger(item.episode)
+    ? episodeLabel(item.season, item.episode)
+    : Number.isSafeInteger(item.year) ? String(item.year) : item.kind === "movie" ? "Movie" : "Item";
+  const languages = Array.isArray(policy.languages)
+    ? policy.languages.flatMap((language) => isRecord(language) && typeof language.code === "string"
+      ? [{ code: language.code, required: language.required === true }]
+      : [])
+    : [];
+  const providers = Array.isArray(value.report.providerStatus)
+    ? value.report.providerStatus.flatMap(providerView)
+    : [];
+  const releases = value.report.releases.flatMap(releaseView).toSorted(compareReleases);
+  return {
+    state: "ready",
+    title,
+    context,
+    policyName: typeof policy.profileName === "string" ? policy.profileName : "Resolved Bazarr policy",
+    languages,
+    providers,
+    releases,
+  };
+}
+
 function dashboardRow(value) {
   if (!isRecord(value) || (value.kind !== "episode" && value.kind !== "movie")) return undefined;
   if ((value.application !== "sonarr" && value.application !== "radarr") || typeof value.title !== "string") return undefined;
@@ -39,6 +73,7 @@ function dashboardRow(value) {
     : Number.isSafeInteger(value.year) ? String(value.year) : "Movie";
   return {
     key: `${value.application}:${value.kind}:${value.itemId}`,
+    itemId: value.itemId,
     application: value.application,
     kind: value.kind,
     title,
@@ -47,6 +82,95 @@ function dashboardRow(value) {
       ? { availableAt: value.availableAt }
       : {}),
   };
+}
+
+function unavailableView(value) {
+  if (value.status === "disabled") {
+    const integrations = Array.isArray(value.missingIntegrations)
+      ? value.missingIntegrations.filter((entry) => typeof entry === "string").join(", ")
+      : "required integrations";
+    return { state: "disabled", message: `Configure ${integrations || "required integrations"} before investigating this item.` };
+  }
+  if (value.status === "policy_unresolved") {
+    const reason = typeof value.reason === "string" ? value.reason.replaceAll("_", " ") : "unresolved";
+    return { state: "policy_unresolved", message: `Bazarr policy is ${reason}. Pegarr did not assume a subtitle language.` };
+  }
+  if (value.status === "inventory_unavailable") {
+    const state = typeof value.state === "string" ? value.state.replaceAll("_", " ") : "unavailable";
+    return { state: "inventory_unavailable", message: `The selected Arr inventory is ${state}. No release analysis was started.` };
+  }
+  if (value.status === "integration_failure") {
+    const names = Array.isArray(value.failures)
+      ? value.failures.flatMap((failure) => isRecord(failure) && typeof failure.integration === "string" ? [failure.integration] : [])
+      : [];
+    return { state: "integration_failure", message: `${names.join(" and ") || "An integration"} could not complete the read-only analysis. Subtitle availability remains Unknown.` };
+  }
+  if (value.status === "not_found") return { state: "not_found", message: "This item is no longer in the bounded missing inventory." };
+  return { state: "invalid", message: "Pegarr could not build a feasibility report for this item." };
+}
+
+function releaseView(value) {
+  if (!isRecord(value) || typeof value.releaseId !== "string" || typeof value.releaseTitle !== "string" || !isRecord(value.video) || !isRecord(value.subtitle)) return [];
+  const evidence = isRecord(value.video.evidence) ? value.video.evidence : {};
+  const languages = Array.isArray(value.subtitle.languages)
+    ? value.subtitle.languages.flatMap((language) => languageView(language))
+    : [];
+  const rejectionReasons = Array.isArray(value.video.rejectionReasons)
+    ? value.video.rejectionReasons.filter((reason) => typeof reason === "string")
+    : [];
+  return [{
+    id: value.releaseId,
+    title: value.releaseTitle,
+    downloadAllowed: value.video.downloadAllowed === true,
+    rejectionReasons,
+    customFormatScore: Number.isFinite(value.video.customFormatScore) ? value.video.customFormatScore : 0,
+    quality: typeof evidence.quality === "string" ? evidence.quality : "Quality unavailable",
+    indexer: typeof evidence.indexer === "string" ? evidence.indexer : "Indexer unavailable",
+    protocol: typeof evidence.protocol === "string" ? evidence.protocol : "Protocol unavailable",
+    confidence: safeConfidence(value.subtitle.confidence),
+    languages,
+  }];
+}
+
+function languageView(value) {
+  if (!isRecord(value) || typeof value.language !== "string") return [];
+  const evidence = isRecord(value.evidence) ? value.evidence : undefined;
+  return [{
+    language: value.language,
+    required: value.required === true,
+    confidence: safeConfidence(value.confidence),
+    providerCount: Number.isSafeInteger(value.providerCount) ? value.providerCount : 0,
+    warnings: Array.isArray(value.warnings) ? value.warnings.filter((warning) => typeof warning === "string") : [],
+    ...(evidence === undefined ? {} : {
+      evidence: {
+        provider: typeof evidence.provider === "string" ? evidence.provider : "Provider",
+        releaseName: typeof evidence.subtitleReleaseName === "string" ? evidence.subtitleReleaseName : "Release evidence unavailable",
+        reasons: Array.isArray(evidence.reasons) ? evidence.reasons.filter((reason) => typeof reason === "string") : [],
+      },
+    }),
+  }];
+}
+
+function providerView(value) {
+  if (!isRecord(value) || typeof value.provider !== "string" || typeof value.status !== "string") return [];
+  return [{
+    provider: value.provider,
+    status: value.status,
+    detail: typeof value.detail === "string" ? value.detail : "",
+    cacheStatus: isRecord(value.cache) && (value.cache.status === "hit" || value.cache.status === "miss") ? value.cache.status : undefined,
+  }];
+}
+
+function safeConfidence(value) {
+  return ["confirmed", "likely", "possible", "no_match_found", "unknown"].includes(value) ? value : "unknown";
+}
+
+function compareReleases(left, right) {
+  if (left.downloadAllowed !== right.downloadAllowed) return left.downloadAllowed ? -1 : 1;
+  const confidence = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };
+  return confidence[left.confidence] - confidence[right.confidence]
+    || right.customFormatScore - left.customFormatScore
+    || left.title.localeCompare(right.title);
 }
 
 function episodeLabel(season, episode) {

@@ -171,6 +171,27 @@ test("PEG-ACCESS-003 authorized inventory is read-only and rejects mutation meth
   assert.equal(inventoryReads, 1);
 });
 
+test("PEG-ACCESS-004 item feasibility is hidden, authenticated before work, and read-only", async () => {
+  const token = "synthetic-access-token-value-0000000001";
+  let feasibilityReads = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  services.readItemFeasibility = async (selection) => {
+    feasibilityReads += 1;
+    return { kind: "item-feasibility", mode: "read_only", status: "not_found", selection };
+  };
+  const path = "/api/v1/library/items/sonarr/episode/305/feasibility";
+
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control: new AccessControl(undefined) })).statusCode, 404);
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control: new AccessControl(new SecretValue(token)), authorization: "Bearer wrong-token-value-000000000000000" })).statusCode, 401);
+  assert.equal(feasibilityReads, 0);
+
+  const access = { control: new AccessControl(new SecretValue(token)), authorization: `Bearer ${token}` };
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, access)).statusCode, 404);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, access)).statusCode, 405);
+  assert.equal(feasibilityReads, 1);
+  assert.equal((await resolveRoute("GET", "/api/v1/library/items/sonarr/movie/305/feasibility", tmpdir(), services, access)).statusCode, 404);
+});
+
 test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe", async () => {
   const page = await resolveRoute("GET", "/", tmpdir());
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
@@ -181,11 +202,14 @@ test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe"
   assert.equal(page.headers?.["content-type"], "text/html; charset=utf-8");
   assert.match(page.headers?.["content-security-policy"] ?? "", /default-src 'self'/u);
   assert.match(String(page.body), /<main id="main"|role="status"|aria-live="polite"/u);
+  assert.match(String(page.body), /release-table|feasibility-panel|No Grab actions/u);
   assert.match(String(page.body), /type="password"|autocomplete="off"/u);
   assert.match(String(styles.body), /@media \(max-width: 760px\)|prefers-reduced-motion/u);
   assert.match(String(client.body), /authorization: `Bearer \$\{accessToken\}`|credentials: "omit"/u);
   assert.match(String(client.body), /textContent|replaceChildren/u);
+  assert.match(String(client.body), /\/api\/v1\/library\/items\/\$\{row\.application\}|feasibilityCache/u);
   assert.match(String(model.body), /export function selectRows/u);
+  assert.equal(client.headers?.["cache-control"], "no-cache");
   assert.doesNotMatch(
     [page.body, client.body, model.body, styles.body].join("\n"),
     /localStor(?:age)|sessionStor(?:age)|document\.cookie|innerHTML|PEGARR_ACCESS_TOKEN/iu,
@@ -210,5 +234,12 @@ function fakeServices(
       state: "disabled",
     }),
     readMissingInventory,
+    readItemFeasibility: async (selection) => ({
+      kind: "item-feasibility",
+      mode: "read_only",
+      status: "not_found",
+      selection,
+    }),
+    close: () => undefined,
   };
 }

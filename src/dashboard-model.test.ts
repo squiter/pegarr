@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { rowsFromInventory, selectRows } from "./web/dashboard-model.js";
+import { demoFeasibilityInput } from "./fixtures/demo.js";
+import { buildFeasibilityReport } from "./matching.js";
+import { feasibilityView, rowsFromInventory, selectRows } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -56,6 +58,7 @@ test("PEG-DASH-001 inventory view-model mapping preserves only display-safe fiel
   assert.deepEqual(rows, [
     {
       key: "sonarr:episode:305",
+      itemId: 305,
       application: "sonarr",
       kind: "episode",
       title: "Synthetic Show",
@@ -64,6 +67,7 @@ test("PEG-DASH-001 inventory view-model mapping preserves only display-safe fiel
     },
     {
       key: "radarr:movie:84",
+      itemId: 84,
       application: "radarr",
       kind: "movie",
       title: "A Synthetic Movie",
@@ -72,6 +76,7 @@ test("PEG-DASH-001 inventory view-model mapping preserves only display-safe fiel
     },
     {
       key: "radarr:movie:85",
+      itemId: 85,
       application: "radarr",
       kind: "movie",
       title: "Later Movie",
@@ -79,6 +84,31 @@ test("PEG-DASH-001 inventory view-model mapping preserves only display-safe fiel
     },
   ]);
   assert.doesNotMatch(JSON.stringify(rows), /ids|path|overview|token/iu);
+});
+
+test("PEG-DASH-004 release view preserves Arr rejections and honest subtitle evidence", () => {
+  const view = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    selection: { application: "sonarr", kind: "episode", itemId: 305 },
+    report: buildFeasibilityReport(demoFeasibilityInput),
+    metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 2, elapsedMs: 5 },
+  });
+
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  assert.equal(view.releases.length, 4);
+  assert.equal(view.releases[0]?.downloadAllowed, true);
+  const rejected = view.releases.find(({ downloadAllowed }) => !downloadAllowed);
+  assert.deepEqual(rejected?.rejectionReasons, ["Quality profile does not allow HDTV-720p"]);
+  assert.ok(view.releases.some(({ languages }) => languages.some(({ confidence }) => confidence === "unknown")));
+  assert.ok(view.releases.some(({ languages }) => languages.some(({ evidence }) => evidence?.reasons.includes("Exact normalized release name"))));
+
+  assert.deepEqual(
+    feasibilityView({ kind: "item-feasibility", mode: "read_only", status: "policy_unresolved", reason: "unassigned" }),
+    { state: "policy_unresolved", message: "Bazarr policy is unassigned. Pegarr did not assume a subtitle language." },
+  );
 });
 
 test("PEG-DASH-002 search, filtering, and sorting are pure local operations", () => {

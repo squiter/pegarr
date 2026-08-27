@@ -10,6 +10,12 @@ import { syntheticSonarrSystemStatusResponse } from "./fixtures/sonarr-system-st
 import { syntheticRadarrSystemStatusResponse } from "./fixtures/radarr-system-status.js";
 import { syntheticRadarrMissingItemsResponse } from "./fixtures/radarr-missing-items.js";
 import { syntheticSonarrMissingItemsResponse } from "./fixtures/sonarr-missing-items.js";
+import { syntheticSonarrEpisodeReleaseResponse } from "./fixtures/sonarr-release-search.js";
+import {
+  syntheticBazarrLanguageProfilesResponse,
+  syntheticBazarrSeriesAssignmentResponse,
+} from "./fixtures/bazarr-language-policy.js";
+import { syntheticSubdlV2EpisodeSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
 import { createRuntimeServices } from "./runtime.js";
 
 test("PEG-RUNTIME-001 configured Sonarr status returns only safe read-only evidence", async (context) => {
@@ -289,4 +295,76 @@ test("PEG-INVENTORY-004 concurrent and repeated runtime inventory reads use one 
   const refreshed = await services.readMissingInventory();
   assert.equal(requestCount, 4);
   assert.equal(refreshed.status, "ready");
+});
+
+test("PEG-ITEM-004 runtime selection composes inventory, Arr, Bazarr, and one scoped provider window", async () => {
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+    radarr: {
+      instanceId: "synthetic-radarr",
+      baseUrl: "https://radarr.example.invalid",
+      allowedHosts: ["radarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-radarr-key-value"),
+    },
+    bazarr: {
+      instanceId: "synthetic-bazarr",
+      baseUrl: "https://bazarr.example.invalid",
+      allowedHosts: ["bazarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-bazarr-key-value"),
+    },
+    subdl: {
+      instanceId: "synthetic-subdl",
+      baseUrl: "https://subdl.example.invalid",
+      allowedHosts: ["subdl.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-subdl-key-value"),
+    },
+    subdlLanguageMappings: [{ policyCode: "en", providerCode: "EN" }],
+  };
+  const requests: string[] = [];
+  const services = createRuntimeServices(configuration, {
+    fetchImplementation: async (input) => {
+      const url = new URL(input);
+      requests.push(`${url.hostname}${url.pathname}`);
+      let body: unknown;
+      if (url.pathname === "/api/v3/wanted/missing") {
+        body = url.hostname.startsWith("sonarr") ? syntheticSonarrMissingItemsResponse : syntheticRadarrMissingItemsResponse;
+      } else if (url.hostname.startsWith("sonarr") && url.pathname === "/api/v3/release") {
+        body = syntheticSonarrEpisodeReleaseResponse;
+      } else if (url.pathname === "/api/system/languages/profiles") {
+        body = syntheticBazarrLanguageProfilesResponse;
+      } else if (url.pathname === "/api/series") {
+        body = syntheticBazarrSeriesAssignmentResponse;
+      } else if (url.pathname === "/api/v2/subtitles/search") {
+        body = syntheticSubdlV2EpisodeSearchResponse;
+      } else {
+        return new Response("{}", { status: 404 });
+      }
+      return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+    },
+    now: () => 1_000,
+    missingInventoryPageSize: 2,
+  });
+
+  const selection = { application: "sonarr" as const, kind: "episode" as const, itemId: 305 };
+  const first = await services.readItemFeasibility(selection);
+  const cached = await services.readItemFeasibility(selection);
+  services.close();
+
+  assert.equal(first.status, "ready");
+  assert.deepEqual(cached, first);
+  assert.equal(requests.filter((entry) => entry.endsWith("/api/v3/wanted/missing")).length, 2);
+  assert.equal(requests.filter((entry) => entry.endsWith("/api/v3/release")).length, 1);
+  assert.equal(requests.filter((entry) => entry.includes("bazarr.example.invalid")).length, 2);
+  assert.equal(requests.filter((entry) => entry.endsWith("/api/v2/subtitles/search")).length, 1);
+  assert.equal(requests.length, 6);
+  assert.doesNotMatch(JSON.stringify(first), /synthetic-(?:sonarr|radarr|bazarr|subdl)-key|example\.invalid/iu);
 });

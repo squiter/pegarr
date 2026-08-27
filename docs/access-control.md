@@ -2,14 +2,18 @@
 
 Pegarr's live library API is disabled unless `PEGARR_ACCESS_TOKEN_FILE` points to a valid secret file. When disabled, protected routes return the same generic `404` response as an unknown route and perform no Sonarr or Radarr work.
 
-The initial protected route is:
+The protected read-only routes are:
 
 ```text
 GET /api/v1/library/missing
 Authorization: Bearer <access token>
+
+GET /api/v1/library/items/sonarr/episode/<episode-id>/feasibility
+GET /api/v1/library/items/radarr/movie/<movie-id>/feasibility
+Authorization: Bearer <access token>
 ```
 
-A missing, malformed, query-string, or incorrect token returns `401` before any upstream request. Mutation methods return `405`. Successful responses use `Cache-Control: no-store`, contain an explicit `read_only` mode, and retain the private library evidence required by the future dashboard.
+A missing, malformed, query-string, or incorrect token returns `401` before any upstream request. Mutation methods return `405`. Successful responses use `Cache-Control: no-store`, contain an explicit `read_only` mode, and retain only the private library evidence required by the current dashboard.
 
 ## Secret boundary
 
@@ -45,4 +49,6 @@ Bearer authentication does not encrypt traffic. Use HTTPS or a trusted private n
 
 Authorized inventory reads request at most one configured page from each Arr instance. Concurrent requests share one in-flight operation, and completed results are reused for 30 seconds. `PEGARR_MISSING_PAGE_SIZE` defaults to 50 and accepts values from 1 through 100.
 
-`PEG-ACCESS-001` through `PEG-ACCESS-003`, `PEG-CONFIG-006`, `PEG-INVENTORY-004`, and `PEG-DOCKER-011` are the deterministic evidence for this boundary.
+Authorized item reads resolve the requested ID from that server-owned inventory before starting release, Bazarr, or provider work. Successful item reports share a 30-second bounded in-memory window. See [item feasibility API](item-feasibility-api.md).
+
+`PEG-ACCESS-001` through `PEG-ACCESS-004`, `PEG-CONFIG-006`, `PEG-INVENTORY-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-011`, and `PEG-DOCKER-013` are the deterministic evidence for this boundary.

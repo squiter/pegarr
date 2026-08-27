@@ -12,6 +12,7 @@ import type {
   RuntimeServices,
   SonarrIntegrationStatus,
 } from "./runtime.js";
+import type { ItemFeasibilitySelection } from "./item-feasibility.js";
 
 export interface RouteResult {
   readonly statusCode: number;
@@ -68,7 +69,9 @@ export async function resolveRoute(
   access?: RouteAccess,
 ): Promise<RouteResult> {
   const pathname = new URL(requestUrl ?? "/", "http://pegarr.invalid").pathname;
-  if (pathname === "/api/v1/library/missing" && access?.control.configured !== true) {
+  const itemSelection = parseItemFeasibilityPath(pathname);
+  const protectedLibraryRoute = pathname === "/api/v1/library/missing" || itemSelection !== undefined;
+  if (protectedLibraryRoute && access?.control.configured !== true) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   const knownReadOnlyRoutes = new Set([
@@ -82,7 +85,7 @@ export async function resolveRoute(
     ...dashboardAssetRoutes.keys(),
   ]);
 
-  if (knownReadOnlyRoutes.has(pathname) && method !== "GET") {
+  if ((knownReadOnlyRoutes.has(pathname) || itemSelection !== undefined) && method !== "GET") {
     return {
       statusCode: 405,
       headers: { allow: "GET" },
@@ -112,7 +115,7 @@ export async function resolveRoute(
       return {
         statusCode: 200,
         headers: {
-          "cache-control": "public, max-age=300",
+          "cache-control": "no-cache",
           "content-type": asset.contentType,
         },
         body: asset.body,
@@ -157,16 +160,8 @@ export async function resolveRoute(
   }
 
   if (pathname === "/api/v1/library/missing") {
-    if (access === undefined) {
-      return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
-    }
-    if (!access.control.authorize(access.authorization)) {
-      return {
-        statusCode: 401,
-        headers: { "www-authenticate": 'Bearer realm="pegarr", charset="UTF-8"' },
-        body: { service: "pegarr", status: "unauthorized" },
-      };
-    }
+    const rejection = authorizeLibraryRoute(access);
+    if (rejection !== undefined) return rejection;
     try {
       return {
         statusCode: 200,
@@ -182,10 +177,56 @@ export async function resolveRoute(
     }
   }
 
+  if (itemSelection !== undefined) {
+    const rejection = authorizeLibraryRoute(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      const body = services === undefined
+        ? {
+            kind: "item-feasibility",
+            mode: "read_only",
+            status: "disabled",
+            selection: itemSelection,
+            missingIntegrations: [itemSelection.application, "bazarr", "subdl"],
+          }
+        : await services.readItemFeasibility(itemSelection);
+      return { statusCode: body.status === "not_found" ? 404 : 200, body };
+    } catch {
+      return {
+        statusCode: 503,
+        body: { service: "pegarr", mode: "read_only", status: "unavailable" },
+      };
+    }
+  }
+
   return {
     statusCode: 404,
     body: { service: "pegarr", status: "not_found" },
   };
+}
+
+function authorizeLibraryRoute(access: RouteAccess | undefined): RouteResult | undefined {
+  if (access === undefined) {
+    return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+  }
+  if (access.control.authorize(access.authorization)) return undefined;
+  return {
+    statusCode: 401,
+    headers: { "www-authenticate": 'Bearer realm="pegarr", charset="UTF-8"' },
+    body: { service: "pegarr", status: "unauthorized" },
+  };
+}
+
+function parseItemFeasibilityPath(pathname: string): ItemFeasibilitySelection | undefined {
+  const match = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/(episode|movie)\/(\d+)\/feasibility$/u.exec(pathname);
+  if (match === null) return undefined;
+  const application = match[1];
+  const kind = match[2];
+  const itemId = Number(match[3]);
+  if (!Number.isSafeInteger(itemId) || itemId < 1) return undefined;
+  if (application === "sonarr" && kind === "episode") return { application, kind, itemId };
+  if (application === "radarr" && kind === "movie") return { application, kind, itemId };
+  return undefined;
 }
 
 async function safeRadarrStatus(services: RuntimeServices | undefined): Promise<RadarrIntegrationStatus> {

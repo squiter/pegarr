@@ -40,4 +40,6 @@ The live route is hidden when access control is disabled and returns `401` befor
 
 The [missing-item dashboard](missing-item-dashboard.md) consumes this route once after authentication. Its search, filtering, and sorting operate on display-safe rows in page memory and do not create additional inventory requests.
 
+Selecting a displayed row calls the [item feasibility API](item-feasibility-api.md). Pegarr resolves private media identity from the cached server-side inventory instead of accepting it from the browser.
+
 `PEG-SONARR-007`, `PEG-SONARR-008`, `PEG-RADARR-007`, `PEG-RADARR-008`, `PEG-INVENTORY-001` through `PEG-INVENTORY-003`, and `PEG-DOCKER-008` are the deterministic evidence for this path.

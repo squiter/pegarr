@@ -12,7 +12,7 @@ const dataDirectory = process.env.DATA_DIR ?? "./data";
 
 async function start(): Promise<void> {
   const configuration = await loadRuntimeConfiguration(process.env);
-  const services = createRuntimeServices(configuration);
+  const services = createRuntimeServices(configuration, { environment: process.env });
   const accessControl = new AccessControl(configuration.accessToken);
   const server = createServer(createRequestHandler(dataDirectory, services, accessControl));
 
@@ -20,9 +20,13 @@ async function start(): Promise<void> {
     process.stdout.write(`${JSON.stringify({ event: "server_started", service: "pegarr", port })}\n`);
   });
 
+  let shuttingDown = false;
   function shutdown(signal: string): void {
+    if (shuttingDown) return;
+    shuttingDown = true;
     process.stdout.write(`${JSON.stringify({ event: "shutdown_started", service: "pegarr", signal })}\n`);
     server.close((error) => {
+      services.close();
       if (error) {
         process.stderr.write(`${JSON.stringify({ event: "shutdown_failed", service: "pegarr" })}\n`);
         process.exitCode = 1;

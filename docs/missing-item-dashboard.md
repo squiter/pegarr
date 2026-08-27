@@ -14,9 +14,13 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Filtering and sorting operate on already loaded rows and do not call Pegarr or the Arr services.
 - Refresh is explicit. Pegarr's server-side 30-second cache prevents repeated refreshes from repeatedly calling the Arr services.
 - Partial inventory identifies the unavailable integration without hiding usable results.
+- Selecting an item opens its interactive release table and requests one protected read-only feasibility report.
+- Video acceptance and Arr rejection reasons remain separate from subtitle confidence.
+- Each release exposes per-language confidence, provider state, matching evidence, and warnings.
+- Successful item views are reused in page memory; an explicit refresh uses Pegarr's bounded server cache.
 - The page has a skip link, labelled controls, a polite status region, keyboard focus styles, reduced-motion behavior, and a mobile layout.
 
-The dashboard does not yet open release candidates. That is the next vertical slice: selecting one inventory item, requesting its read-only feasibility report, and showing the existing video and subtitle evidence without adding Grab.
+The dashboard deliberately has no Grab control. Phase 1 ends at explainable decision support; mutation remains a separately confirmed Phase 2 boundary.
 
 ## Web security
 
@@ -24,4 +28,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-003` and `PEG-DOCKER-012` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-012`, and `PEG-DOCKER-013` are the deterministic evidence for this page.

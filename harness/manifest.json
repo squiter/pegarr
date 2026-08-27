@@ -713,6 +713,54 @@
       "title": "Packaged dashboard assets and local controls cause no upstream requests",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Packaged assets and pure view model on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-CONFIG-007",
+      "title": "Runtime provider language mappings are explicit, bounded, and canonical",
+      "evidence": "src/config.test.ts",
+      "boundary": "Pure parsing of synthetic non-secret language mappings; no network"
+    },
+    {
+      "id": "PEG-ACCESS-004",
+      "title": "Item feasibility authenticates before work and rejects mutation methods",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with synthetic access tokens and an upstream-call spy"
+    },
+    {
+      "id": "PEG-ITEM-001",
+      "title": "Selected item reports derive matching identity from server-owned inventory",
+      "evidence": "src/item-feasibility.test.ts",
+      "boundary": "Synthetic inventory and injected episode and movie report builders"
+    },
+    {
+      "id": "PEG-ITEM-002",
+      "title": "Disabled, unavailable, and missing item states remain distinct",
+      "evidence": "src/item-feasibility.test.ts",
+      "boundary": "Synthetic inventory states with report-work spies; no network"
+    },
+    {
+      "id": "PEG-ITEM-003",
+      "title": "Concurrent and repeated item selections share one bounded report window",
+      "evidence": "src/item-feasibility.test.ts",
+      "boundary": "Deterministic clock and injected report builder; no network"
+    },
+    {
+      "id": "PEG-ITEM-004",
+      "title": "Runtime item selection composes Arr, Bazarr, and one provider window",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected synthetic HTTP responses, credentials, and deterministic clock"
+    },
+    {
+      "id": "PEG-DASH-004",
+      "title": "Release view preserves Arr rejection and honest subtitle evidence",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure view mapping over a sanitized deterministic feasibility report"
+    },
+    {
+      "id": "PEG-DOCKER-013",
+      "title": "Packaged item analysis is authenticated, cached, scoped, and has no Grab",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Four synthetic sibling services and five secret files on an internal-only Docker network"
     }
   ],
   "manualGaps": [

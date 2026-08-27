@@ -1,4 +1,4 @@
-import { rowsFromInventory, selectRows } from "/assets/dashboard-model.js";
+import { feasibilityView, rowsFromInventory, selectRows } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -7,9 +7,18 @@ const elements = {
   connectButton: document.querySelector("#connect-button"),
   dashboard: document.querySelector("#dashboard"),
   emptyState: document.querySelector("#empty-state"),
+  feasibilityClose: document.querySelector("#feasibility-close"),
+  feasibilityContext: document.querySelector("#feasibility-context"),
+  feasibilityNotice: document.querySelector("#feasibility-notice"),
+  feasibilityPanel: document.querySelector("#feasibility-panel"),
+  feasibilityRefresh: document.querySelector("#feasibility-refresh"),
+  feasibilitySummary: document.querySelector("#feasibility-summary"),
+  feasibilityTitle: document.querySelector("#feasibility-title"),
   inventoryList: document.querySelector("#inventory-list"),
   kindFilter: document.querySelector("#kind-filter"),
   refreshButton: document.querySelector("#refresh-button"),
+  releaseTableBody: document.querySelector("#release-table-body"),
+  releaseTableWrap: document.querySelector("#release-table-wrap"),
   searchInput: document.querySelector("#search-input"),
   sortOrder: document.querySelector("#sort-order"),
   sourceStatus: document.querySelector("#source-status"),
@@ -19,6 +28,8 @@ const elements = {
 
 let accessToken;
 let inventoryRows = [];
+let selectedRow;
+const feasibilityCache = new Map();
 
 elements.accessForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -33,6 +44,8 @@ elements.accessForm?.addEventListener("submit", async (event) => {
 });
 
 elements.refreshButton?.addEventListener("click", loadInventory);
+elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
+elements.feasibilityClose?.addEventListener("click", closeFeasibility);
 for (const control of [elements.searchInput, elements.kindFilter, elements.sortOrder]) {
   control?.addEventListener("input", renderInventory);
   control?.addEventListener("change", renderInventory);
@@ -67,6 +80,7 @@ async function loadInventory() {
     if (!response.ok) throw new Error("inventory_unavailable");
     const inventory = await response.json();
     inventoryRows = rowsFromInventory(inventory);
+    feasibilityCache.clear();
     renderSources(inventory);
     elements.accessPanel.hidden = true;
     elements.dashboard.hidden = false;
@@ -106,6 +120,12 @@ function renderItem(row) {
   const item = document.createElement("li");
   item.className = "inventory-card";
 
+  const select = document.createElement("button");
+  select.className = "inventory-select";
+  select.type = "button";
+  select.setAttribute("aria-label", `Investigate ${row.title}, ${row.context}`);
+  select.addEventListener("click", () => loadFeasibility(row));
+
   const icon = document.createElement("span");
   icon.className = `kind-icon kind-icon--${row.kind}`;
   icon.setAttribute("aria-hidden", "true");
@@ -132,8 +152,162 @@ function renderItem(row) {
     date.textContent = "Availability unknown";
   }
   metadata.append(application, date);
-  item.append(icon, copy, metadata);
+  select.append(icon, copy, metadata);
+  item.append(select);
   return item;
+}
+
+async function loadFeasibility(row, refresh = false) {
+  selectedRow = row;
+  elements.feasibilityPanel.hidden = false;
+  elements.feasibilityTitle.textContent = row.title;
+  elements.feasibilityContext.textContent = row.context;
+  elements.feasibilitySummary.replaceChildren();
+  elements.releaseTableBody.replaceChildren();
+  elements.releaseTableWrap.hidden = true;
+  const cached = refresh ? undefined : feasibilityCache.get(row.key);
+  if (cached !== undefined) {
+    renderFeasibility(cached);
+    elements.feasibilityTitle.focus();
+    return;
+  }
+  setFeasibilityNotice("Searching releases, resolving Bazarr policy, and checking subtitle evidence…", "loading");
+  setBusy(true);
+  try {
+    const response = await fetch(`/api/v1/library/items/${row.application}/${row.kind}/${row.itemId}/feasibility`, {
+      method: "GET",
+      headers: { authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (response.status === 401) {
+      accessToken = undefined;
+      feasibilityCache.clear();
+      closeFeasibility();
+      showAccess("That token was not accepted. Check the configured secret and try again.");
+      return;
+    }
+    const result = feasibilityView(await response.json());
+    if (response.status >= 500 && result.state === "invalid") throw new Error("feasibility_unavailable");
+    if (result.state === "ready") feasibilityCache.set(row.key, result);
+    renderFeasibility(result);
+    elements.feasibilityTitle.focus();
+  } catch {
+    setFeasibilityNotice("Pegarr could not complete this analysis. Subtitle availability remains Unknown.", "error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+function renderFeasibility(view) {
+  if (view.state !== "ready") {
+    elements.feasibilitySummary.replaceChildren();
+    elements.releaseTableWrap.hidden = true;
+    setFeasibilityNotice(view.message, view.state === "policy_unresolved" ? "warning" : "error");
+    return;
+  }
+  const policy = document.createElement("div");
+  policy.className = "policy-summary";
+  const policyLabel = document.createElement("strong");
+  policyLabel.textContent = view.policyName;
+  const languages = document.createElement("span");
+  languages.textContent = view.languages.length === 0
+    ? "No policy languages"
+    : view.languages.map(({ code, required }) => `${code}${required ? " required" : ""}`).join(" · ");
+  policy.append(policyLabel, languages);
+
+  const providers = document.createElement("div");
+  providers.className = "provider-summary";
+  providers.replaceChildren(...view.providers.map((provider) => {
+    const chip = document.createElement("span");
+    chip.className = `provider-chip provider-chip--${provider.status}`;
+    chip.textContent = `${provider.provider}: ${provider.status.replaceAll("_", " ")}${provider.cacheStatus ? ` · cache ${provider.cacheStatus}` : ""}`;
+    if (provider.detail) chip.title = provider.detail;
+    return chip;
+  }));
+  elements.feasibilitySummary.replaceChildren(policy, providers);
+  elements.releaseTableBody.replaceChildren(...view.releases.map(renderRelease));
+  elements.releaseTableWrap.hidden = false;
+  setFeasibilityNotice(
+    view.releases.length === 0
+      ? "The Arr search returned no release candidates."
+      : `${view.releases.length} release candidates evaluated. Video and subtitle decisions remain separate.`,
+    view.releases.length === 0 ? "warning" : "success",
+  );
+}
+
+function renderRelease(row) {
+  const tableRow = document.createElement("tr");
+  const release = document.createElement("td");
+  release.dataset.label = "Video release";
+  const title = document.createElement("strong");
+  title.textContent = row.title;
+  const metadata = document.createElement("span");
+  metadata.textContent = `${row.quality} · ${row.indexer} · ${row.protocol}`;
+  release.append(title, metadata);
+
+  const video = document.createElement("td");
+  video.dataset.label = "Arr decision";
+  const decision = document.createElement("span");
+  decision.className = `decision-badge decision-badge--${row.downloadAllowed ? "accepted" : "rejected"}`;
+  decision.textContent = row.downloadAllowed ? "Accepted" : "Rejected by Arr";
+  const score = document.createElement("span");
+  score.textContent = `Custom format ${row.customFormatScore}`;
+  video.append(decision, score);
+  for (const reason of row.rejectionReasons) {
+    const rejection = document.createElement("span");
+    rejection.className = "rejection-reason";
+    rejection.textContent = reason;
+    video.append(rejection);
+  }
+
+  const subtitle = document.createElement("td");
+  subtitle.dataset.label = "Subtitle confidence";
+  const confidence = document.createElement("span");
+  confidence.className = `confidence-badge confidence-badge--${row.confidence}`;
+  confidence.textContent = row.confidence.replaceAll("_", " ");
+  subtitle.append(confidence);
+  for (const language of row.languages) {
+    const languageStatus = document.createElement("span");
+    languageStatus.textContent = `${language.language}: ${language.confidence.replaceAll("_", " ")}`;
+    subtitle.append(languageStatus);
+  }
+
+  const evidenceCell = document.createElement("td");
+  evidenceCell.dataset.label = "Evidence";
+  const evidence = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "Why this confidence?";
+  evidence.append(summary);
+  const evidenceList = document.createElement("ul");
+  const messages = row.languages.flatMap((language) => [
+    ...(language.evidence?.reasons ?? []),
+    ...language.warnings,
+    ...(language.evidence ? [`${language.evidence.provider}: ${language.evidence.releaseName}`] : []),
+  ]);
+  for (const message of messages.length > 0 ? messages : ["No release-specific subtitle evidence was available."]) {
+    const reason = document.createElement("li");
+    reason.textContent = message;
+    evidenceList.append(reason);
+  }
+  evidence.append(evidenceList);
+  evidenceCell.append(evidence);
+  tableRow.append(release, video, subtitle, evidenceCell);
+  return tableRow;
+}
+
+function closeFeasibility() {
+  selectedRow = undefined;
+  elements.feasibilityPanel.hidden = true;
+  elements.releaseTableBody.replaceChildren();
+  elements.feasibilitySummary.replaceChildren();
+}
+
+function setFeasibilityNotice(message, state) {
+  elements.feasibilityNotice.textContent = message;
+  elements.feasibilityNotice.dataset.state = state;
 }
 
 function renderSources(inventory) {
@@ -154,6 +328,9 @@ function setBusy(busy) {
   elements.refreshButton.disabled = busy;
   elements.accessToken.disabled = busy;
   elements.dashboard?.setAttribute("aria-busy", String(busy));
+  elements.feasibilityPanel?.setAttribute("aria-busy", String(busy));
+  for (const button of document.querySelectorAll(".inventory-select")) button.disabled = busy;
+  elements.feasibilityRefresh.disabled = busy;
 }
 
 function setStatus(message, state) {

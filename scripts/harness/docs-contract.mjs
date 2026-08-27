@@ -15,6 +15,7 @@ const requiredDocs = [
   "docs/configuration.md",
   "docs/access-control.md",
   "docs/missing-item-dashboard.md",
+  "docs/item-feasibility-api.md",
   "docs/provider-search-cache.md",
   "docs/episode-feasibility-report.md",
   "docs/movie-feasibility-report.md",

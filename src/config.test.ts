@@ -216,3 +216,22 @@ test("PEG-CONFIG-006 browser API access uses only a bounded secret file", async 
     /does not contain one valid token/u,
   );
 });
+
+test("PEG-CONFIG-007 runtime SubDL language mappings are explicit, bounded, and canonical", async () => {
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_SUBDL_LANGUAGE_MAPPINGS: "en:EN, pt-BR:PT-BR, es:ES",
+  });
+  assert.deepEqual(configuration.subdlLanguageMappings, [
+    { policyCode: "en", providerCode: "EN" },
+    { policyCode: "pt-BR", providerCode: "PT-BR" },
+    { policyCode: "es", providerCode: "ES" },
+  ]);
+  await assert.rejects(
+    loadRuntimeConfiguration({ PEGARR_SUBDL_LANGUAGE_MAPPINGS: "pt-BR:PT-BR,pb:PB" }),
+    /invalid or duplicate/u,
+  );
+  await assert.rejects(
+    loadRuntimeConfiguration({ PEGARR_SUBDL_LANGUAGE_MAPPINGS: "not-a-pair" }),
+    /policy:provider/u,
+  );
+});

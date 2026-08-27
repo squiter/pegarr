@@ -81,6 +81,29 @@ export const dashboardPage = `<!doctype html>
       </div>
       <ol id="inventory-list" class="inventory-list" aria-label="Missing items"></ol>
     </section>
+
+    <section id="feasibility-panel" class="feasibility-panel" aria-labelledby="feasibility-title" hidden>
+      <div class="feasibility-heading">
+        <div>
+          <p class="eyebrow">Read-only release analysis</p>
+          <h2 id="feasibility-title" tabindex="-1">Selected item</h2>
+          <p id="feasibility-context" class="feasibility-context"></p>
+        </div>
+        <div class="feasibility-actions">
+          <button id="feasibility-refresh" class="secondary-button" type="button">Refresh analysis</button>
+          <button id="feasibility-close" class="quiet-button" type="button">Close</button>
+        </div>
+      </div>
+      <div id="feasibility-summary" class="feasibility-summary"></div>
+      <div id="feasibility-notice" class="feasibility-notice" role="status" aria-live="polite"></div>
+      <div id="release-table-wrap" class="release-table-wrap" hidden>
+        <table class="release-table">
+          <caption>Interactive release candidates enriched with subtitle evidence</caption>
+          <thead><tr><th scope="col">Video release</th><th scope="col">Arr decision</th><th scope="col">Subtitle confidence</th><th scope="col">Evidence</th></tr></thead>
+          <tbody id="release-table-body"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <footer>

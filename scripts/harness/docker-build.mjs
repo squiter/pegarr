@@ -767,6 +767,7 @@ async function packagedMissingInventorySmokeTest() {
   const scenario = "PEG-DOCKER-008";
   const accessScenario = "PEG-DOCKER-011";
   const dashboardScenario = "PEG-DOCKER-012";
+  const selectionScenario = "PEG-DOCKER-013";
   const suffix = `${process.pid}`;
   const networkName = `pegarr-harness-inventory-internal-${suffix}`;
   const fixtureName = `pegarr-harness-inventory-${suffix}`;
@@ -777,15 +778,21 @@ async function packagedMissingInventorySmokeTest() {
   const keys = {
     sonarr: "synthetic-inventory-sonarr-key",
     radarr: "synthetic-inventory-radarr-key",
+    bazarr: "synthetic-inventory-bazarr-key",
+    subdl: "synthetic-inventory-subdl-key",
     access: "synthetic-inventory-access-token-00000001",
   };
   const paths = {
     sonarr: join(fixtureDirectory, "sonarr_api_key"),
     radarr: join(fixtureDirectory, "radarr_api_key"),
+    bazarr: join(fixtureDirectory, "bazarr_api_key"),
+    subdl: join(fixtureDirectory, "subdl_api_key"),
     access: join(fixtureDirectory, "pegarr_access_token"),
   };
   writeFileSync(paths.sonarr, keys.sonarr, { mode: 0o444 });
   writeFileSync(paths.radarr, keys.radarr, { mode: 0o444 });
+  writeFileSync(paths.bazarr, keys.bazarr, { mode: 0o444 });
+  writeFileSync(paths.subdl, keys.subdl, { mode: 0o444 });
   writeFileSync(paths.access, keys.access, { mode: 0o444 });
 
   const network = docker([
@@ -801,16 +808,26 @@ async function packagedMissingInventorySmokeTest() {
     `const keys = ${JSON.stringify(keys)};`,
     "const sonarr = { page: 1, pageSize: 2, totalRecords: 2, records: [{ id: 305, seriesId: 42, tvdbId: 9000305, title: 'Synthetic Episode Five', airDateUtc: '2024-03-05T20:00:00Z', seasonNumber: 3, episodeNumber: 5, monitored: true, hasFile: false, series: { id: 42, title: 'Synthetic Show', year: 2022, imdbId: 'tt9000005', tmdbId: 900005 } }, { id: 306, seriesId: 42, tvdbId: 9000306, title: 'Synthetic Episode Six', airDateUtc: '2024-03-12T20:00:00Z', seasonNumber: 3, episodeNumber: 6, monitored: true, hasFile: false, series: { id: 42, title: 'Synthetic Show', year: 2022, imdbId: 'tt9000005', tmdbId: 900005 } }] };",
     "const radarr = { page: 1, pageSize: 2, totalRecords: 2, records: [{ id: 84, title: 'Synthetic Movie', year: 2024, tmdbId: 900084, imdbId: 'tt9000084', monitored: true, hasFile: false, digitalRelease: '2024-05-12T00:00:00Z' }, { id: 85, title: 'Second Synthetic Movie', year: 2023, tmdbId: 900085, imdbId: 'tt9000085', monitored: true, hasFile: false, physicalRelease: '2024-01-18T00:00:00Z' }] };",
+    "const releases = [{ guid: 'synthetic-release-guid', title: 'Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP', indexerId: 11, indexer: 'Synthetic Indexer', protocol: 'torrent', releaseGroup: 'GROUP', downloadAllowed: true, rejections: [], customFormatScore: 100, customFormats: [{ id: 7, name: 'Subtitle preference' }], languages: [{ id: 1, name: 'English' }], quality: { quality: { id: 3, name: 'WEB 1080p', source: 'WEB-DL', resolution: 1080 } }, size: 2400000000, ageHours: 3, seeders: 42, leechers: 6 }];",
+    "const profiles = [{ profileId: 7, name: 'Synthetic policy', cutoff: 1, items: [{ id: 1, language: 'pt-BR', hi: 'False', forced: 'False', audio_exclude: 'False', audio_only_include: 'False' }], mustContain: [], mustNotContain: [], originalFormat: 0 }];",
+    "const assignment = { data: [{ sonarrSeriesId: 42, profileId: 7 }], total: 1 };",
+    "const subtitles = { status: true, subtitles: [{ n_id: 'synthetic-subtitle', release_name: 'Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP', language: 'PT-BR', season: 3, episode: 5, hi: false, full_season: false }] };",
     "let requestCount = 0;",
     "createServer((request, response) => {",
     "  const host = String(request.headers.host || '').split(':')[0];",
     "  const url = new URL(request.url || '/', 'http://fixture.invalid');",
-    "  let body;",
+    "  let body; let expectedKey;",
     "  if (request.method === 'GET' && url.pathname === '/__count') { response.writeHead(200); response.end(String(requestCount)); return; }",
-    "  if (request.method !== 'GET' || url.pathname !== '/api/v3/wanted/missing' || url.searchParams.get('pageSize') !== '2' || url.searchParams.get('monitored') !== 'true') { response.writeHead(405); response.end('{}'); return; }",
-    "  if (host === 'sonarr-fixture' && request.headers['x-api-key'] === keys.sonarr) body = sonarr;",
-    "  else if (host === 'radarr-fixture' && request.headers['x-api-key'] === keys.radarr) body = radarr;",
-    "  else { response.writeHead(401, { 'content-type': 'application/json' }); response.end('{}'); return; }",
+    "  if (request.method !== 'GET') { response.writeHead(405); response.end('{}'); return; }",
+    "  if (host === 'sonarr-fixture' && url.pathname === '/api/v3/wanted/missing' && url.searchParams.get('pageSize') === '2' && url.searchParams.get('monitored') === 'true') { body = sonarr; expectedKey = keys.sonarr; }",
+    "  else if (host === 'radarr-fixture' && url.pathname === '/api/v3/wanted/missing' && url.searchParams.get('pageSize') === '2' && url.searchParams.get('monitored') === 'true') { body = radarr; expectedKey = keys.radarr; }",
+    "  else if (host === 'sonarr-fixture' && url.pathname === '/api/v3/release' && url.searchParams.get('episodeId') === '305') { body = releases; expectedKey = keys.sonarr; }",
+    "  else if (host === 'bazarr-fixture' && url.pathname === '/api/system/languages/profiles') { body = profiles; expectedKey = keys.bazarr; }",
+    "  else if (host === 'bazarr-fixture' && url.pathname === '/api/series' && url.searchParams.get('seriesid[]') === '42') { body = assignment; expectedKey = keys.bazarr; }",
+    "  else if (host === 'subdl-fixture' && url.pathname === '/api/v2/subtitles/search' && url.searchParams.get('languages') === 'PT-BR') { body = subtitles; expectedKey = keys.subdl; }",
+    "  else { response.writeHead(404, { 'content-type': 'application/json' }); response.end('{}'); return; }",
+    "  const providedKey = host === 'subdl-fixture' ? String(request.headers.authorization || '').replace(/^Bearer /, '') : request.headers['x-api-key'];",
+    "  if (providedKey !== expectedKey) { response.writeHead(401, { 'content-type': 'application/json' }); response.end('{}'); return; }",
     "  requestCount += 1;",
     "  response.writeHead(200, { 'content-type': 'application/json' });",
     "  response.end(JSON.stringify(body));",
@@ -823,6 +840,8 @@ async function packagedMissingInventorySmokeTest() {
       "--network", networkName,
       "--network-alias", "sonarr-fixture",
       "--network-alias", "radarr-fixture",
+      "--network-alias", "bazarr-fixture",
+      "--network-alias", "subdl-fixture",
       "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
       "pegarr:harness", "node", "-e", fixtureScript,
     ]);
@@ -835,6 +854,8 @@ async function packagedMissingInventorySmokeTest() {
       "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
       "--mount", `type=bind,source=${paths.sonarr},target=/run/secrets/sonarr_api_key,readonly`,
       "--mount", `type=bind,source=${paths.radarr},target=/run/secrets/radarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.bazarr},target=/run/secrets/bazarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.subdl},target=/run/secrets/subdl_api_key,readonly`,
       "--env", "PEGARR_SONARR_URL=http://sonarr-fixture:8082",
       "--env", "PEGARR_SONARR_ALLOWED_HOSTS=sonarr-fixture",
       "--env", "PEGARR_SONARR_API_KEY_FILE=/run/secrets/sonarr_api_key",
@@ -843,6 +864,15 @@ async function packagedMissingInventorySmokeTest() {
       "--env", "PEGARR_RADARR_ALLOWED_HOSTS=radarr-fixture",
       "--env", "PEGARR_RADARR_API_KEY_FILE=/run/secrets/radarr_api_key",
       "--env", "PEGARR_RADARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_BAZARR_URL=http://bazarr-fixture:8082",
+      "--env", "PEGARR_BAZARR_ALLOWED_HOSTS=bazarr-fixture",
+      "--env", "PEGARR_BAZARR_API_KEY_FILE=/run/secrets/bazarr_api_key",
+      "--env", "PEGARR_BAZARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_SUBDL_URL=http://subdl-fixture:8082",
+      "--env", "PEGARR_SUBDL_ALLOWED_HOSTS=subdl-fixture",
+      "--env", "PEGARR_SUBDL_API_KEY_FILE=/run/secrets/subdl_api_key",
+      "--env", "PEGARR_SUBDL_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_SUBDL_LANGUAGE_MAPPINGS=pt-BR:PT-BR",
       "--env", "PEGARR_MISSING_PAGE_SIZE=2",
       "pegarr:harness", "npm", "run", "--silent", "inventory:missing",
     ];
@@ -877,6 +907,8 @@ async function packagedMissingInventorySmokeTest() {
       "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
       "--mount", `type=bind,source=${paths.sonarr},target=/run/secrets/sonarr_api_key,readonly`,
       "--mount", `type=bind,source=${paths.radarr},target=/run/secrets/radarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.bazarr},target=/run/secrets/bazarr_api_key,readonly`,
+      "--mount", `type=bind,source=${paths.subdl},target=/run/secrets/subdl_api_key,readonly`,
       "--mount", `type=bind,source=${paths.access},target=/run/secrets/pegarr_access_token,readonly`,
       "--env", "DATA_DIR=/tmp",
       "--env", "PEGARR_SONARR_URL=http://sonarr-fixture:8082",
@@ -887,6 +919,15 @@ async function packagedMissingInventorySmokeTest() {
       "--env", "PEGARR_RADARR_ALLOWED_HOSTS=radarr-fixture",
       "--env", "PEGARR_RADARR_API_KEY_FILE=/run/secrets/radarr_api_key",
       "--env", "PEGARR_RADARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_BAZARR_URL=http://bazarr-fixture:8082",
+      "--env", "PEGARR_BAZARR_ALLOWED_HOSTS=bazarr-fixture",
+      "--env", "PEGARR_BAZARR_API_KEY_FILE=/run/secrets/bazarr_api_key",
+      "--env", "PEGARR_BAZARR_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_SUBDL_URL=http://subdl-fixture:8082",
+      "--env", "PEGARR_SUBDL_ALLOWED_HOSTS=subdl-fixture",
+      "--env", "PEGARR_SUBDL_API_KEY_FILE=/run/secrets/subdl_api_key",
+      "--env", "PEGARR_SUBDL_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_SUBDL_LANGUAGE_MAPPINGS=pt-BR:PT-BR",
       "--env", "PEGARR_ACCESS_TOKEN_FILE=/run/secrets/pegarr_access_token",
       "--env", "PEGARR_MISSING_PAGE_SIZE=2",
       "pegarr:harness",
@@ -916,8 +957,11 @@ async function packagedMissingInventorySmokeTest() {
       "  const queryToken = await fetch(endpoint + '?token=' + encodeURIComponent(token));",
       "  const wrong = await fetch(endpoint, { headers: { authorization: 'Bearer synthetic-wrong-access-token-00000001' } });",
       "  const mutation = await fetch(endpoint, { method: 'POST', headers: { authorization: 'Bearer ' + token } });",
+      "  const itemEndpoint = app + '/api/v1/library/items/sonarr/episode/305/feasibility';",
+      "  const itemWrong = await fetch(itemEndpoint, { headers: { authorization: 'Bearer synthetic-wrong-access-token-00000001' } });",
+      "  const itemMutation = await fetch(itemEndpoint, { method: 'POST', headers: { authorization: 'Bearer ' + token } });",
       "  const before = Number(await (await fetch(countUrl)).text());",
-      "  if (queryToken.status !== 401 || wrong.status !== 401 || mutation.status !== 405 || before !== 2) throw new Error('unauthorized request crossed the boundary');",
+      "  if (queryToken.status !== 401 || wrong.status !== 401 || mutation.status !== 405 || itemWrong.status !== 401 || itemMutation.status !== 405 || before !== 2) throw new Error('unauthorized request crossed the boundary');",
       "  const response = await fetch(endpoint, { headers: { authorization: 'Bearer ' + token } });",
       "  const body = await response.json();",
       "  const cached = await fetch(endpoint, { headers: { authorization: 'Bearer ' + token } });",
@@ -928,7 +972,14 @@ async function packagedMissingInventorySmokeTest() {
       "  const dashboardModel = await import(modelUrl);",
       "  const rows = dashboardModel.rowsFromInventory(body);",
       "  const movies = dashboardModel.selectRows(rows, { kind: 'movie', sort: 'title-asc' });",
+      "  const itemResponse = await fetch(itemEndpoint, { headers: { authorization: 'Bearer ' + token } });",
+      "  const itemBody = await itemResponse.json();",
+      "  const cachedItem = await fetch(itemEndpoint, { headers: { authorization: 'Bearer ' + token } });",
+      "  const itemView = dashboardModel.feasibilityView(itemBody);",
+      "  const finalCount = Number(await (await fetch(countUrl)).text());",
       "  if (rows.length !== 4 || movies.length !== 2 || after !== 4) throw new Error('packaged local dashboard controls mismatch');",
+      "  if (itemResponse.status !== 200 || cachedItem.status !== 200 || itemBody.status !== 'ready' || itemView.state !== 'ready' || itemView.releases.length !== 1 || itemView.releases[0].confidence !== 'confirmed' || finalCount !== 8) throw new Error('packaged item feasibility mismatch');",
+      "  if (clientText.includes('/grab') || pageText.includes('Grab selected release')) throw new Error('Grab crossed the Phase 1 boundary');",
       "  if (response.headers.get('cache-control') !== 'no-store' || response.headers.get('x-content-type-options') !== 'nosniff') throw new Error('security headers missing');",
       "  if (JSON.stringify(body).includes(token)) throw new Error('access token escaped');",
       "  console.log('protected inventory=ready, unauthorized upstream requests=0, cached refresh requests=0');",
@@ -945,6 +996,7 @@ async function packagedMissingInventorySmokeTest() {
     process.stdout.write(`${scenario} packaged missing inventory=ready (two requests, secret-files, read-only, internal-network)\n`);
     process.stdout.write(`${accessScenario} ${protectedInventory.stdout.trim()} (secret-file bearer, internal-network)\n`);
     process.stdout.write(`${dashboardScenario} packaged dashboard=ready (responsive assets, local controls, zero extra upstream requests)\n`);
+    process.stdout.write(`${selectionScenario} packaged item analysis=ready (authenticated, cached, one provider window, no Grab)\n`);
   } finally {
     docker(["rm", "--force", appName]);
     docker(["rm", "--force", fixtureName]);

@@ -149,6 +149,7 @@ for (const contract of [
   "maximumSecretBytes = 4_096",
   'return "[redacted]"',
   "PEGARR_ACCESS_TOKEN_FILE",
+  "PEGARR_SUBDL_LANGUAGE_MAPPINGS",
 ]) {
   if (!configuration.includes(contract)) {
     issues.push(`The runtime configuration must retain ${contract}`);
@@ -296,9 +297,25 @@ if (/^phase-[01]-/u.test(manifest.phase)) {
   }
   if (
     !app.includes('"/api/v1/library/missing"') ||
-    app.indexOf("access.control.authorize") > app.indexOf("services.readMissingInventory")
+    app.indexOf("authorizeLibraryRoute(access)") > app.indexOf("services.readMissingInventory")
   ) {
     issues.push("The live missing-item route must authenticate before reading upstream inventory");
+  }
+  if (
+    !app.includes("parseItemFeasibilityPath") ||
+    !app.includes("services.readItemFeasibility") ||
+    app.indexOf("authorizeLibraryRoute(access)") > app.indexOf("services.readItemFeasibility")
+  ) {
+    issues.push("The live item-feasibility route must authenticate before any report work");
+  }
+  const itemFeasibility = readFileSync(resolve(repoRoot, "src/item-feasibility.ts"), "utf8");
+  if (
+    !itemFeasibility.includes("readInventory") ||
+    !itemFeasibility.includes("#inFlight") ||
+    !itemFeasibility.includes("#cache") ||
+    /\b(?:grabRelease|downloadRelease|deleteItem|updateItem)\b/iu.test(itemFeasibility)
+  ) {
+    issues.push("Item feasibility must remain server-owned, bounded, and read-only");
   }
   if (
     !app.includes('pathname === "/"') ||

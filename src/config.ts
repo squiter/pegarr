@@ -1,6 +1,8 @@
 import { open } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 
+import { validateLanguageMappings, type ProviderLanguageMapping } from "./provider-policy-search.js";
+
 export class ConfigurationError extends Error {
   constructor(message: string) {
     super(message);
@@ -49,6 +51,7 @@ export interface RuntimeConfiguration {
   readonly subdl?: SubdlRuntimeConfiguration;
   readonly accessToken?: SecretValue;
   readonly missingPageSize?: number;
+  readonly subdlLanguageMappings?: readonly ProviderLanguageMapping[];
 }
 
 const maximumSecretBytes = 4_096;
@@ -94,6 +97,9 @@ export async function loadRuntimeConfiguration(
     100,
     "PEGARR_MISSING_PAGE_SIZE",
   );
+  const subdlLanguageMappings = parseSubdlLanguageMappings(
+    environment.PEGARR_SUBDL_LANGUAGE_MAPPINGS,
+  );
 
   return {
     ...(sonarr === undefined ? {} : { sonarr }),
@@ -102,7 +108,33 @@ export async function loadRuntimeConfiguration(
     ...(subdl === undefined ? {} : { subdl }),
     ...(accessToken === undefined ? {} : { accessToken }),
     ...(missingPageSize === undefined ? {} : { missingPageSize }),
+    ...(subdlLanguageMappings === undefined ? {} : { subdlLanguageMappings }),
   };
+}
+
+function parseSubdlLanguageMappings(
+  value: string | undefined,
+): readonly ProviderLanguageMapping[] | undefined {
+  const normalized = optional(value);
+  if (normalized === undefined) return undefined;
+  const mappings = normalized.split(",").map((entry) => {
+    const parts = entry.split(":").map((part) => part.trim());
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw new ConfigurationError(
+        "PEGARR_SUBDL_LANGUAGE_MAPPINGS must use policy:provider comma-separated pairs",
+      );
+    }
+    return { policyCode: parts[0], providerCode: parts[1] };
+  });
+  if (mappings.length > 64) {
+    throw new ConfigurationError("PEGARR_SUBDL_LANGUAGE_MAPPINGS may contain at most 64 pairs");
+  }
+  try {
+    validateLanguageMappings(mappings);
+  } catch {
+    throw new ConfigurationError("PEGARR_SUBDL_LANGUAGE_MAPPINGS contains an invalid or duplicate pair");
+  }
+  return mappings;
 }
 
 async function loadAccessToken(

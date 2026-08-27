@@ -124,6 +124,14 @@
 | PEG-DASH-002 | Dashboard search, filtering, and sorting stay local | `src/dashboard-model.test.ts` |
 | PEG-DASH-003 | Dashboard routes are accessible, responsive, and secret-safe | `src/app.test.ts` |
 | PEG-DOCKER-012 | Packaged dashboard assets and controls cause no upstream requests | `scripts/harness/docker-build.mjs` |
+| PEG-CONFIG-007 | Runtime provider language mappings are explicit and canonical | `src/config.test.ts` |
+| PEG-ACCESS-004 | Item feasibility authenticates before work and rejects mutations | `src/app.test.ts` |
+| PEG-ITEM-001 | Item reports derive identity from server-owned inventory | `src/item-feasibility.test.ts` |
+| PEG-ITEM-002 | Disabled, unavailable, and missing item states remain distinct | `src/item-feasibility.test.ts` |
+| PEG-ITEM-003 | Repeated selections share one bounded report window | `src/item-feasibility.test.ts` |
+| PEG-ITEM-004 | Runtime selection composes Arr, Bazarr, and one provider window | `src/runtime.test.ts` |
+| PEG-DASH-004 | Release view preserves Arr decisions and honest evidence | `src/dashboard-model.test.ts` |
+| PEG-DOCKER-013 | Packaged item analysis is authenticated, cached, and read-only | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 
