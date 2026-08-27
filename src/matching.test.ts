@@ -33,6 +33,20 @@ test("PEG-MATCH-002 demo report associates subtitle evidence with every Arr rele
   assert.ok(report.releases[3]?.subtitle.languages[0]?.warnings.some((warning) => warning.includes("rate limited")));
 });
 
+test("PEG-MATCH-011 reports retain safe release traits beside original Arr evidence", () => {
+  const release = buildFeasibilityReport(demoFeasibilityInput).releases[0];
+
+  assert.deepEqual(release?.video.traits, {
+    source: "WEB-DL",
+    resolution: "1080p",
+    releaseGroup: "GROUP",
+  });
+  assert.equal(release?.video.evidence.sizeBytes, 2_400_000_000);
+  assert.equal(release?.video.evidence.ageHours, 3.5);
+  assert.deepEqual(release?.video.evidence.customFormats, [{ id: 7, name: "PT-BR or Multi subtitles" }]);
+  assert.doesNotMatch(JSON.stringify(release), /downloadUrl|magnet|api.?key/iu);
+});
+
 test("PEG-MATCH-003 provider failures produce Unknown instead of No match found", () => {
   const providerResults: readonly ProviderSearchResult[] = [
     { provider: "subdl", status: "timeout", subtitles: [] },

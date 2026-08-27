@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { feasibilityView, itemAnalysisSummary, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows } from "./web/dashboard-model.js";
+import { feasibilityView, itemAnalysisSummary, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -227,6 +227,84 @@ test("PEG-DASH-007 release filtering and sorting stay local and preserve Arr dec
   assert.deepEqual(byTitle.map(({ title }) => title), byTitle.map(({ title }) => title).toSorted((left, right) => left.localeCompare(right)));
   assert.deepEqual(view.releases.map(({ id }) => id), originalOrder);
   assert.deepEqual(selectReleases(view.releases, { decision: "unsafe", confidence: "unsafe", sort: "unsafe" }), view.releases);
+});
+
+test("PEG-DASH-014 release rows preserve safe Arr metadata needed for comparison", () => {
+  const view = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    report: buildFeasibilityReport(demoFeasibilityInput),
+  });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+
+  assert.deepEqual({
+    sizeBytes: view.releases[0]?.sizeBytes,
+    ageHours: view.releases[0]?.ageHours,
+    seeders: view.releases[0]?.seeders,
+    leechers: view.releases[0]?.leechers,
+    arrLanguages: view.releases[0]?.arrLanguages,
+    customFormats: view.releases[0]?.customFormats,
+    releaseGroup: view.releases[0]?.releaseGroup,
+    edition: view.releases[0]?.edition,
+  }, {
+    sizeBytes: 2_400_000_000,
+    ageHours: 3.5,
+    seeders: 42,
+    leechers: 6,
+    arrLanguages: ["English"],
+    customFormats: ["PT-BR or Multi subtitles"],
+    releaseGroup: "GROUP",
+    edition: undefined,
+  });
+  assert.doesNotMatch(JSON.stringify(view.releases), /downloadUrl|magnet|infoHash/iu);
+});
+
+test("PEG-DASH-015 release search matches loaded title, indexer, group, language, and format evidence", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+
+  assert.equal(selectReleases(view.releases, { query: "pt-br or multi" }).length, 1);
+  assert.equal(selectReleases(view.releases, { query: "synthetic usenet" })[0]?.downloadAllowed, false);
+  assert.ok(selectReleases(view.releases, { query: "english" }).length > 1);
+  assert.deepEqual(selectReleases(view.releases, { query: "not in this analysis" }), []);
+});
+
+test("PEG-DASH-016 protocol filtering stays local and preserves rejected releases", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+
+  const torrents = selectReleases(view.releases, { protocol: "torrent" });
+  const usenet = selectReleases(view.releases, { protocol: "usenet" });
+  assert.equal(torrents.length, 3);
+  assert.equal(usenet.length, 1);
+  assert.equal(usenet[0]?.downloadAllowed, false);
+  assert.deepEqual(selectReleases(view.releases, { protocol: "unsafe" }), view.releases);
+});
+
+test("PEG-DASH-017 release size, age, and seeder sorting is deterministic with unknown values last", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+
+  assert.deepEqual(selectReleases(view.releases, { sort: "seeders-desc" }).map(({ seeders }) => seeders), [42, 18, 9, undefined]);
+  assert.deepEqual(selectReleases(view.releases, { sort: "size-asc" }).map(({ sizeBytes }) => sizeBytes), [1_100_000_000, 2_100_000_000, 2_400_000_000, 8_700_000_000]);
+  assert.deepEqual(selectReleases(view.releases, { sort: "size-desc" }).map(({ sizeBytes }) => sizeBytes), [8_700_000_000, 2_400_000_000, 2_100_000_000, 1_100_000_000]);
+  assert.deepEqual(selectReleases(view.releases, { sort: "age-asc" }).map(({ ageHours }) => ageHours), [1.25, 3.5, 7, 48]);
+});
+
+test("PEG-DASH-018 release shortlist is bounded, deterministic, and page-memory safe", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  const ids = view.releases.map(({ id }) => id);
+
+  assert.deepEqual(shortlistedReleases(view.releases, [ids[2]!, ids[0]!, ids[2]!, "missing", ids[1]!, ids[3]!]).map(({ id }) => id), [ids[2], ids[0], ids[1]]);
+  assert.deepEqual(shortlistedReleases(view.releases, undefined), []);
+  assert.doesNotMatch(JSON.stringify(shortlistedReleases(view.releases, ids)), /downloadUrl|magnet|infoHash/iu);
 });
 
 test("PEG-DASH-008 item summaries use the best Arr-accepted confidence and retain freshness", () => {

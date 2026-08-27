@@ -70,4 +70,6 @@ Exit code `0` means a report was built. Exit code `1` means policy resolution or
 
 The successful report intentionally contains the item title, media identifiers, release titles, policy details, and match evidence. Treat it as private library output; inspect and sanitize it before attaching it to a public issue.
 
+Release rows retain safe Arr comparison evidence such as size, age, peers, language/custom-format names, release group, and edition. Download URLs, magnet handles, and info hashes are discarded before report construction.
+
 `PEG-MOVIEFLOW-001` through `PEG-MOVIEFLOW-003`, `PEG-MOVIEREPORT-001`, `PEG-MOVIEREPORT-002`, `PEG-CACHE-001` through `PEG-CACHE-008`, `PEG-DOCKER-007`, and `PEG-DOCKER-010` are the deterministic completion evidence for this path. They use only sanitized fixtures and internal-only Docker networks.

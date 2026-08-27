@@ -45,6 +45,8 @@ The current repository foundation includes:
 - authenticated episode and movie selection routes that derive private matching identity from server-owned inventory;
 - an interactive release table that preserves Arr decisions while explaining per-language subtitle confidence and provider state;
 - local release filtering and sorting that reuse the in-memory analysis without new upstream requests;
+- release rows with safe Arr size, age, peer, language, custom-format, group, and edition evidence;
+- page-memory release search, protocol filtering, metadata sorting, and a three-candidate shortlist for comparison;
 - page-memory item summaries with best Arr-accepted confidence, policy/freshness badges, and local attention filters;
 - per-required-language coverage computed only from Arr-accepted releases, with Unknown kept distinct from No match found;
 - provider-evidence health that exposes available, partial, unavailable, and unknown search windows without changing match confidence;

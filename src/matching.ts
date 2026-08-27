@@ -57,6 +57,7 @@ export function assessRelease(input: FeasibilityInput, release: ArrReleaseCandid
       rejectionReasons: release.rejectionReasons,
       customFormatScore: release.customFormatScore,
       evidence: release.evidence,
+      ...(release.traits === undefined ? {} : { traits: release.traits }),
     },
     subtitle: {
       confidence: overallConfidence(languages),

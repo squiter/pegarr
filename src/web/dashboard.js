@@ -1,4 +1,4 @@
-import { feasibilityView, itemAnalysisSummary, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows } from "/assets/dashboard-model.js";
+import { feasibilityView, itemAnalysisSummary, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -23,6 +23,12 @@ const elements = {
   releaseConfidenceFilter: document.querySelector("#release-confidence-filter"),
   releaseControls: document.querySelector("#release-controls"),
   releaseDecisionFilter: document.querySelector("#release-decision-filter"),
+  releaseProtocolFilter: document.querySelector("#release-protocol-filter"),
+  releaseSearchInput: document.querySelector("#release-search-input"),
+  releaseShortlist: document.querySelector("#release-shortlist"),
+  releaseShortlistClear: document.querySelector("#release-shortlist-clear"),
+  releaseShortlistCount: document.querySelector("#release-shortlist-count"),
+  releaseShortlistItems: document.querySelector("#release-shortlist-items"),
   releaseSortOrder: document.querySelector("#release-sort-order"),
   releaseTableBody: document.querySelector("#release-table-body"),
   releaseTableWrap: document.querySelector("#release-table-wrap"),
@@ -43,6 +49,7 @@ let activeFeasibility;
 let pageBusy = false;
 const feasibilityCache = new Map();
 const analysisByItem = new Map();
+const shortlistedReleaseIds = new Set();
 
 elements.accessForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -59,11 +66,13 @@ elements.accessForm?.addEventListener("submit", async (event) => {
 elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
 elements.feasibilityClose?.addEventListener("click", closeFeasibility);
+elements.releaseShortlistClear?.addEventListener("click", clearShortlist);
 for (const control of [elements.searchInput, elements.kindFilter, elements.analysisFilter, elements.bestConfidenceFilter, elements.requiredCoverageFilter, elements.providerEvidenceFilter, elements.sortOrder]) {
   control?.addEventListener("input", renderInventory);
   control?.addEventListener("change", renderInventory);
 }
-for (const control of [elements.releaseDecisionFilter, elements.releaseConfidenceFilter, elements.releaseSortOrder]) {
+for (const control of [elements.releaseSearchInput, elements.releaseDecisionFilter, elements.releaseConfidenceFilter, elements.releaseProtocolFilter, elements.releaseSortOrder]) {
+  control?.addEventListener("input", renderReleaseSelection);
   control?.addEventListener("change", renderReleaseSelection);
 }
 
@@ -400,11 +409,15 @@ function renderReleaseSelection() {
   const view = activeFeasibility;
   if (view === undefined) return;
   const releases = selectReleases(view.releases, {
+    query: elements.releaseSearchInput?.value,
     decision: elements.releaseDecisionFilter?.value,
     confidence: elements.releaseConfidenceFilter?.value,
+    protocol: elements.releaseProtocolFilter?.value,
     sort: elements.releaseSortOrder?.value,
   });
+  pruneShortlist(view.releases);
   elements.releaseTableBody.replaceChildren(...releases.map(renderRelease));
+  renderShortlist(view.releases);
   elements.releaseTableWrap.hidden = releases.length === 0;
   elements.releaseVisibleCount.textContent = `${releases.length} of ${view.releases.length} ${view.releases.length === 1 ? "release" : "releases"} shown`;
   const stale = view.analysis.source === "stale_cache";
@@ -429,6 +442,8 @@ function renderReleaseSelection() {
 
 function renderRelease(row) {
   const tableRow = document.createElement("tr");
+  tableRow.dataset.releaseId = row.id;
+  tableRow.classList.toggle("release-row--shortlisted", shortlistedReleaseIds.has(row.id));
   const release = document.createElement("td");
   release.dataset.label = "Video release";
   const title = document.createElement("strong");
@@ -436,6 +451,20 @@ function renderRelease(row) {
   const metadata = document.createElement("span");
   metadata.textContent = `${row.quality} · ${row.indexer} · ${row.protocol}`;
   release.append(title, metadata);
+  const traits = [row.releaseGroup ? `Group ${row.releaseGroup}` : "", row.edition ?? ""].filter(Boolean);
+  if (traits.length > 0) {
+    const traitLine = document.createElement("span");
+    traitLine.className = "release-traits";
+    traitLine.textContent = traits.join(" · ");
+    release.append(traitLine);
+  }
+  const facts = releaseFacts(row);
+  if (facts.length > 0) {
+    const factLine = document.createElement("span");
+    factLine.className = "release-facts";
+    factLine.textContent = facts.join(" · ");
+    release.append(factLine);
+  }
 
   const video = document.createElement("td");
   video.dataset.label = "Arr decision";
@@ -445,6 +474,16 @@ function renderRelease(row) {
   const score = document.createElement("span");
   score.textContent = `Custom format ${row.customFormatScore}`;
   video.append(decision, score);
+  if (row.customFormats.length > 0) {
+    const formats = document.createElement("span");
+    formats.textContent = `Formats: ${row.customFormats.join(", ")}`;
+    video.append(formats);
+  }
+  if (row.arrLanguages.length > 0) {
+    const arrLanguages = document.createElement("span");
+    arrLanguages.textContent = `Arr languages: ${row.arrLanguages.join(", ")}`;
+    video.append(arrLanguages);
+  }
   for (const reason of row.rejectionReasons) {
     const rejection = document.createElement("span");
     rejection.className = "rejection-reason";
@@ -483,8 +522,79 @@ function renderRelease(row) {
   }
   evidence.append(evidenceList);
   evidenceCell.append(evidence);
-  tableRow.append(release, video, subtitle, evidenceCell);
+
+  const shortlistCell = document.createElement("td");
+  shortlistCell.dataset.label = "Shortlist";
+  const shortlist = document.createElement("button");
+  shortlist.className = "shortlist-toggle";
+  shortlist.type = "button";
+  updateShortlistButton(shortlist, row);
+  shortlist.addEventListener("click", () => toggleShortlist(row, tableRow, shortlist));
+  shortlistCell.append(shortlist);
+  tableRow.append(release, video, subtitle, evidenceCell, shortlistCell);
   return tableRow;
+}
+
+function releaseFacts(row) {
+  return [
+    row.sizeBytes === undefined ? "" : formatBytes(row.sizeBytes),
+    row.ageHours === undefined ? "" : formatAge(row.ageHours),
+    row.seeders === undefined ? "" : `${row.seeders.toLocaleString()} ${row.seeders === 1 ? "seeder" : "seeders"}`,
+    row.leechers === undefined ? "" : `${row.leechers.toLocaleString()} ${row.leechers === 1 ? "leecher" : "leechers"}`,
+  ].filter(Boolean);
+}
+
+function toggleShortlist(row, tableRow, button) {
+  if (shortlistedReleaseIds.has(row.id)) shortlistedReleaseIds.delete(row.id);
+  else if (shortlistedReleaseIds.size >= 3) {
+    setFeasibilityNotice("The page-memory shortlist holds up to 3 releases. Remove one before adding another.", "warning");
+    return;
+  } else shortlistedReleaseIds.add(row.id);
+  tableRow.classList.toggle("release-row--shortlisted", shortlistedReleaseIds.has(row.id));
+  updateShortlistButton(button, row);
+  renderShortlist(activeFeasibility?.releases ?? []);
+}
+
+function updateShortlistButton(button, row) {
+  const selected = shortlistedReleaseIds.has(row.id);
+  button.setAttribute("aria-pressed", String(selected));
+  button.setAttribute("aria-label", `${selected ? "Remove" : "Add"} ${row.title} ${selected ? "from" : "to"} shortlist`);
+  button.textContent = selected ? "Remove" : "Shortlist";
+}
+
+function renderShortlist(releases) {
+  const rows = shortlistedReleases(releases, [...shortlistedReleaseIds]);
+  elements.releaseShortlist.hidden = releases.length === 0;
+  elements.releaseShortlistCount.textContent = `${rows.length} of 3 selected`;
+  elements.releaseShortlistClear.hidden = rows.length === 0;
+  elements.releaseShortlistItems.replaceChildren(...rows.map((row) => {
+    const card = document.createElement("article");
+    card.className = "release-shortlist-card";
+    card.setAttribute("role", "listitem");
+    const title = document.createElement("strong");
+    title.textContent = row.title;
+    const decision = document.createElement("span");
+    decision.textContent = `${row.downloadAllowed ? "Arr accepted" : "Arr rejected"} · ${confidenceLabel(row.confidence)}`;
+    const metadata = document.createElement("span");
+    metadata.textContent = [row.quality, row.releaseGroup ? `Group ${row.releaseGroup}` : "", ...releaseFacts(row)].filter(Boolean).join(" · ");
+    card.append(title, decision, metadata);
+    return card;
+  }));
+}
+
+function pruneShortlist(releases) {
+  const currentIds = new Set(releases.map(({ id }) => id));
+  for (const id of shortlistedReleaseIds) if (!currentIds.has(id)) shortlistedReleaseIds.delete(id);
+}
+
+function clearShortlist() {
+  shortlistedReleaseIds.clear();
+  for (const row of document.querySelectorAll(".release-row--shortlisted")) row.classList.remove("release-row--shortlisted");
+  for (const button of document.querySelectorAll(".shortlist-toggle")) {
+    const row = activeFeasibility?.releases.find(({ id }) => id === button.closest("tr")?.dataset.releaseId);
+    if (row !== undefined) updateShortlistButton(button, row);
+  }
+  renderShortlist(activeFeasibility?.releases ?? []);
 }
 
 function rememberAnalysis(key, view) {
@@ -513,13 +623,19 @@ function closeFeasibility() {
   elements.feasibilityPanel.hidden = true;
   elements.releaseTableBody.replaceChildren();
   elements.releaseControls.hidden = true;
+  shortlistedReleaseIds.clear();
+  elements.releaseShortlist.hidden = true;
+  elements.releaseShortlistItems.replaceChildren();
   elements.feasibilitySummary.replaceChildren();
 }
 
 function resetReleaseControls() {
+  elements.releaseSearchInput.value = "";
   elements.releaseDecisionFilter.value = "all";
   elements.releaseConfidenceFilter.value = "all";
+  elements.releaseProtocolFilter.value = "all";
   elements.releaseSortOrder.value = "recommended";
+  shortlistedReleaseIds.clear();
 }
 
 function setFeasibilityNotice(message, state) {
@@ -548,6 +664,8 @@ function setBusy(value) {
   elements.dashboard?.setAttribute("aria-busy", String(value));
   elements.feasibilityPanel?.setAttribute("aria-busy", String(value));
   for (const button of document.querySelectorAll(".inventory-select")) button.disabled = value;
+  for (const button of document.querySelectorAll(".shortlist-toggle")) button.disabled = value;
+  elements.releaseShortlistClear.disabled = value;
   elements.feasibilityRefresh.disabled = value;
 }
 
@@ -558,6 +676,25 @@ function setStatus(message, state) {
 
 function formatDateTime(value) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function formatBytes(value) {
+  if (value < 1_000) return `${value.toLocaleString()} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let size = value;
+  let unit = -1;
+  do {
+    size /= 1_000;
+    unit += 1;
+  } while (size >= 1_000 && unit < units.length - 1);
+  return `${size >= 10 ? size.toFixed(1) : size.toFixed(2)} ${units[unit]}`;
+}
+
+function formatAge(hours) {
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min old`;
+  if (hours < 24) return `${hours >= 10 ? Math.round(hours) : hours.toFixed(1)} h old`;
+  const days = hours / 24;
+  return `${days >= 10 ? Math.round(days) : days.toFixed(1)} d old`;
 }
 
 function capitalize(value) {

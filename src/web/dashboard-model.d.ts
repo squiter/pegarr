@@ -48,6 +48,14 @@ export interface FeasibilityReleaseRow {
   readonly quality: string;
   readonly indexer: string;
   readonly protocol: string;
+  readonly sizeBytes?: number;
+  readonly ageHours?: number;
+  readonly seeders?: number;
+  readonly leechers?: number;
+  readonly arrLanguages: readonly string[];
+  readonly customFormats: readonly string[];
+  readonly releaseGroup?: string;
+  readonly edition?: string;
   readonly confidence: "confirmed" | "likely" | "possible" | "no_match_found" | "unknown";
   readonly languages: readonly {
     readonly language: string;
@@ -61,7 +69,11 @@ export interface FeasibilityReleaseRow {
 
 export function selectReleases(
   rows: readonly FeasibilityReleaseRow[],
-  options: { readonly decision?: string; readonly confidence?: string; readonly sort?: string },
+  options: { readonly query?: string; readonly decision?: string; readonly confidence?: string; readonly protocol?: string; readonly sort?: string },
+): readonly FeasibilityReleaseRow[];
+export function shortlistedReleases(
+  rows: readonly FeasibilityReleaseRow[],
+  releaseIds: readonly string[] | unknown,
 ): readonly FeasibilityReleaseRow[];
 
 export type FeasibilityView =

@@ -20,7 +20,10 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Selecting an item opens its interactive release table and requests one protected read-only feasibility report.
 - Video acceptance and Arr rejection reasons remain separate from subtitle confidence.
 - Each release exposes per-language confidence, contributing provider count, provider state, matching evidence, and warnings.
-- Release controls filter by Arr decision or subtitle confidence and sort by the combined decision order, subtitle confidence, custom-format score, or title.
+- Release rows also show safe Arr size, age, seeders/leechers when supplied, release group/edition, language names, and matched custom formats. Download handles and credentials never enter the browser model.
+- Release search matches the loaded title, indexer, quality, protocol, group, edition, Arr languages, and custom-format names. Protocol filtering keeps torrent and Usenet decisions separate without hiding Arr rejection state.
+- Release controls sort by the combined decision order, subtitle confidence, custom-format score, seeders, size, age, or title. Missing numeric evidence is always placed last.
+- A page-memory shortlist holds up to three release candidates in selection order so their Arr decision, subtitle confidence, quality, group, size, age, and peer evidence can be compared. It clears when the item or page changes and never persists to browser storage.
 - Release filtering and sorting operate only on the analysis already in page memory. They never repeat Arr, Bazarr, or provider requests, and rejected releases remain available through the Arr-decision filter.
 - Analysis timing and safe Arr, Bazarr, and provider request counts stay visible beside provider quota and cache timestamps.
 - Successful item views are reused in page memory. An explicit refresh re-reads Arr and Bazarr while retaining the stable provider-language cache window.
@@ -37,4 +40,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-013`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-018` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-019`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-019` are the deterministic evidence for this page.

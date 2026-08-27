@@ -148,6 +148,14 @@
 | PEG-DASH-012 | Provider-evidence health distinguishes available, partial, unavailable, and unknown | `src/dashboard-model.test.ts` |
 | PEG-DASH-013 | Required-language and provider-health controls remain page-memory-only assets | `src/app.test.ts` |
 | PEG-DOCKER-018 | Packaged required-language and provider-health controls cause no upstream requests | `scripts/harness/docker-build.mjs` |
+| PEG-MATCH-011 | Reports retain safe release traits beside original Arr evidence | `src/matching.test.ts` |
+| PEG-DASH-014 | Release rows preserve safe Arr metadata needed for comparison | `src/dashboard-model.test.ts` |
+| PEG-DASH-015 | Release search matches only already loaded safe evidence | `src/dashboard-model.test.ts` |
+| PEG-DASH-016 | Protocol filtering stays local and preserves rejected releases | `src/dashboard-model.test.ts` |
+| PEG-DASH-017 | Release size, age, and seeder sorting is deterministic | `src/dashboard-model.test.ts` |
+| PEG-DASH-018 | Release shortlist is bounded, deterministic, and page-memory safe | `src/dashboard-model.test.ts` |
+| PEG-DASH-019 | Richer release controls and shortlist remain page-memory-only assets | `src/app.test.ts` |
+| PEG-DOCKER-019 | Packaged rich release exploration causes no upstream requests | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

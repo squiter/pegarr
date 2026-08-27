@@ -178,6 +178,7 @@ export interface ReleaseAssessment {
     readonly rejectionReasons: readonly string[];
     readonly customFormatScore: number;
     readonly evidence: ArrReleaseEvidence;
+    readonly traits?: ReleaseTraits;
   };
   readonly subtitle: {
     readonly confidence: SubtitleConfidence;

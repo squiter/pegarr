@@ -142,6 +142,10 @@ export const dashboardPage = `<!doctype html>
       </div>
       <div id="feasibility-summary" class="feasibility-summary"></div>
       <div id="release-controls" class="release-controls" aria-label="Release controls" hidden>
+        <label class="release-search-control" for="release-search-input">
+          <span>Search releases</span>
+          <input id="release-search-input" type="search" placeholder="Title, indexer, group, or format" autocomplete="off">
+        </label>
         <label for="release-decision-filter">
           <span>Arr decision</span>
           <select id="release-decision-filter">
@@ -161,22 +165,42 @@ export const dashboardPage = `<!doctype html>
             <option value="unknown">Unknown</option>
           </select>
         </label>
+        <label for="release-protocol-filter">
+          <span>Protocol</span>
+          <select id="release-protocol-filter">
+            <option value="all">All protocols</option>
+            <option value="torrent">Torrent</option>
+            <option value="usenet">Usenet</option>
+          </select>
+        </label>
         <label for="release-sort-order">
           <span>Sort</span>
           <select id="release-sort-order">
             <option value="recommended">Arr decision, then confidence</option>
             <option value="confidence-desc">Subtitle confidence</option>
             <option value="custom-format-desc">Custom format score</option>
+            <option value="seeders-desc">Most seeders</option>
+            <option value="size-asc">Smallest size</option>
+            <option value="size-desc">Largest size</option>
+            <option value="age-asc">Newest release age</option>
             <option value="title-asc">Release title A–Z</option>
           </select>
         </label>
         <p id="release-visible-count" class="release-visible-count"></p>
       </div>
+      <section id="release-shortlist" class="release-shortlist" aria-labelledby="release-shortlist-title" hidden>
+        <div>
+          <strong id="release-shortlist-title">Release shortlist</strong>
+          <span id="release-shortlist-count" aria-live="polite">0 of 3 selected</span>
+        </div>
+        <button id="release-shortlist-clear" class="quiet-button" type="button" hidden>Clear shortlist</button>
+        <div id="release-shortlist-items" class="release-shortlist-items" role="list"></div>
+      </section>
       <div id="feasibility-notice" class="feasibility-notice" role="status" aria-live="polite"></div>
       <div id="release-table-wrap" class="release-table-wrap" hidden>
         <table class="release-table">
           <caption>Interactive release candidates enriched with subtitle evidence</caption>
-          <thead><tr><th scope="col">Video release</th><th scope="col">Arr decision</th><th scope="col">Subtitle confidence</th><th scope="col">Evidence</th></tr></thead>
+          <thead><tr><th scope="col">Video release</th><th scope="col">Arr decision</th><th scope="col">Subtitle confidence</th><th scope="col">Evidence</th><th scope="col">Shortlist</th></tr></thead>
           <tbody id="release-table-body"></tbody>
         </table>
       </div>

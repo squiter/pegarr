@@ -33,6 +33,8 @@ The stale result is never presented as current. Failed automatic retries are thr
 
 Provider rate limits, timeouts, unsupported mappings, and outages remain visible in `report.providerStatus` and language warnings. They never become `No match found`.
 
+Each release also retains the safe Arr evidence needed for a manual decision: quality, protocol, indexer, size, age, seeders/leechers when supplied, Arr language and custom-format names, plus normalized release-group or edition traits. Download URLs, magnet links, info hashes, and upstream credentials are never copied into the report.
+
 Only `GET` is accepted. Missing or invalid credentials are rejected before inventory, release, Bazarr, or provider work. No Grab route exists in Phase 1.
 
-`PEG-ACCESS-004`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-013` through `PEG-DOCKER-015` are the deterministic evidence for this route.
+`PEG-ACCESS-004`, `PEG-ITEM-001` through `PEG-ITEM-006`, `PEG-MATCH-011`, and `PEG-DOCKER-013` through `PEG-DOCKER-015` are the deterministic evidence for this route.

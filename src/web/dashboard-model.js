@@ -154,13 +154,17 @@ function summarizeProviderEvidence(providers) {
 }
 
 export function selectReleases(rows, options = {}) {
+  const query = String(options.query ?? "").trim().toLocaleLowerCase();
   const decision = options.decision === "accepted" || options.decision === "rejected"
     ? options.decision
     : "all";
   const confidence = confidenceValues.includes(options.confidence) ? options.confidence : "all";
+  const protocol = releaseProtocols.includes(options.protocol) ? options.protocol : "all";
   const selected = rows.filter((row) =>
     (decision === "all" || (decision === "accepted") === row.downloadAllowed) &&
-    (confidence === "all" || row.confidence === confidence),
+    (confidence === "all" || row.confidence === confidence) &&
+    (protocol === "all" || row.protocol.toLocaleLowerCase() === protocol) &&
+    (!query || releaseSearchText(row).includes(query)),
   );
   const sort = options.sort ?? "recommended";
   return selected.toSorted((left, right) => {
@@ -179,8 +183,42 @@ export function selectReleases(rows, options = {}) {
         || left.title.localeCompare(right.title)
         || left.id.localeCompare(right.id);
     }
+    if (sort === "seeders-desc") {
+      return compareOptionalReleaseNumber(left, right, "seeders", "desc")
+        || compareVideoDecision(left, right)
+        || compareConfidence(left, right)
+        || left.title.localeCompare(right.title);
+    }
+    if (sort === "size-asc" || sort === "size-desc") {
+      return compareOptionalReleaseNumber(left, right, "sizeBytes", sort === "size-asc" ? "asc" : "desc")
+        || compareVideoDecision(left, right)
+        || compareConfidence(left, right)
+        || left.title.localeCompare(right.title);
+    }
+    if (sort === "age-asc") {
+      return compareOptionalReleaseNumber(left, right, "ageHours", "asc")
+        || compareVideoDecision(left, right)
+        || compareConfidence(left, right)
+        || left.title.localeCompare(right.title);
+    }
     return compareReleases(left, right);
   });
+}
+
+export function shortlistedReleases(rows, releaseIds) {
+  if (!Array.isArray(releaseIds)) return [];
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const selected = [];
+  const seen = new Set();
+  for (const id of releaseIds) {
+    if (typeof id !== "string" || seen.has(id)) continue;
+    const row = byId.get(id);
+    if (row === undefined) continue;
+    selected.push(row);
+    seen.add(id);
+    if (selected.length === maximumShortlistSize) break;
+  }
+  return selected;
 }
 
 export function feasibilityView(value) {
@@ -290,6 +328,7 @@ function unavailableView(value) {
 function releaseView(value) {
   if (!isRecord(value) || typeof value.releaseId !== "string" || typeof value.releaseTitle !== "string" || !isRecord(value.video) || !isRecord(value.subtitle)) return [];
   const evidence = isRecord(value.video.evidence) ? value.video.evidence : {};
+  const traits = isRecord(value.video.traits) ? value.video.traits : {};
   const languages = Array.isArray(value.subtitle.languages)
     ? value.subtitle.languages.flatMap((language) => languageView(language))
     : [];
@@ -305,6 +344,16 @@ function releaseView(value) {
     quality: typeof evidence.quality === "string" ? evidence.quality : "Quality unavailable",
     indexer: typeof evidence.indexer === "string" ? evidence.indexer : "Indexer unavailable",
     protocol: typeof evidence.protocol === "string" ? evidence.protocol : "Protocol unavailable",
+    ...(safeOptionalCount(evidence.sizeBytes) === undefined ? {} : { sizeBytes: safeOptionalCount(evidence.sizeBytes) }),
+    ...(safeDecimal(evidence.ageHours) === undefined ? {} : { ageHours: safeDecimal(evidence.ageHours) }),
+    ...(safeOptionalCount(evidence.seeders) === undefined ? {} : { seeders: safeOptionalCount(evidence.seeders) }),
+    ...(safeOptionalCount(evidence.leechers) === undefined ? {} : { leechers: safeOptionalCount(evidence.leechers) }),
+    arrLanguages: Array.isArray(evidence.languages) ? evidence.languages.filter((language) => typeof language === "string") : [],
+    customFormats: Array.isArray(evidence.customFormats)
+      ? evidence.customFormats.flatMap((format) => isRecord(format) && typeof format.name === "string" ? [format.name] : [])
+      : [],
+    ...(typeof traits.releaseGroup === "string" ? { releaseGroup: traits.releaseGroup } : {}),
+    ...(typeof traits.edition === "string" ? { edition: traits.edition } : {}),
     confidence: safeConfidence(value.subtitle.confidence),
     languages,
   }];
@@ -356,6 +405,10 @@ function safeOptionalCount(value) {
   return Number.isFinite(value) && value >= 0 ? Math.min(Math.round(value), Number.MAX_SAFE_INTEGER) : undefined;
 }
 
+function safeDecimal(value) {
+  return Number.isFinite(value) && value >= 0 ? Math.min(value, 1_000_000) : undefined;
+}
+
 function safeEpochSeconds(value) {
   return Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000
     ? Math.round(value)
@@ -385,6 +438,28 @@ function compareVideoDecision(left, right) {
 
 function compareConfidence(left, right) {
   return confidenceRank[left.confidence] - confidenceRank[right.confidence];
+}
+
+function compareOptionalReleaseNumber(left, right, field, direction) {
+  const leftValue = left[field];
+  const rightValue = right[field];
+  if (leftValue === undefined && rightValue === undefined) return 0;
+  if (leftValue === undefined) return 1;
+  if (rightValue === undefined) return -1;
+  return direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
+}
+
+function releaseSearchText(row) {
+  return [
+    row.title,
+    row.quality,
+    row.indexer,
+    row.protocol,
+    row.releaseGroup,
+    row.edition,
+    ...row.arrLanguages,
+    ...row.customFormats,
+  ].filter(Boolean).join(" ").toLocaleLowerCase();
 }
 
 function matchesAnalysis(summary, filter) {
@@ -452,5 +527,7 @@ const confidenceValues = ["confirmed", "likely", "possible", "no_match_found", "
 const requiredCoverageValues = ["strong", "possible", "no_match_found", "unknown", "no_accepted_release", "no_required_languages"];
 const providerEvidenceValues = ["available", "partial", "unavailable", "unknown"];
 const providerFailureStatuses = ["rate_limited", "timeout", "unavailable", "unsupported", "unauthorized", "invalid_response", "unexpected_status"];
+const releaseProtocols = ["torrent", "usenet"];
+const maximumShortlistSize = 3;
 const confidenceRank = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };
 const analysisConfidenceRank = { ...confidenceRank, none: 5, not_analyzed: 6 };

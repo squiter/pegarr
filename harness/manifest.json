@@ -857,6 +857,54 @@
       "title": "Packaged required-language and provider-health controls cause no upstream requests",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Packaged assets and pure evidence selection on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-MATCH-011",
+      "title": "Reports retain safe release traits beside original Arr evidence",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure report construction over sanitized release traits and evidence"
+    },
+    {
+      "id": "PEG-DASH-014",
+      "title": "Release rows preserve safe Arr metadata needed for comparison",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure view mapping over sanitized size, age, peer, language, format, group, and edition evidence"
+    },
+    {
+      "id": "PEG-DASH-015",
+      "title": "Release search matches only the already loaded safe evidence",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure text selection over in-memory release rows"
+    },
+    {
+      "id": "PEG-DASH-016",
+      "title": "Protocol filtering stays local and preserves rejected releases",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure protocol selection over in-memory release rows"
+    },
+    {
+      "id": "PEG-DASH-017",
+      "title": "Release size, age, and seeder sorting is deterministic",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure numeric ordering with missing evidence kept last"
+    },
+    {
+      "id": "PEG-DASH-018",
+      "title": "Release shortlist is bounded, deterministic, and page-memory safe",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure selection over safe release IDs with a three-row bound"
+    },
+    {
+      "id": "PEG-DASH-019",
+      "title": "Richer release controls and shortlist remain page-memory-only assets",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process HTML, CSS, JavaScript, and storage-boundary inspection"
+    },
+    {
+      "id": "PEG-DOCKER-019",
+      "title": "Packaged rich release exploration causes no upstream requests",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Packaged metadata, search, protocol, sorts, and shortlist on an internal-only Docker network"
     }
   ],
   "manualGaps": [
