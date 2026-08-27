@@ -9,8 +9,9 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - An explicit connect panel explains the memory-only token boundary.
 - Missing episodes and movies are shown with application, title, episode or year context, and availability date.
 - Search matches title, series context, and application.
-- Type filtering switches between all items, episodes, and movies.
-- Sorting supports newest availability, oldest availability, title, and type.
+- After an item is analyzed, search also matches its Bazarr profile name and language codes.
+- Type filtering switches between all items, episodes, and movies. Analysis filters distinguish not analyzed, analyzed or attempted, needs-attention, and stale items; best-confidence filtering uses only completed reports and Arr-accepted releases.
+- Sorting supports availability, title, type, best Arr-accepted subtitle confidence, and most recent analysis.
 - Filtering and sorting operate on already loaded rows and do not call Pegarr or the Arr services.
 - Refresh is explicit. Pegarr's server-side 30-second cache prevents repeated refreshes from repeatedly calling the Arr services.
 - Partial inventory identifies the unavailable integration without hiding usable results.
@@ -22,6 +23,8 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Analysis timing and safe Arr, Bazarr, and provider request counts stay visible beside provider quota and cache timestamps.
 - Successful item views are reused in page memory. An explicit refresh re-reads Arr and Bazarr while retaining the stable provider-language cache window.
 - If a transient Arr or Bazarr failure prevents refresh, the last successful in-process report remains available for a bounded period with a prominent stale warning, original generation time, expiry, and affected integration names.
+- Safe per-item summaries remain only in page memory. Analyzed cards show the best Arr-accepted confidence, Bazarr policy, language requirements, accepted/total release counts, generation time, and a stale or failure label when applicable.
+- Inventory refresh preserves summaries only for items still present, while authentication loss or page reload clears them. No analysis summary enters browser storage.
 - The page has a skip link, labelled controls, a polite status region, keyboard focus styles, reduced-motion behavior, and a mobile layout.
 
 The dashboard deliberately has no Grab control. Phase 1 ends at explainable decision support; mutation remains a separately confirmed Phase 2 boundary.
@@ -32,4 +35,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-007`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-016` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-010`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-017` are the deterministic evidence for this page.

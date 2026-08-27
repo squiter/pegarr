@@ -809,6 +809,30 @@
       "title": "Packaged release controls make no additional upstream requests",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Packaged assets and pure release selection on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-DASH-008",
+      "title": "Item summaries use the best Arr-accepted subtitle confidence and retain freshness",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure summary mapping over sanitized feasibility views"
+    },
+    {
+      "id": "PEG-DASH-009",
+      "title": "Analyzed-item filtering and ordering are deterministic page-memory operations",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure selection over safe inventory rows and in-memory summaries"
+    },
+    {
+      "id": "PEG-DASH-010",
+      "title": "Analyzed-item cards and controls remain page-memory-only assets",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process HTML, CSS, JavaScript, and storage-boundary inspection"
+    },
+    {
+      "id": "PEG-DOCKER-017",
+      "title": "Packaged item summaries and dashboard analysis controls cause no upstream requests",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Packaged assets and pure summary selection on an internal-only Docker network"
     }
   ],
   "manualGaps": [

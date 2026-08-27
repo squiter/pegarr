@@ -1,9 +1,11 @@
-import { feasibilityView, rowsFromInventory, selectReleases, selectRows } from "/assets/dashboard-model.js";
+import { feasibilityView, itemAnalysisSummary, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
   accessForm: document.querySelector("#access-form"),
   accessToken: document.querySelector("#access-token"),
+  analysisFilter: document.querySelector("#analysis-filter"),
+  bestConfidenceFilter: document.querySelector("#best-confidence-filter"),
   connectButton: document.querySelector("#connect-button"),
   dashboard: document.querySelector("#dashboard"),
   emptyState: document.querySelector("#empty-state"),
@@ -36,7 +38,9 @@ let accessToken;
 let inventoryRows = [];
 let selectedRow;
 let activeFeasibility;
+let pageBusy = false;
 const feasibilityCache = new Map();
+const analysisByItem = new Map();
 
 elements.accessForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -53,7 +57,7 @@ elements.accessForm?.addEventListener("submit", async (event) => {
 elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
 elements.feasibilityClose?.addEventListener("click", closeFeasibility);
-for (const control of [elements.searchInput, elements.kindFilter, elements.sortOrder]) {
+for (const control of [elements.searchInput, elements.kindFilter, elements.analysisFilter, elements.bestConfidenceFilter, elements.sortOrder]) {
   control?.addEventListener("input", renderInventory);
   control?.addEventListener("change", renderInventory);
 }
@@ -79,11 +83,13 @@ async function loadInventory() {
     });
     if (response.status === 401) {
       accessToken = undefined;
+      clearPageEvidence();
       showAccess("That token was not accepted. Check the configured secret and try again.");
       return;
     }
     if (response.status === 404) {
       accessToken = undefined;
+      clearPageEvidence();
       showAccess("Private library access is not enabled on this Pegarr server.");
       return;
     }
@@ -91,6 +97,8 @@ async function loadInventory() {
     const inventory = await response.json();
     inventoryRows = rowsFromInventory(inventory);
     feasibilityCache.clear();
+    pruneAnalysisMemory();
+    if (selectedRow !== undefined && !inventoryRows.some(({ key }) => key === selectedRow.key)) closeFeasibility();
     renderSources(inventory);
     elements.accessPanel.hidden = true;
     elements.dashboard.hidden = false;
@@ -118,9 +126,11 @@ function showAccess(message) {
 }
 
 function renderInventory() {
-  const rows = selectRows(inventoryRows, {
+  const rows = selectRows(rowsWithAnalysis(inventoryRows, analysisByItem), {
     query: elements.searchInput?.value,
     kind: elements.kindFilter?.value,
+    analysis: elements.analysisFilter?.value,
+    confidence: elements.bestConfidenceFilter?.value,
     sort: elements.sortOrder?.value,
   });
   elements.inventoryList.replaceChildren(...rows.map(renderItem));
@@ -136,6 +146,7 @@ function renderItem(row) {
   const select = document.createElement("button");
   select.className = "inventory-select";
   select.type = "button";
+  select.disabled = pageBusy;
   select.setAttribute("aria-label", `Investigate ${row.title}, ${row.context}`);
   select.addEventListener("click", () => loadFeasibility(row));
 
@@ -151,6 +162,7 @@ function renderItem(row) {
   const context = document.createElement("p");
   context.textContent = row.context;
   copy.append(title, context);
+  if (row.analysis !== undefined) copy.append(renderItemAnalysis(row.analysis));
 
   const metadata = document.createElement("div");
   metadata.className = "item-metadata";
@@ -170,6 +182,51 @@ function renderItem(row) {
   return item;
 }
 
+function renderItemAnalysis(summary) {
+  const analysis = document.createElement("div");
+  analysis.className = "item-analysis";
+  const badge = document.createElement("span");
+  const badgeState = summary.state === "ready" ? summary.bestConfidence : summary.state;
+  badge.className = `item-analysis-badge item-analysis-badge--${badgeState}`;
+  badge.textContent = analysisBadgeLabel(summary);
+  const detail = document.createElement("span");
+  detail.className = "item-analysis-detail";
+  if (summary.state === "ready" || summary.state === "stale") {
+    const languages = (summary.languages ?? []).map(({ code, required }) => `${code}${required ? " required" : ""}`).join(", ");
+    detail.textContent = [summary.policyName, languages, `${summary.acceptedCount} of ${summary.releaseCount} releases accepted by Arr`].filter(Boolean).join(" · ");
+  } else {
+    detail.textContent = summary.message ?? "The analysis needs attention before Pegarr can compare releases.";
+  }
+  analysis.append(badge, detail);
+  if (summary.generatedAt) {
+    const generated = document.createElement("time");
+    generated.dateTime = summary.generatedAt;
+    generated.textContent = `Analyzed ${formatDateTime(summary.generatedAt)}`;
+    analysis.append(generated);
+  }
+  return analysis;
+}
+
+function analysisBadgeLabel(summary) {
+  if (summary.state === "stale") return `Stale · ${confidenceLabel(summary.bestConfidence)}`;
+  if (summary.state === "ready") return summary.bestConfidence === "none"
+    ? "No accepted release"
+    : `Best ${confidenceLabel(summary.bestConfidence)}`;
+  const labels = {
+    disabled: "Analysis disabled",
+    policy_unresolved: "Policy unresolved",
+    inventory_unavailable: "Inventory unavailable",
+    integration_failure: "Analysis unavailable",
+    not_found: "Item no longer missing",
+    invalid: "Analysis unreadable",
+  };
+  return labels[summary.state] ?? "Analysis needs attention";
+}
+
+function confidenceLabel(value) {
+  return value === "none" ? "no accepted release" : value.replaceAll("_", " ");
+}
+
 async function loadFeasibility(row, refresh = false) {
   const changedItem = selectedRow?.key !== row.key;
   selectedRow = row;
@@ -184,6 +241,7 @@ async function loadFeasibility(row, refresh = false) {
   elements.releaseControls.hidden = true;
   const cached = refresh ? undefined : feasibilityCache.get(row.key);
   if (cached !== undefined) {
+    rememberAnalysis(row.key, cached);
     renderFeasibility(cached);
     elements.feasibilityTitle.focus();
     return;
@@ -202,14 +260,14 @@ async function loadFeasibility(row, refresh = false) {
     });
     if (response.status === 401) {
       accessToken = undefined;
-      feasibilityCache.clear();
-      closeFeasibility();
+      clearPageEvidence();
       showAccess("That token was not accepted. Check the configured secret and try again.");
       return;
     }
     const result = feasibilityView(await response.json());
     if (response.status >= 500 && result.state === "invalid") throw new Error("feasibility_unavailable");
     if (result.state === "ready") feasibilityCache.set(row.key, result);
+    rememberAnalysis(row.key, result);
     renderFeasibility(result);
     elements.feasibilityTitle.focus();
   } catch {
@@ -389,6 +447,26 @@ function renderRelease(row) {
   return tableRow;
 }
 
+function rememberAnalysis(key, view) {
+  analysisByItem.set(key, itemAnalysisSummary(view));
+  renderInventory();
+}
+
+function pruneAnalysisMemory() {
+  const currentKeys = new Set(inventoryRows.map(({ key }) => key));
+  for (const key of analysisByItem.keys()) {
+    if (!currentKeys.has(key)) analysisByItem.delete(key);
+  }
+}
+
+function clearPageEvidence() {
+  inventoryRows = [];
+  feasibilityCache.clear();
+  analysisByItem.clear();
+  closeFeasibility();
+  renderInventory();
+}
+
 function closeFeasibility() {
   selectedRow = undefined;
   activeFeasibility = undefined;
@@ -422,14 +500,15 @@ function renderSources(inventory) {
   elements.sourceStatus.replaceChildren(...chips);
 }
 
-function setBusy(busy) {
-  elements.connectButton.disabled = busy;
-  elements.refreshButton.disabled = busy;
-  elements.accessToken.disabled = busy;
-  elements.dashboard?.setAttribute("aria-busy", String(busy));
-  elements.feasibilityPanel?.setAttribute("aria-busy", String(busy));
-  for (const button of document.querySelectorAll(".inventory-select")) button.disabled = busy;
-  elements.feasibilityRefresh.disabled = busy;
+function setBusy(value) {
+  pageBusy = value;
+  elements.connectButton.disabled = value;
+  elements.refreshButton.disabled = value;
+  elements.accessToken.disabled = value;
+  elements.dashboard?.setAttribute("aria-busy", String(value));
+  elements.feasibilityPanel?.setAttribute("aria-busy", String(value));
+  for (const button of document.querySelectorAll(".inventory-select")) button.disabled = value;
+  elements.feasibilityRefresh.disabled = value;
 }
 
 function setStatus(message, state) {

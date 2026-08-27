@@ -6,12 +6,29 @@ export interface DashboardRow {
   readonly title: string;
   readonly context: string;
   readonly availableAt?: string;
+  readonly analysis?: DashboardAnalysisSummary;
+}
+
+export type DashboardAnalysisState = "ready" | "stale" | "disabled" | "policy_unresolved" | "inventory_unavailable" | "integration_failure" | "not_found" | "invalid";
+export interface DashboardAnalysisSummary {
+  readonly state: DashboardAnalysisState;
+  readonly bestConfidence: FeasibilityReleaseRow["confidence"] | "none";
+  readonly releaseCount: number;
+  readonly acceptedCount: number;
+  readonly policyName?: string;
+  readonly languages?: readonly { readonly code: string; readonly required: boolean }[];
+  readonly generatedAt?: string;
+  readonly message?: string;
 }
 
 export function rowsFromInventory(value: unknown): readonly DashboardRow[];
 export function selectRows(
   rows: readonly DashboardRow[],
-  options: { readonly query?: string; readonly kind?: string; readonly sort?: string },
+  options: { readonly query?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly sort?: string },
+): readonly DashboardRow[];
+export function rowsWithAnalysis(
+  rows: readonly DashboardRow[],
+  analyses: ReadonlyMap<string, DashboardAnalysisSummary>,
 ): readonly DashboardRow[];
 
 export interface FeasibilityReleaseRow {
@@ -44,3 +61,4 @@ export type FeasibilityView =
   | { readonly state: "invalid" | "disabled" | "policy_unresolved" | "inventory_unavailable" | "integration_failure" | "not_found"; readonly message: string };
 
 export function feasibilityView(value: unknown): FeasibilityView;
+export function itemAnalysisSummary(view: FeasibilityView | unknown): DashboardAnalysisSummary;

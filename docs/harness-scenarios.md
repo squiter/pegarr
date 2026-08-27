@@ -140,6 +140,10 @@
 | PEG-DOCKER-015 | Packaged integration outage retains labeled stale evidence | `scripts/harness/docker-build.mjs` |
 | PEG-DASH-007 | Release filtering and sorting stay local while preserving Arr decisions | `src/dashboard-model.test.ts` |
 | PEG-DOCKER-016 | Packaged release controls make no additional upstream requests | `scripts/harness/docker-build.mjs` |
+| PEG-DASH-008 | Item summaries use the best Arr-accepted confidence and retain freshness | `src/dashboard-model.test.ts` |
+| PEG-DASH-009 | Analyzed-item filtering and ordering are deterministic page-memory operations | `src/dashboard-model.test.ts` |
+| PEG-DASH-010 | Analyzed-item cards and controls remain page-memory-only assets | `src/app.test.ts` |
+| PEG-DOCKER-017 | Packaged item summaries and dashboard analysis controls cause no upstream requests | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

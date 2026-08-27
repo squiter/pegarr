@@ -228,6 +228,21 @@ test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe"
   assert.equal((await resolveRoute("POST", "/", tmpdir())).statusCode, 405);
 });
 
+test("PEG-DASH-010 analyzed-item cards and controls remain page-memory-only assets", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, model.body, styles.body].join("\n");
+
+  assert.match(String(page.body), /analysis-filter|best-confidence-filter|confidence-desc|analyzed-desc/u);
+  assert.match(String(client.body), /analysisByItem|rememberAnalysis|renderItemAnalysis/u);
+  assert.match(String(model.body), /itemAnalysisSummary|rowsWithAnalysis|needs_attention/u);
+  assert.match(String(styles.body), /item-analysis-badge|item-analysis-detail/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
+  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
+});
+
 function fakeServices(
   readMissingInventory: RuntimeServices["readMissingInventory"],
 ): RuntimeServices {

@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { feasibilityView, rowsFromInventory, selectReleases, selectRows } from "./web/dashboard-model.js";
+import { feasibilityView, itemAnalysisSummary, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -227,6 +227,88 @@ test("PEG-DASH-007 release filtering and sorting stay local and preserve Arr dec
   assert.deepEqual(byTitle.map(({ title }) => title), byTitle.map(({ title }) => title).toSorted((left, right) => left.localeCompare(right)));
   assert.deepEqual(view.releases.map(({ id }) => id), originalOrder);
   assert.deepEqual(selectReleases(view.releases, { decision: "unsafe", confidence: "unsafe", sort: "unsafe" }), view.releases);
+});
+
+test("PEG-DASH-008 item summaries use the best Arr-accepted confidence and retain freshness", () => {
+  const mapped = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    selection: { application: "sonarr", kind: "episode", itemId: 305 },
+    analysis: {
+      source: "stale_cache",
+      generatedAt: "2026-08-27T12:00:00.000Z",
+      expiresAt: "2026-08-27T12:00:30.000Z",
+      staleUntil: "2026-08-27T18:00:30.000Z",
+      refreshFailure: "integration_failure",
+      unavailableIntegrations: ["sonarr"],
+    },
+    report: buildFeasibilityReport(demoFeasibilityInput),
+    metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 2, elapsedMs: 5 },
+  });
+  assert.equal(mapped.state, "ready");
+  if (mapped.state !== "ready") return;
+  const acceptedLikely = mapped.releases.find(({ downloadAllowed, confidence }) => downloadAllowed && confidence === "likely");
+  const rejectedConfirmed = mapped.releases.find(({ downloadAllowed, confidence }) => !downloadAllowed && confidence === "confirmed");
+  assert.ok(acceptedLikely);
+  assert.ok(rejectedConfirmed);
+
+  const summary = itemAnalysisSummary({ ...mapped, releases: [rejectedConfirmed, acceptedLikely] });
+  assert.deepEqual(summary, {
+    state: "stale",
+    bestConfidence: "likely",
+    releaseCount: 2,
+    acceptedCount: 1,
+    policyName: "Original plus Brazilian Portuguese",
+    languages: [{ code: "pt-BR", required: true }, { code: "en", required: false }],
+    generatedAt: "2026-08-27T12:00:00.000Z",
+  });
+  assert.deepEqual(itemAnalysisSummary({ state: "policy_unresolved", message: "No language was assumed." }), {
+    state: "policy_unresolved",
+    bestConfidence: "none",
+    releaseCount: 0,
+    acceptedCount: 0,
+    message: "No language was assumed.",
+  });
+  assert.doesNotMatch(JSON.stringify(summary), /release-guid|subtitle-id|token|api.?key/iu);
+});
+
+test("PEG-DASH-009 analyzed-item filtering and ordering are deterministic page-memory operations", () => {
+  const rows = rowsFromInventory(inventory);
+  const analyses = new Map([
+    ["sonarr:episode:305", {
+      state: "ready" as const,
+      bestConfidence: "likely" as const,
+      releaseCount: 3,
+      acceptedCount: 2,
+      policyName: "Brazilian Portuguese",
+      languages: [{ code: "pt-BR", required: true }],
+      generatedAt: "2026-08-27T12:00:00.000Z",
+    }],
+    ["radarr:movie:84", {
+      state: "stale" as const,
+      bestConfidence: "confirmed" as const,
+      releaseCount: 2,
+      acceptedCount: 1,
+      policyName: "English fallback",
+      languages: [{ code: "en", required: false }],
+      generatedAt: "2026-08-27T11:00:00.000Z",
+    }],
+  ]);
+  const analyzedRows = rowsWithAnalysis(rows, analyses);
+
+  assert.deepEqual(selectRows(analyzedRows, { analysis: "not_analyzed" }).map(({ key }) => key), ["radarr:movie:85"]);
+  assert.deepEqual(selectRows(analyzedRows, { analysis: "needs_attention" }).map(({ key }) => key), ["radarr:movie:84"]);
+  assert.deepEqual(selectRows(analyzedRows, { analysis: "stale" }).map(({ key }) => key), ["radarr:movie:84"]);
+  assert.deepEqual(selectRows(analyzedRows, { confidence: "likely" }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(analyzedRows, { query: "pt-br" }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(analyzedRows, { sort: "confidence-desc" }).map(({ key }) => key), ["radarr:movie:84", "sonarr:episode:305", "radarr:movie:85"]);
+  assert.deepEqual(selectRows(analyzedRows, { sort: "analyzed-desc" }).map(({ key }) => key), ["sonarr:episode:305", "radarr:movie:84", "radarr:movie:85"]);
+  const unresolvedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:movie:85", itemAnalysisSummary({ state: "policy_unresolved" })]]));
+  const noAcceptedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:movie:85", { state: "ready", bestConfidence: "none", releaseCount: 2, acceptedCount: 0 }]]));
+  assert.equal(selectRows(unresolvedRow, { confidence: "none" }).length, 0);
+  assert.equal(selectRows(noAcceptedRow, { confidence: "none" }).length, 1);
+  assert.ok(rows.every((row) => row.analysis === undefined));
 });
 
 test("PEG-DASH-002 search, filtering, and sorting are pure local operations", () => {

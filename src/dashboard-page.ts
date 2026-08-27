@@ -21,7 +21,7 @@ export const dashboardPage = `<!doctype html>
     <section class="hero" aria-labelledby="page-title">
       <p class="eyebrow">Your missing library</p>
       <h1 id="page-title">Choose what to investigate next.</h1>
-      <p class="lede">See monitored episodes and movies waiting for a file. Filtering and sorting happen here, without making new requests to Sonarr or Radarr.</p>
+      <p class="lede">See monitored episodes and movies waiting for a file. Analyze an item once, then use its confidence and freshness here without making new requests.</p>
     </section>
 
     <section id="access-panel" class="access-panel" aria-labelledby="access-title">
@@ -64,6 +64,28 @@ export const dashboardPage = `<!doctype html>
             <option value="movie">Movies</option>
           </select>
         </label>
+        <label for="analysis-filter">
+          <span>Analysis</span>
+          <select id="analysis-filter">
+            <option value="all">All analysis states</option>
+            <option value="not_analyzed">Not analyzed</option>
+            <option value="analyzed">Analyzed or attempted</option>
+            <option value="needs_attention">Needs attention</option>
+            <option value="stale">Stale</option>
+          </select>
+        </label>
+        <label for="best-confidence-filter">
+          <span>Best accepted subtitle</span>
+          <select id="best-confidence-filter">
+            <option value="all">All confidence levels</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="likely">Likely</option>
+            <option value="possible">Possible</option>
+            <option value="no_match_found">No match found</option>
+            <option value="unknown">Unknown</option>
+            <option value="none">No accepted release</option>
+          </select>
+        </label>
         <label for="sort-order">
           <span>Sort</span>
           <select id="sort-order">
@@ -71,13 +93,15 @@ export const dashboardPage = `<!doctype html>
             <option value="available-asc">Oldest availability</option>
             <option value="title-asc">Title A–Z</option>
             <option value="kind-asc">Type</option>
+            <option value="confidence-desc">Best subtitle confidence</option>
+            <option value="analyzed-desc">Recently analyzed</option>
           </select>
         </label>
       </div>
 
       <div id="empty-state" class="empty-state" hidden>
         <h3>No matching missing items</h3>
-        <p>Try a different search or type filter.</p>
+        <p>Try a different search or analysis filter.</p>
       </div>
       <ol id="inventory-list" class="inventory-list" aria-label="Missing items"></ol>
     </section>

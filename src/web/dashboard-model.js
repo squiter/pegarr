@@ -14,17 +14,71 @@ export function rowsFromInventory(value) {
 export function selectRows(rows, options = {}) {
   const query = String(options.query ?? "").trim().toLocaleLowerCase();
   const kind = options.kind === "episode" || options.kind === "movie" ? options.kind : "all";
+  const analysis = ["not_analyzed", "analyzed", "needs_attention", "stale"].includes(options.analysis)
+    ? options.analysis
+    : "all";
+  const confidence = [...confidenceValues, "none"].includes(options.confidence) ? options.confidence : "all";
   const selected = rows.filter((row) =>
     (kind === "all" || row.kind === kind) &&
-    (!query || `${row.title} ${row.context} ${row.application}`.toLocaleLowerCase().includes(query)),
+    matchesAnalysis(row.analysis, analysis) &&
+    matchesSummaryConfidence(row.analysis, confidence) &&
+    (!query || rowSearchText(row).includes(query)),
   );
   const sort = options.sort ?? "available-desc";
   return selected.toSorted((left, right) => {
     if (sort === "title-asc") return left.title.localeCompare(right.title);
     if (sort === "kind-asc") return left.kind.localeCompare(right.kind) || left.title.localeCompare(right.title);
+    if (sort === "confidence-desc") return compareRowAnalysis(left, right) || left.title.localeCompare(right.title);
+    if (sort === "analyzed-desc") {
+      return compareAnalysisPresence(left, right)
+        || String(right.analysis?.generatedAt ?? "").localeCompare(String(left.analysis?.generatedAt ?? ""))
+        || left.title.localeCompare(right.title);
+    }
     const direction = sort === "available-asc" ? 1 : -1;
     return direction * String(left.availableAt ?? "").localeCompare(String(right.availableAt ?? "")) || left.title.localeCompare(right.title);
   });
+}
+
+export function rowsWithAnalysis(rows, analyses) {
+  return rows.map((row) => {
+    const analysis = analyses.get(row.key);
+    return analysis === undefined ? row : { ...row, analysis };
+  });
+}
+
+export function itemAnalysisSummary(view) {
+  if (!isRecord(view) || typeof view.state !== "string") {
+    return { state: "invalid", bestConfidence: "none", releaseCount: 0, acceptedCount: 0 };
+  }
+  if (view.state !== "ready") {
+    const state = ["disabled", "policy_unresolved", "inventory_unavailable", "integration_failure", "not_found"].includes(view.state)
+      ? view.state
+      : "invalid";
+    return {
+      state,
+      bestConfidence: "none",
+      releaseCount: 0,
+      acceptedCount: 0,
+      ...(typeof view.message === "string" ? { message: view.message } : {}),
+    };
+  }
+  const releases = Array.isArray(view.releases) ? view.releases : [];
+  const accepted = releases.filter((release) => release.downloadAllowed === true).toSorted(compareReleases);
+  const analysis = isRecord(view.analysis) ? view.analysis : {};
+  const languages = Array.isArray(view.languages)
+    ? view.languages.flatMap((language) => isRecord(language) && typeof language.code === "string"
+      ? [{ code: language.code, required: language.required === true }]
+      : [])
+    : [];
+  return {
+    state: analysis.source === "stale_cache" ? "stale" : "ready",
+    bestConfidence: accepted[0]?.confidence ?? "none",
+    releaseCount: releases.length,
+    acceptedCount: accepted.length,
+    policyName: typeof view.policyName === "string" ? view.policyName : "Resolved Bazarr policy",
+    languages,
+    ...(safeTimestamp(analysis.generatedAt) === undefined ? {} : { generatedAt: safeTimestamp(analysis.generatedAt) }),
+  };
 }
 
 export function selectReleases(rows, options = {}) {
@@ -261,6 +315,44 @@ function compareConfidence(left, right) {
   return confidenceRank[left.confidence] - confidenceRank[right.confidence];
 }
 
+function matchesAnalysis(summary, filter) {
+  if (filter === "all") return true;
+  if (filter === "not_analyzed") return summary === undefined;
+  if (filter === "analyzed") return summary !== undefined;
+  if (filter === "stale") return summary?.state === "stale";
+  return summary !== undefined && (
+    summary.state !== "ready" || ["possible", "no_match_found", "unknown", "none"].includes(summary.bestConfidence)
+  );
+}
+
+function matchesSummaryConfidence(summary, confidence) {
+  if (confidence === "all") return true;
+  return (summary?.state === "ready" || summary?.state === "stale") && summary.bestConfidence === confidence;
+}
+
+function rowSearchText(row) {
+  const policy = row.analysis?.policyName ?? "";
+  const languages = Array.isArray(row.analysis?.languages)
+    ? row.analysis.languages.map(({ code }) => code).join(" ")
+    : "";
+  return `${row.title} ${row.context} ${row.application} ${policy} ${languages}`.toLocaleLowerCase();
+}
+
+function compareRowAnalysis(left, right) {
+  const leftRank = left.analysis === undefined
+    ? analysisConfidenceRank.not_analyzed
+    : analysisConfidenceRank[left.analysis.bestConfidence] ?? analysisConfidenceRank.none;
+  const rightRank = right.analysis === undefined
+    ? analysisConfidenceRank.not_analyzed
+    : analysisConfidenceRank[right.analysis.bestConfidence] ?? analysisConfidenceRank.none;
+  return leftRank - rightRank || compareAnalysisPresence(left, right);
+}
+
+function compareAnalysisPresence(left, right) {
+  if ((left.analysis === undefined) === (right.analysis === undefined)) return 0;
+  return left.analysis === undefined ? 1 : -1;
+}
+
 function episodeLabel(season, episode) {
   if (!Number.isSafeInteger(season) || !Number.isSafeInteger(episode)) return "Episode";
   return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
@@ -272,3 +364,4 @@ function isRecord(value) {
 
 const confidenceValues = ["confirmed", "likely", "possible", "no_match_found", "unknown"];
 const confidenceRank = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };
+const analysisConfidenceRank = { ...confidenceRank, none: 5, not_analyzed: 6 };

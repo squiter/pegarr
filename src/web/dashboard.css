@@ -166,7 +166,7 @@ button:disabled { cursor: wait; opacity: .55; }
 
 .controls {
   display: grid;
-  grid-template-columns: minmax(14rem, 1fr) 11rem 14rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: .8rem;
   margin: 1.5rem 0 1rem;
   padding: 1rem;
@@ -210,6 +210,23 @@ button:disabled { cursor: wait; opacity: .55; }
 .item-copy { min-width: 0; }
 .item-copy h3 { overflow: hidden; margin-bottom: .25rem; font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
 .item-copy p { overflow: hidden; margin-bottom: 0; color: var(--muted); font-size: .85rem; text-overflow: ellipsis; white-space: nowrap; }
+.item-analysis { display: flex; flex-wrap: wrap; gap: .35rem .55rem; align-items: center; margin-top: .55rem; }
+.item-analysis-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: .18rem .48rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: .68rem;
+  font-weight: 800;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.item-analysis-badge--confirmed, .item-analysis-badge--likely { color: var(--accent); border-color: rgb(52 211 153 / 45%); }
+.item-analysis-badge--possible, .item-analysis-badge--no_match_found, .item-analysis-badge--stale, .item-analysis-badge--none { color: var(--warning); border-color: rgb(251 191 36 / 45%); }
+.item-analysis-badge--unknown, .item-analysis-badge--disabled, .item-analysis-badge--policy_unresolved, .item-analysis-badge--inventory_unavailable, .item-analysis-badge--integration_failure, .item-analysis-badge--not_found, .item-analysis-badge--invalid { color: var(--danger); border-color: rgb(251 113 133 / 45%); }
+.item-analysis-detail { min-width: 0; flex: 1 1 12rem; }
+.item-analysis-detail, .item-analysis time { overflow: hidden; color: var(--muted); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
 .item-metadata { display: flex; gap: .75rem; align-items: center; color: var(--muted); font-size: .78rem; }
 .application-badge { min-height: 1.55rem; padding: .18rem .5rem; color: var(--text); }
 .empty-state { padding: 4rem 1rem; text-align: center; color: var(--muted); }
