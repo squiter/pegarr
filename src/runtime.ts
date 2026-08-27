@@ -11,6 +11,10 @@ import {
   type SonarrSystemStatus,
 } from "./adapters/sonarr.js";
 import type { ArrRuntimeConfiguration, RuntimeConfiguration } from "./config.js";
+import {
+  buildMissingInventory,
+  type MissingInventoryResult,
+} from "./inventory-missing.js";
 
 export type ArrIntegrationState =
   | "disabled"
@@ -45,6 +49,7 @@ export type RadarrIntegrationStatus = ArrIntegrationStatus<"radarr", "Radarr">;
 export interface RuntimeServices {
   readSonarrStatus(): Promise<SonarrIntegrationStatus>;
   readRadarrStatus(): Promise<RadarrIntegrationStatus>;
+  readMissingInventory(): Promise<MissingInventoryResult>;
 }
 
 export interface RuntimeServicesOptions {
@@ -52,6 +57,8 @@ export interface RuntimeServicesOptions {
   readonly now?: () => number;
   readonly sonarrStatusTtlMs?: number;
   readonly radarrStatusTtlMs?: number;
+  readonly missingInventoryTtlMs?: number;
+  readonly missingInventoryPageSize?: number;
 }
 
 interface AdapterErrorShape {
@@ -88,6 +95,7 @@ export function createRuntimeServices(
   configuration: RuntimeConfiguration,
   options: RuntimeServicesOptions = {},
 ): RuntimeServices {
+  const { accessToken: _accessToken, ...inventoryConfiguration } = configuration;
   const now = options.now ?? Date.now;
   const readSonarrStatus = createStatusReader<"sonarr", "Sonarr", SonarrSystemStatus>({
     integration: "sonarr",
@@ -127,8 +135,55 @@ export function createRuntimeServices(
       "radarrStatusTtlMs",
     ),
   });
+  const readMissingInventory = createMissingInventoryReader(inventoryConfiguration, {
+    fetchImplementation: options.fetchImplementation,
+    now,
+    ttlMs: boundedCacheTtl(
+      options.missingInventoryTtlMs ?? defaultStatusTtlMs,
+      "missingInventoryTtlMs",
+    ),
+    pageSize: options.missingInventoryPageSize ?? inventoryConfiguration.missingPageSize ?? 50,
+  });
 
-  return { readSonarrStatus, readRadarrStatus };
+  return { readSonarrStatus, readRadarrStatus, readMissingInventory };
+}
+
+function createMissingInventoryReader(
+  configuration: RuntimeConfiguration,
+  options: {
+    readonly fetchImplementation: FetchImplementation | undefined;
+    readonly now: () => number;
+    readonly ttlMs: number;
+    readonly pageSize: number;
+  },
+): () => Promise<MissingInventoryResult> {
+  let cached: { readonly value: MissingInventoryResult; readonly expiresAt: number } | undefined;
+  let inFlight: Promise<MissingInventoryResult> | undefined;
+  const read = async (): Promise<MissingInventoryResult> => {
+    const value = await buildMissingInventory({
+      configuration,
+      pageSize: options.pageSize,
+      ...(options.fetchImplementation === undefined
+        ? {}
+        : { fetchImplementation: options.fetchImplementation }),
+      now: options.now,
+    });
+    cached = { value, expiresAt: options.now() + options.ttlMs };
+    return value;
+  };
+
+  return async () => {
+    const requestedAt = options.now();
+    if (cached !== undefined && requestedAt < cached.expiresAt) return cached.value;
+    if (inFlight !== undefined) return inFlight;
+    const current = read();
+    inFlight = current;
+    try {
+      return await current;
+    } finally {
+      if (inFlight === current) inFlight = undefined;
+    }
+  };
 }
 
 function createStatusReader<

@@ -8,7 +8,7 @@ Read `ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md` before making architectural or pr
 
 ## Current phase
 
-The repository is in Phase 0, the API feasibility spike. Prefer small contract probes, sanitized fixtures, and deterministic matching experiments over a broad UI or production feature set.
+The repository is in the Phase 1 read-only MVP foundation. Keep live library routes authenticated, cache bounded, and behavior deterministic. Build the missing-item and release-selection experience in small vertical slices; Grab remains outside this phase.
 
 ## Non-negotiable behavior
 

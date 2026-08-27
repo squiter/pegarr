@@ -182,3 +182,37 @@ test("PEG-CONFIG-005 SubDL credentials use an independent bounded secret-file co
     },
   );
 });
+
+test("PEG-CONFIG-006 browser API access uses only a bounded secret file", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-access-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const secretPath = join(directory, "access-token");
+  const secret = "synthetic-access-token-value-0000000001";
+  await writeFile(secretPath, `${secret}\n`, { mode: 0o600 });
+
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_ACCESS_TOKEN_FILE: secretPath,
+  });
+  assert.equal(configuration.accessToken?.reveal(), secret);
+  assert.equal(JSON.stringify(configuration), '{"accessToken":"[redacted]"}');
+
+  await assert.rejects(
+    loadRuntimeConfiguration({ PEGARR_ACCESS_TOKEN: secret }),
+    (error: unknown) => {
+      assert.ok(error instanceof ConfigurationError);
+      assert.match(error.message, /PEGARR_ACCESS_TOKEN_FILE/u);
+      assert.doesNotMatch(error.message, new RegExp(secret, "u"));
+      return true;
+    },
+  );
+
+  const shortPath = join(directory, "short-token");
+  await writeFile(shortPath, "too-short", { mode: 0o600 });
+  await assert.rejects(
+    loadRuntimeConfiguration({ PEGARR_ACCESS_TOKEN_FILE: shortPath }),
+    /does not contain one valid token/u,
+  );
+});

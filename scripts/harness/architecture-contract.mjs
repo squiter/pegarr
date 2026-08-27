@@ -148,10 +148,26 @@ for (const contract of [
   '`${spec.prefix}_API_KEY_FILE`',
   "maximumSecretBytes = 4_096",
   'return "[redacted]"',
+  "PEGARR_ACCESS_TOKEN_FILE",
 ]) {
   if (!configuration.includes(contract)) {
     issues.push(`The runtime configuration must retain ${contract}`);
   }
+}
+
+const accessControl = readFileSync(resolve(repoRoot, "src/access-control.ts"), "utf8");
+for (const contract of ['createHash("sha256")', "timingSafeEqual", "authorization.slice(7)"]) {
+  if (!accessControl.includes(contract)) {
+    issues.push(`The API access boundary must retain ${contract}`);
+  }
+}
+
+const accessCompose = readFileSync(resolve(repoRoot, "deploy/compose.access.yaml"), "utf8");
+if (!accessCompose.includes("PEGARR_ACCESS_TOKEN_FILE: /run/secrets/pegarr_access_token")) {
+  issues.push("The access Compose overlay must mount the bearer token through a secret file");
+}
+if (/PEGARR_ACCESS_TOKEN\s*:/u.test(accessCompose)) {
+  issues.push("The access Compose overlay may not pass the bearer token as an environment value");
 }
 
 const sonarrCompose = readFileSync(resolve(repoRoot, "deploy/compose.sonarr.yaml"), "utf8");
@@ -247,19 +263,25 @@ if (!ciWorkflow.includes("path: .artifacts/harness/")) {
 }
 
 const manifest = readJson("harness/manifest.json");
-if (manifest.phase.startsWith("phase-0")) {
+if (/^phase-[01]-/u.test(manifest.phase)) {
   const app = readFileSync(resolve(repoRoot, "src/app.ts"), "utf8");
   if (/\/api\/v1\/[^"'`]*(?:grab|download|delete)/iu.test(app)) {
-    issues.push("Phase 0 may not expose a mutating API route");
+    issues.push("The read-only phases may not expose a mutating API route");
   }
   if (!app.includes('"/api/v1/feasibility/demo"')) {
-    issues.push("Phase 0 must retain the synthetic read-only feasibility route");
+    issues.push("The read-only phases must retain the synthetic feasibility route");
   }
   if (!app.includes('"/api/v1/integrations/sonarr/status"')) {
-    issues.push("Phase 0 must retain the read-only Sonarr status route");
+    issues.push("The read-only phases must retain the Sonarr status route");
   }
   if (!app.includes('"/api/v1/integrations/radarr/status"')) {
-    issues.push("Phase 0 must retain the read-only Radarr status route");
+    issues.push("The read-only phases must retain the Radarr status route");
+  }
+  if (
+    !app.includes('"/api/v1/library/missing"') ||
+    app.indexOf("access.control.authorize") > app.indexOf("services.readMissingInventory")
+  ) {
+    issues.push("The live missing-item route must authenticate before reading upstream inventory");
   }
 }
 

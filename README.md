@@ -9,7 +9,7 @@
 Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It is designed to compare interactive-search releases with subtitle-provider evidence, explain the confidence of each match, and eventually let an authorized user grab the best-informed release.
 
 > [!IMPORTANT]
-> Pegarr is in its API-feasibility phase. The container exposes a synthetic, read-only API report, opt-in integration probes, and an explicit one-shot Sonarr episode feasibility command. It does not expose a live search browser route or perform Grab operations.
+> Pegarr is entering its read-only MVP phase. The container exposes a protected missing-item API, a synthetic feasibility report, opt-in integration probes, and explicit one-shot release reports. Live library access requires a secret-file bearer token. Pegarr does not expose Grab operations.
 
 ## Why Pegarr?
 
@@ -26,7 +26,7 @@ Provider failures are never treated as proof that subtitles do not exist.
 
 ## Project status
 
-The first milestone is a read-only feasibility spike. Its end-to-end Sonarr episode path is now fixture-proven and locally compatible with real Sonarr/Bazarr reads; authenticated live SubDL and Radarr compatibility remain explicit manual gaps. See [the research and implementation proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md) for the product decisions, phases, non-goals, and open questions.
+The API-feasibility milestone is complete, and the first Phase 1 foundation is an authenticated read-only missing-item route. End-to-end Sonarr episode and season paths are fixture-proven and locally compatible with real Sonarr/Bazarr reads; authenticated live SubDL and Radarr compatibility remain explicit manual gaps. See [the research and implementation proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md) for the product decisions, phases, non-goals, and open questions.
 
 The current repository foundation includes:
 
@@ -39,6 +39,8 @@ The current repository foundation includes:
 - a bounded, read-only Bazarr v1 language-profile adapter that preserves cutoff, subtitle type, audio conditions, and release filters beside normalized policy;
 - a bounded SubDL v2 exact-search adapter with header-only authentication, explicit provider language codes, and local release matching;
 - a durable SQLite provider-result cache that reuses only successful item/language windows, never failures or quota responses;
+- a secret-file bearer boundary for live library APIs, with constant-time comparison and no browser storage;
+- an authenticated `/api/v1/library/missing` route with 30-second single-flight caching and no mutation methods;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;
 - secret-file-only Sonarr configuration and a browser-safe version/status route;
 - a measured one-shot Sonarr probe with a 30-second status cache and single-flight protection;
@@ -62,7 +64,7 @@ npm run check
 npm start
 ```
 
-Then open <http://localhost:8080/health> or inspect the Phase 0 report at <http://localhost:8080/api/v1/feasibility/demo>. Sonarr and Radarr integration state is available at `/api/v1/integrations/<integration>/status`; each reports `disabled` until explicitly configured.
+Then open <http://localhost:8080/health> or inspect the synthetic report at <http://localhost:8080/api/v1/feasibility/demo>. Sonarr and Radarr integration state is available at `/api/v1/integrations/<integration>/status`; each reports `disabled` until explicitly configured. Live missing-item data is available only through the authenticated route documented in the [access-control guide](docs/access-control.md).
 
 The demo maps a sanitized synthetic Sonarr v3 response into four release candidates, then associates synthetic SubDL evidence with them. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly. Live release searches are available only through the explicit one-shot commands documented in the [episode feasibility report guide](docs/episode-feasibility-report.md) and [movie feasibility report guide](docs/movie-feasibility-report.md); they are not exposed as browser-triggerable API routes.
 
@@ -70,7 +72,7 @@ The demo maps a sanitized synthetic Sonarr v3 response into four release candida
 
 Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise.
 
-See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [access-control guide](docs/access-control.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 
@@ -89,7 +91,7 @@ docker compose -f deploy/compose.nas.yaml up -d
 docker compose -f deploy/compose.nas.yaml ps
 ```
 
-For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), and [SubDL](deploy/compose.subdl.yaml) Compose overlays mount API keys as Docker secrets; follow the [configuration guide](docs/configuration.md) to run the one-shot probes, and never put a key in `.env`.
+For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [access](deploy/compose.access.yaml), [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), and [SubDL](deploy/compose.subdl.yaml) Compose overlays mount credentials as Docker secrets; follow the [configuration guide](docs/configuration.md), and never put a token or key in `.env`.
 
 ## Container publishing
 

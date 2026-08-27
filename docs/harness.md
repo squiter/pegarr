@@ -20,7 +20,7 @@ The guides are `AGENTS.md`, this document, the research record, the scenario led
 The computational sensors currently enforce:
 
 - scenario-to-test traceability and explicit manual gaps;
-- Phase 0 read-only and confidence-state architecture ratchets;
+- read-only phase, authentication, and confidence-state architecture ratchets;
 - core matching isolation from Node, adapters, and fixtures;
 - local Markdown links and required contributor documentation;
 - secret-safe tracked files and absence of browser credential storage;

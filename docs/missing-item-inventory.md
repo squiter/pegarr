@@ -1,8 +1,8 @@
 # Missing-item inventory
 
-Status: packaged, read-only Phase 0 discovery foundation; Sonarr live-compatible and Radarr fixture-proven
+Status: packaged and available through an authenticated read-only API; Sonarr live-compatible and Radarr fixture-proven
 
-`npm run inventory:missing` reads one bounded page of monitored missing episodes from Sonarr and monitored missing movies from Radarr. It creates the common item identity needed by a future dashboard and interactive release table without exposing a browser route before authentication exists.
+`npm run inventory:missing` reads one bounded page of monitored missing episodes from Sonarr and monitored missing movies from Radarr. The same deterministic inventory is available at authenticated `GET /api/v1/library/missing`, creating the common item identity needed by the dashboard and interactive release table.
 
 The command cannot search providers, Grab releases, update monitoring, or mutate either Arr application.
 
@@ -36,6 +36,6 @@ Each item retains only:
 
 Paths, overviews, artwork, ratings, tags, and upstream configuration are discarded. Titles and identifiers are still private library data, so sanitize output before attaching it to a public issue.
 
-No missing-item browser route is exposed yet. That waits for an explicit Phase 1 authentication and privacy boundary.
+The live route is hidden when access control is disabled and returns `401` before upstream work for missing or invalid credentials. Authorized runtime reads share one in-flight request and reuse the completed inventory for 30 seconds. See [read-only API access control](access-control.md).
 
 `PEG-SONARR-007`, `PEG-SONARR-008`, `PEG-RADARR-007`, `PEG-RADARR-008`, `PEG-INVENTORY-001` through `PEG-INVENTORY-003`, and `PEG-DOCKER-008` are the deterministic evidence for this path.

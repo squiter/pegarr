@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "phase": "phase-0-api-feasibility",
+  "phase": "phase-1-read-only-mvp",
   "completion": {
     "affected": "npm run check:affected",
     "full": "npm run check"
@@ -653,6 +653,42 @@
       "title": "Corrupt provider cache rows are discarded and fetched again",
       "evidence": "src/provider-search-cache.test.ts",
       "boundary": "Deliberately corrupted row in a disposable SQLite database; no network"
+    },
+    {
+      "id": "PEG-ACCESS-001",
+      "title": "Bearer authentication uses one bounded in-memory token",
+      "evidence": "src/access-control.test.ts",
+      "boundary": "Pure authentication check over synthetic secrets; no HTTP or network"
+    },
+    {
+      "id": "PEG-CONFIG-006",
+      "title": "Browser API access uses only a bounded secret file",
+      "evidence": "src/config.test.ts",
+      "boundary": "Temporary synthetic secret files; no network"
+    },
+    {
+      "id": "PEG-ACCESS-002",
+      "title": "Hidden and unauthorized inventory requests perform no upstream work",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with an upstream-call spy; no network"
+    },
+    {
+      "id": "PEG-ACCESS-003",
+      "title": "Authorized inventory is read-only and rejects mutation methods",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with a synthetic access token and inventory"
+    },
+    {
+      "id": "PEG-INVENTORY-004",
+      "title": "Concurrent and repeated runtime inventory reads use one bounded window",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected HTTP responses, deterministic clock, and synthetic credentials"
+    },
+    {
+      "id": "PEG-DOCKER-011",
+      "title": "Packaged authenticated inventory blocks unauthorized upstream work",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling services and three secret files on an internal-only Docker network"
     }
   ],
   "manualGaps": [
@@ -674,7 +710,7 @@
     {
       "id": "PEG-MANUAL-004",
       "title": "Any future Grab confirmation flow",
-      "reason": "Mutating behavior is outside Phase 0 and must never run against a live service automatically"
+      "reason": "Mutating behavior is outside the read-only MVP and must never run against a live service automatically"
     },
     {
       "id": "PEG-MANUAL-005",

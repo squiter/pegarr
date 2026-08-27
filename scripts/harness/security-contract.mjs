@@ -41,6 +41,13 @@ for (const file of files) {
     issues.push(`${file} may not pass an integration API key as an environment value`);
   }
 
+  if (
+    /(?:compose[^/]*\.ya?ml|\.env\.example)$/u.test(file) &&
+    /PEGARR_ACCESS_TOKEN\s*[:=]/u.test(content)
+  ) {
+    issues.push(`${file} may not pass the Pegarr access token as an environment value`);
+  }
+
   if (file.includes("fixtures/") || file.includes("fixture")) {
     if (/\b(?:10\.|127\.0\.0\.1|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/u.test(content)) {
       issues.push(`${file} contains a private or loopback address`);

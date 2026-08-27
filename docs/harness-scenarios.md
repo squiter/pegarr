@@ -114,6 +114,12 @@
 | PEG-CACHE-006 | Unsafe packaged cache configuration fails before network access | `src/report-sonarr-season.test.ts` |
 | PEG-CACHE-007 | The cache prunes the oldest windows at its configured bound | `src/provider-search-cache.test.ts` |
 | PEG-CACHE-008 | Corrupt cache rows are discarded and fetched again | `src/provider-search-cache.test.ts` |
+| PEG-ACCESS-001 | Bearer authentication uses one bounded in-memory token | `src/access-control.test.ts` |
+| PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
+| PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
+| PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |
+| PEG-INVENTORY-004 | Runtime inventory reads share one bounded cache window | `src/runtime.test.ts` |
+| PEG-DOCKER-011 | Packaged authentication blocks unauthorized upstream work | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 
@@ -122,7 +128,7 @@
 | PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima verified the authenticated Sonarr 4.0.16.2944 packaged status probe and a 100-row episode release search on 2026-08-26; Radarr remains fixture-proven only, and NAS production validation is intentionally separate |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima verified authenticated profile-list and targeted series-assignment shapes on 2026-08-26 without retaining policy contents; installed NAS compatibility remains intentionally untested |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
-| PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside Phase 0 and require explicit confirmation |
+| PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside the read-only MVP and require explicit confirmation |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.

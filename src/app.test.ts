@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import test from "node:test";
 
 import type { FeasibilityReport } from "./domain.js";
+import { AccessControl } from "./access-control.js";
+import { SecretValue } from "./config.js";
 import { healthResponse, readinessResponse, resolveRoute } from "./app.js";
+import type { RuntimeServices } from "./runtime.js";
 
 test("PEG-OPS-001 liveness is healthy", () => {
   assert.deepEqual(healthResponse(), {
@@ -92,3 +95,98 @@ test("PEG-RUNTIME-007 Radarr status is read-only and disabled without configurat
     405,
   );
 });
+
+test("PEG-ACCESS-002 protected inventory stays hidden or unauthorized without upstream work", async () => {
+  let inventoryReads = 0;
+  const services = fakeServices(async () => {
+    inventoryReads += 1;
+    return { kind: "missing-item-inventory", mode: "read_only", status: "disabled" };
+  });
+  const unconfigured = await resolveRoute(
+    "GET",
+    "/api/v1/library/missing?token=unsafe",
+    tmpdir(),
+    services,
+    { control: new AccessControl(undefined) },
+  );
+  assert.deepEqual(unconfigured, {
+    statusCode: 404,
+    body: { service: "pegarr", status: "not_found" },
+  });
+  assert.equal(
+    (await resolveRoute(
+      "POST",
+      "/api/v1/library/missing",
+      tmpdir(),
+      services,
+      { control: new AccessControl(undefined) },
+    )).statusCode,
+    404,
+  );
+
+  const access = new AccessControl(new SecretValue("synthetic-access-token-value-0000000001"));
+  const unauthorized = await resolveRoute(
+    "GET",
+    "/api/v1/library/missing",
+    tmpdir(),
+    services,
+    { control: access, authorization: "Bearer wrong-token-value-000000000000000" },
+  );
+  assert.equal(unauthorized.statusCode, 401);
+  assert.deepEqual(unauthorized.headers, {
+    "www-authenticate": 'Bearer realm="pegarr", charset="UTF-8"',
+  });
+  assert.equal(inventoryReads, 0);
+  assert.doesNotMatch(JSON.stringify([unconfigured, unauthorized]), /unsafe|wrong-token/iu);
+});
+
+test("PEG-ACCESS-003 authorized inventory is read-only and rejects mutation methods", async () => {
+  const token = "synthetic-access-token-value-0000000001";
+  let inventoryReads = 0;
+  const services = fakeServices(async () => {
+    inventoryReads += 1;
+    return { kind: "missing-item-inventory", mode: "read_only", status: "disabled" };
+  });
+  const access = { control: new AccessControl(new SecretValue(token)), authorization: `Bearer ${token}` };
+  const response = await resolveRoute(
+    "GET",
+    "/api/v1/library/missing",
+    tmpdir(),
+    services,
+    access,
+  );
+  const mutation = await resolveRoute(
+    "POST",
+    "/api/v1/library/missing",
+    tmpdir(),
+    services,
+    access,
+  );
+
+  assert.deepEqual(response, {
+    statusCode: 200,
+    body: { kind: "missing-item-inventory", mode: "read_only", status: "disabled" },
+  });
+  assert.equal(mutation.statusCode, 405);
+  assert.equal(inventoryReads, 1);
+});
+
+function fakeServices(
+  readMissingInventory: RuntimeServices["readMissingInventory"],
+): RuntimeServices {
+  return {
+    readSonarrStatus: async () => ({
+      integration: "sonarr",
+      mode: "read_only",
+      configured: false,
+      state: "disabled",
+    }),
+    readRadarrStatus: async () => ({
+      integration: "radarr",
+      mode: "read_only",
+      configured: false,
+      state: "disabled",
+    }),
+    readMissingInventory,
+  };
+}

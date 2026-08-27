@@ -4,7 +4,11 @@ import type { FetchImplementation } from "./adapters/fetch-json-transport.js";
 import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
 import { RadarrAdapterError, RadarrClient } from "./adapters/radarr.js";
 import { SonarrAdapterError, SonarrClient } from "./adapters/sonarr.js";
-import { loadRuntimeConfiguration, type ServiceRuntimeConfiguration } from "./config.js";
+import {
+  loadRuntimeConfiguration,
+  type RuntimeConfiguration,
+  type ServiceRuntimeConfiguration,
+} from "./config.js";
 import type { MissingItemPage } from "./domain.js";
 
 export interface MissingInventoryOptions {
@@ -21,7 +25,7 @@ type InventoryFailureState =
   | "unexpected_status"
   | "invalid_response";
 
-type InventorySource =
+export type InventorySource =
   | {
       readonly integration: "sonarr" | "radarr";
       readonly status: "disabled";
@@ -38,49 +42,85 @@ type InventorySource =
       readonly retryAfterSeconds?: number;
     };
 
+export type MissingInventoryResult =
+  | {
+      readonly kind: "missing-item-inventory";
+      readonly mode: "read_only";
+      readonly status: "disabled";
+    }
+  | {
+      readonly kind: "missing-item-inventory";
+      readonly mode: "read_only";
+      readonly status: "ready" | "partial" | "integration_failure";
+      readonly sources: readonly [InventorySource, InventorySource];
+      readonly metrics: {
+        readonly requestCount: number;
+        readonly itemCount: number;
+        readonly elapsedMs: number;
+      };
+    };
+
+export interface MissingInventoryBuildOptions {
+  readonly configuration: RuntimeConfiguration;
+  readonly pageSize?: number;
+  readonly fetchImplementation?: FetchImplementation;
+  readonly now?: () => number;
+}
+
 export async function runMissingInventory(options: MissingInventoryOptions): Promise<number> {
   try {
-    const pageSize = parsePageSize(options.environment.PEGARR_MISSING_PAGE_SIZE);
     const configuration = await loadRuntimeConfiguration(options.environment);
-    if (configuration.sonarr === undefined && configuration.radarr === undefined) {
-      writeState(options, "disabled");
-      return 2;
-    }
-    const now = options.now ?? Date.now;
-    const startedAt = now();
-    const [sonarr, radarr] = await Promise.all([
-      readSonarr(configuration.sonarr, pageSize, options.fetchImplementation),
-      readRadarr(configuration.radarr, pageSize, options.fetchImplementation),
-    ]);
-    const readyCount = [sonarr, radarr].filter((source) => source.status === "ready").length;
-    const failureCount = [sonarr, radarr].filter(
-      (source) => source.status === "integration_failure",
-    ).length;
-    const status = readyCount === 0
-      ? "integration_failure"
-      : failureCount === 0
-        ? "ready"
-        : "partial";
-    const output = {
-      kind: "missing-item-inventory",
-      mode: "read_only",
-      status,
-      sources: [sonarr, radarr],
-      metrics: {
-        requestCount: [sonarr, radarr].filter((source) => source.status !== "disabled").length,
-        itemCount: [sonarr, radarr].reduce(
-          (count, source) => count + (source.status === "ready" ? source.page.items.length : 0),
-          0,
-        ),
-        elapsedMs: safeElapsed(startedAt, now()),
-      },
-    };
+    const output = await buildMissingInventory({
+      configuration,
+      pageSize: configuration.missingPageSize ?? 50,
+      ...(options.fetchImplementation === undefined
+        ? {}
+        : { fetchImplementation: options.fetchImplementation }),
+      ...(options.now === undefined ? {} : { now: options.now }),
+    });
     options.write(`${JSON.stringify(output)}\n`);
-    return status === "integration_failure" ? 1 : 0;
+    return output.status === "disabled" ? 2 : output.status === "integration_failure" ? 1 : 0;
   } catch {
     writeState(options, "invalid_configuration");
     return 2;
   }
+}
+
+export async function buildMissingInventory(
+  options: MissingInventoryBuildOptions,
+): Promise<MissingInventoryResult> {
+  const pageSize = boundedPageSize(options.pageSize ?? 50);
+  if (options.configuration.sonarr === undefined && options.configuration.radarr === undefined) {
+    return { kind: "missing-item-inventory", mode: "read_only", status: "disabled" };
+  }
+  const now = options.now ?? Date.now;
+  const startedAt = now();
+  const [sonarr, radarr] = await Promise.all([
+    readSonarr(options.configuration.sonarr, pageSize, options.fetchImplementation),
+    readRadarr(options.configuration.radarr, pageSize, options.fetchImplementation),
+  ]);
+  const sources = [sonarr, radarr] as const;
+  const readyCount = sources.filter((source) => source.status === "ready").length;
+  const failureCount = sources.filter((source) => source.status === "integration_failure").length;
+  const status = readyCount === 0
+    ? "integration_failure"
+    : failureCount === 0
+      ? "ready"
+      : "partial";
+  return {
+    kind: "missing-item-inventory",
+    mode: "read_only",
+    status,
+    sources,
+    metrics: {
+      requestCount: sources.filter((source) => source.status !== "disabled").length,
+      itemCount: sources.reduce(
+        (count, source) => count + (source.status === "ready" ? source.page.items.length : 0),
+        0,
+      ),
+      elapsedMs: safeElapsed(startedAt, now()),
+    },
+  };
 }
 
 async function readSonarr(
@@ -147,12 +187,10 @@ function failure(integration: "sonarr" | "radarr", error: unknown): InventorySou
   };
 }
 
-function parsePageSize(value: string | undefined): number {
-  const normalized = value?.trim();
-  if (normalized === undefined || normalized === "") return 50;
-  if (!/^\d{1,3}$/u.test(normalized)) throw new TypeError("Invalid missing inventory page size");
-  const pageSize = Number(normalized);
-  if (pageSize < 1 || pageSize > 100) throw new TypeError("Invalid missing inventory page size");
+function boundedPageSize(pageSize: number): number {
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+    throw new TypeError("Invalid missing inventory page size");
+  }
   return pageSize;
 }
 

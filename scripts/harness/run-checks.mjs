@@ -23,7 +23,7 @@ const checks = [
     "PEG-ARCH",
     process.execPath,
     ["scripts/harness/architecture-contract.mjs"],
-    "Restore the Phase 0 boundary or deliberately update its ratchet.",
+    "Restore the current read-only boundary or deliberately update its ratchet.",
   ),
   check(
     "PEG-SECRETS",

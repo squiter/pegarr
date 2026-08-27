@@ -60,6 +60,15 @@ The packaged feasibility reports can reuse successful SubDL results from a priva
 
 The database contains private normalized matching evidence such as media identifiers and release names, but never API keys, authorization headers, provider download handles, or upstream URLs. Keep the data volume private. See the [provider search cache guide](provider-search-cache.md) for result and deletion semantics.
 
+## Read-only API access
+
+| Variable | Required when enabled | Meaning |
+| --- | --- | --- |
+| `PEGARR_ACCESS_TOKEN_FILE` | Yes | Absolute in-container path to one random bearer token of 32 through 4096 characters |
+| `PEGARR_MISSING_PAGE_SIZE` | No | Missing items requested from each Arr instance; defaults to 50, maximum 100 |
+
+The live library route is absent unless the access token is configured. Pegarr rejects a direct `PEGARR_ACCESS_TOKEN` value. Use [the access-control overlay and guide](access-control.md) to mount the token without placing it in `.env`, browser storage, URLs, or logs.
+
 ## Docker secret deployment
 
 Create the secret outside the repository and restrict it to the account managing the container:
@@ -69,6 +78,7 @@ install -m 600 /dev/null /absolute/private/path/sonarr_api_key
 install -m 600 /dev/null /absolute/private/path/radarr_api_key
 install -m 600 /dev/null /absolute/private/path/bazarr_api_key
 install -m 600 /dev/null /absolute/private/path/subdl_api_key
+install -m 600 /dev/null /absolute/private/path/pegarr_access_token
 ```
 
 Place the API key in that file using an editor that does not store it in shell history. Then set the non-secret variables in `.env`, including the host path used only by Docker Compose:
@@ -97,12 +107,14 @@ PEGARR_SUBDL_PROBE_SEASON=1
 PEGARR_SUBDL_PROBE_EPISODE=1
 PEGARR_PROVIDER_CACHE_TTL_SECONDS=900
 PEGARR_PROVIDER_CACHE_MAX_ENTRIES=5000
+PEGARR_ACCESS_TOKEN_HOST_FILE=/absolute/private/path/pegarr_access_token
+PEGARR_MISSING_PAGE_SIZE=50
 ```
 
 Enable the opt-in overlay alongside either Compose base:
 
 ```console
-docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml -f deploy/compose.radarr.yaml -f deploy/compose.bazarr.yaml -f deploy/compose.subdl.yaml up -d
+docker compose -f deploy/compose.nas.yaml -f deploy/compose.access.yaml -f deploy/compose.sonarr.yaml -f deploy/compose.radarr.yaml -f deploy/compose.bazarr.yaml -f deploy/compose.subdl.yaml up -d
 ```
 
 The host secrets are mounted under `/run/secrets`; only those in-container paths are passed to Pegarr. Host paths and API keys must never be committed.

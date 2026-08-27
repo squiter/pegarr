@@ -8,6 +8,8 @@ import { resolveRoute } from "./app.js";
 import { loadRuntimeConfiguration, SecretValue } from "./config.js";
 import { syntheticSonarrSystemStatusResponse } from "./fixtures/sonarr-system-status.js";
 import { syntheticRadarrSystemStatusResponse } from "./fixtures/radarr-system-status.js";
+import { syntheticRadarrMissingItemsResponse } from "./fixtures/radarr-missing-items.js";
+import { syntheticSonarrMissingItemsResponse } from "./fixtures/sonarr-missing-items.js";
 import { createRuntimeServices } from "./runtime.js";
 
 test("PEG-RUNTIME-001 configured Sonarr status returns only safe read-only evidence", async (context) => {
@@ -236,4 +238,55 @@ test("PEG-RUNTIME-006 Radarr failures and refreshes stay classified and bounded"
   const refreshed = await services.readRadarrStatus();
   assert.equal(requestCount, 2);
   assert.equal(refreshed.state, "available");
+});
+
+test("PEG-INVENTORY-004 concurrent and repeated runtime inventory reads use one bounded window", async () => {
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+    radarr: {
+      instanceId: "synthetic-radarr",
+      baseUrl: "https://radarr.example.invalid",
+      allowedHosts: ["radarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-radarr-key-value"),
+    },
+  };
+  let currentTime = 10_000;
+  let requestCount = 0;
+  const services = createRuntimeServices(configuration, {
+    fetchImplementation: async (input) => {
+      requestCount += 1;
+      await Promise.resolve();
+      return new Response(JSON.stringify(
+        new URL(input).hostname.startsWith("sonarr")
+          ? syntheticSonarrMissingItemsResponse
+          : syntheticRadarrMissingItemsResponse,
+      ), { status: 200, headers: { "content-type": "application/json" } });
+    },
+    now: () => currentTime,
+    missingInventoryTtlMs: 30_000,
+    missingInventoryPageSize: 2,
+  });
+
+  const [first, concurrent] = await Promise.all([
+    services.readMissingInventory(),
+    services.readMissingInventory(),
+  ]);
+  const cached = await services.readMissingInventory();
+  assert.equal(requestCount, 2);
+  assert.deepEqual(concurrent, first);
+  assert.deepEqual(cached, first);
+  assert.equal(first.status, "ready");
+  assert.doesNotMatch(JSON.stringify(first), /private|overview|path|images|synthetic-(?:sonarr|radarr)-key/iu);
+
+  currentTime += 30_001;
+  const refreshed = await services.readMissingInventory();
+  assert.equal(requestCount, 4);
+  assert.equal(refreshed.status, "ready");
 });

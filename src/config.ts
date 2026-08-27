@@ -47,6 +47,8 @@ export interface RuntimeConfiguration {
   readonly radarr?: RadarrRuntimeConfiguration;
   readonly bazarr?: BazarrRuntimeConfiguration;
   readonly subdl?: SubdlRuntimeConfiguration;
+  readonly accessToken?: SecretValue;
+  readonly missingPageSize?: number;
 }
 
 const maximumSecretBytes = 4_096;
@@ -85,13 +87,35 @@ export async function loadRuntimeConfiguration(
     defaultInstanceId: "subdl",
     secretFormat: "bearer",
   });
+  const accessToken = await loadAccessToken(environment);
+  const missingPageSize = parseOptionalBoundedInteger(
+    environment.PEGARR_MISSING_PAGE_SIZE,
+    1,
+    100,
+    "PEGARR_MISSING_PAGE_SIZE",
+  );
 
   return {
     ...(sonarr === undefined ? {} : { sonarr }),
     ...(radarr === undefined ? {} : { radarr }),
     ...(bazarr === undefined ? {} : { bazarr }),
     ...(subdl === undefined ? {} : { subdl }),
+    ...(accessToken === undefined ? {} : { accessToken }),
+    ...(missingPageSize === undefined ? {} : { missingPageSize }),
   };
+}
+
+async function loadAccessToken(
+  environment: Readonly<Record<string, string | undefined>>,
+): Promise<SecretValue | undefined> {
+  if (present(environment.PEGARR_ACCESS_TOKEN)) {
+    throw new ConfigurationError(
+      "Direct access token environment variables are not supported; use PEGARR_ACCESS_TOKEN_FILE",
+    );
+  }
+  const path = optional(environment.PEGARR_ACCESS_TOKEN_FILE);
+  if (path === undefined) return undefined;
+  return readSecret(path, "Pegarr", "PEGARR_ACCESS_TOKEN_FILE", "access");
 }
 
 async function loadIntegrationConfiguration(
@@ -185,11 +209,29 @@ function parseBoolean(value: string | undefined, name: string): boolean {
   throw new ConfigurationError(`${name} must be true or false`);
 }
 
+function parseOptionalBoundedInteger(
+  value: string | undefined,
+  minimum: number,
+  maximum: number,
+  name: string,
+): number | undefined {
+  const normalized = optional(value);
+  if (normalized === undefined) return undefined;
+  if (!/^\d+$/u.test(normalized)) {
+    throw new ConfigurationError(`${name} must be an integer between ${minimum} and ${maximum}`);
+  }
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new ConfigurationError(`${name} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return parsed;
+}
+
 async function readSecret(
   path: string,
-  displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL",
+  displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL" | "Pegarr",
   apiKeyFileName: string,
-  secretFormat: "arr" | "bearer",
+  secretFormat: "arr" | "bearer" | "access",
 ): Promise<SecretValue> {
   if (!isAbsolute(path)) {
     throw new ConfigurationError(`${apiKeyFileName} must be an absolute path`);
@@ -206,16 +248,26 @@ async function readSecret(
     const value = buffer.subarray(0, bytesRead).toString("utf8").trim();
     const valid = secretFormat === "arr"
       ? /^[a-z0-9_-]{16,256}$/iu.test(value)
-      : /^[a-z0-9._~+/=-]{16,4096}$/iu.test(value);
+      : secretFormat === "access"
+        ? /^[a-z0-9._~+/=-]{32,4096}$/iu.test(value)
+        : /^[a-z0-9._~+/=-]{16,4096}$/iu.test(value);
     if (!valid) {
-      throw new ConfigurationError(`${displayName} API key file does not contain one valid API key`);
+      throw new ConfigurationError(
+        secretFormat === "access"
+          ? "Pegarr access token file does not contain one valid token"
+          : `${displayName} API key file does not contain one valid API key`,
+      );
     }
     return new SecretValue(value);
   } catch (error) {
     if (error instanceof ConfigurationError) {
       throw error;
     }
-    throw new ConfigurationError(`${displayName} API key file could not be read`);
+    throw new ConfigurationError(
+      secretFormat === "access"
+        ? "Pegarr access token file could not be read"
+        : `${displayName} API key file could not be read`,
+    );
   } finally {
     await handle?.close();
   }

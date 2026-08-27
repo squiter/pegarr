@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 
+import { AccessControl } from "./access-control.js";
 import { JsonTransportError } from "./adapters/http.js";
 import { createRequestHandler } from "./app.js";
 import { ConfigurationError, loadRuntimeConfiguration } from "./config.js";
@@ -12,7 +13,8 @@ const dataDirectory = process.env.DATA_DIR ?? "./data";
 async function start(): Promise<void> {
   const configuration = await loadRuntimeConfiguration(process.env);
   const services = createRuntimeServices(configuration);
-  const server = createServer(createRequestHandler(dataDirectory, services));
+  const accessControl = new AccessControl(configuration.accessToken);
+  const server = createServer(createRequestHandler(dataDirectory, services, accessControl));
 
   server.listen(port, host, () => {
     process.stdout.write(`${JSON.stringify({ event: "server_started", service: "pegarr", port })}\n`);

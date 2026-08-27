@@ -2,6 +2,7 @@ import { constants as fsConstants } from "node:fs";
 import { access } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import type { AccessControl } from "./access-control.js";
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
 import type {
@@ -19,7 +20,14 @@ export interface RouteResult {
 const jsonHeaders = {
   "cache-control": "no-store",
   "content-type": "application/json; charset=utf-8",
+  "referrer-policy": "no-referrer",
+  "x-content-type-options": "nosniff",
 } as const;
+
+export interface RouteAccess {
+  readonly control: AccessControl;
+  readonly authorization?: string;
+}
 
 export function healthResponse(): RouteResult {
   return {
@@ -49,14 +57,19 @@ export async function resolveRoute(
   requestUrl: string | undefined,
   dataDirectory: string,
   services?: RuntimeServices,
+  access?: RouteAccess,
 ): Promise<RouteResult> {
   const pathname = new URL(requestUrl ?? "/", "http://pegarr.invalid").pathname;
+  if (pathname === "/api/v1/library/missing" && access?.control.configured !== true) {
+    return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+  }
   const knownReadOnlyRoutes = new Set([
     "/health",
     "/health/ready",
     "/api/v1/feasibility/demo",
     "/api/v1/integrations/sonarr/status",
     "/api/v1/integrations/radarr/status",
+    "/api/v1/library/missing",
   ]);
 
   if (knownReadOnlyRoutes.has(pathname) && method !== "GET") {
@@ -102,6 +115,32 @@ export async function resolveRoute(
     };
   }
 
+  if (pathname === "/api/v1/library/missing") {
+    if (access === undefined) {
+      return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+    }
+    if (!access.control.authorize(access.authorization)) {
+      return {
+        statusCode: 401,
+        headers: { "www-authenticate": 'Bearer realm="pegarr", charset="UTF-8"' },
+        body: { service: "pegarr", status: "unauthorized" },
+      };
+    }
+    try {
+      return {
+        statusCode: 200,
+        body: services === undefined
+          ? { kind: "missing-item-inventory", mode: "read_only", status: "disabled" }
+          : await services.readMissingInventory(),
+      };
+    } catch {
+      return {
+        statusCode: 503,
+        body: { service: "pegarr", mode: "read_only", status: "unavailable" },
+      };
+    }
+  }
+
   return {
     statusCode: 404,
     body: { service: "pegarr", status: "not_found" },
@@ -129,9 +168,25 @@ async function safeRadarrStatus(services: RuntimeServices | undefined): Promise<
   }
 }
 
-export function createRequestHandler(dataDirectory: string, services?: RuntimeServices) {
+export function createRequestHandler(
+  dataDirectory: string,
+  services?: RuntimeServices,
+  accessControl?: AccessControl,
+) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
-    const result = await resolveRoute(request.method, request.url, dataDirectory, services);
+    const authorization = request.headers.authorization;
+    const result = await resolveRoute(
+      request.method,
+      request.url,
+      dataDirectory,
+      services,
+      accessControl === undefined
+        ? undefined
+        : {
+            control: accessControl,
+            ...(typeof authorization === "string" ? { authorization } : {}),
+          },
+    );
     response.writeHead(result.statusCode, { ...jsonHeaders, ...result.headers });
     response.end(`${JSON.stringify(result.body)}\n`);
   };
