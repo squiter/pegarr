@@ -162,6 +162,23 @@ for (const contract of ['createHash("sha256")', "timingSafeEqual", "authorizatio
   }
 }
 
+const dashboardClient = readFileSync(resolve(repoRoot, "src/web/dashboard.js"), "utf8");
+for (const forbidden of ["localStorage", "sessionStorage", "document.cookie", "innerHTML"]) {
+  if (dashboardClient.includes(forbidden)) {
+    issues.push(`The dashboard client may not use ${forbidden}`);
+  }
+}
+for (const contract of [
+  'authorization: `Bearer ${accessToken}`',
+  'credentials: "omit"',
+  "replaceChildren",
+  "textContent",
+]) {
+  if (!dashboardClient.includes(contract)) {
+    issues.push(`The dashboard client must retain ${contract}`);
+  }
+}
+
 const accessCompose = readFileSync(resolve(repoRoot, "deploy/compose.access.yaml"), "utf8");
 if (!accessCompose.includes("PEGARR_ACCESS_TOKEN_FILE: /run/secrets/pegarr_access_token")) {
   issues.push("The access Compose overlay must mount the bearer token through a secret file");
@@ -282,6 +299,13 @@ if (/^phase-[01]-/u.test(manifest.phase)) {
     app.indexOf("access.control.authorize") > app.indexOf("services.readMissingInventory")
   ) {
     issues.push("The live missing-item route must authenticate before reading upstream inventory");
+  }
+  if (
+    !app.includes('pathname === "/"') ||
+    !app.includes("content-security-policy") ||
+    !app.includes("dashboardPage")
+  ) {
+    issues.push("The Phase 1 dashboard must retain its same-origin security boundary");
   }
 }
 

@@ -38,4 +38,6 @@ Paths, overviews, artwork, ratings, tags, and upstream configuration are discard
 
 The live route is hidden when access control is disabled and returns `401` before upstream work for missing or invalid credentials. Authorized runtime reads share one in-flight request and reuse the completed inventory for 30 seconds. See [read-only API access control](access-control.md).
 
+The [missing-item dashboard](missing-item-dashboard.md) consumes this route once after authentication. Its search, filtering, and sorting operate on display-safe rows in page memory and do not create additional inventory requests.
+
 `PEG-SONARR-007`, `PEG-SONARR-008`, `PEG-RADARR-007`, `PEG-RADARR-008`, `PEG-INVENTORY-001` through `PEG-INVENTORY-003`, and `PEG-DOCKER-008` are the deterministic evidence for this path.

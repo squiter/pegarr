@@ -689,6 +689,30 @@
       "title": "Packaged authenticated inventory blocks unauthorized upstream work",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Synthetic sibling services and three secret files on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-DASH-001",
+      "title": "Inventory view-model mapping preserves only display-safe fields",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure mapping over sanitized synthetic inventory"
+    },
+    {
+      "id": "PEG-DASH-002",
+      "title": "Dashboard search, filtering, and sorting are pure local operations",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure selection functions over in-memory display rows"
+    },
+    {
+      "id": "PEG-DASH-003",
+      "title": "Dashboard routes are accessible, responsive, and secret-safe",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process HTML, CSS, and JavaScript asset inspection"
+    },
+    {
+      "id": "PEG-DOCKER-012",
+      "title": "Packaged dashboard assets and local controls cause no upstream requests",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Packaged assets and pure view model on an internal-only Docker network"
     }
   ],
   "manualGaps": [

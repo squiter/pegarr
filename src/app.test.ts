@@ -171,6 +171,28 @@ test("PEG-ACCESS-003 authorized inventory is read-only and rejects mutation meth
   assert.equal(inventoryReads, 1);
 });
 
+test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+
+  assert.equal(page.statusCode, 200);
+  assert.equal(page.headers?.["content-type"], "text/html; charset=utf-8");
+  assert.match(page.headers?.["content-security-policy"] ?? "", /default-src 'self'/u);
+  assert.match(String(page.body), /<main id="main"|role="status"|aria-live="polite"/u);
+  assert.match(String(page.body), /type="password"|autocomplete="off"/u);
+  assert.match(String(styles.body), /@media \(max-width: 760px\)|prefers-reduced-motion/u);
+  assert.match(String(client.body), /authorization: `Bearer \$\{accessToken\}`|credentials: "omit"/u);
+  assert.match(String(client.body), /textContent|replaceChildren/u);
+  assert.match(String(model.body), /export function selectRows/u);
+  assert.doesNotMatch(
+    [page.body, client.body, model.body, styles.body].join("\n"),
+    /localStor(?:age)|sessionStor(?:age)|document\.cookie|innerHTML|PEGARR_ACCESS_TOKEN/iu,
+  );
+  assert.equal((await resolveRoute("POST", "/", tmpdir())).statusCode, 405);
+});
+
 function fakeServices(
   readMissingInventory: RuntimeServices["readMissingInventory"],
 ): RuntimeServices {

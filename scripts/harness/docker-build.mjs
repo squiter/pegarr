@@ -766,6 +766,7 @@ async function packagedMovieReportSmokeTest() {
 async function packagedMissingInventorySmokeTest() {
   const scenario = "PEG-DOCKER-008";
   const accessScenario = "PEG-DOCKER-011";
+  const dashboardScenario = "PEG-DOCKER-012";
   const suffix = `${process.pid}`;
   const networkName = `pegarr-harness-inventory-internal-${suffix}`;
   const fixtureName = `pegarr-harness-inventory-${suffix}`;
@@ -905,8 +906,13 @@ async function packagedMissingInventorySmokeTest() {
     const accessProbe = [
       `const token = ${JSON.stringify(keys.access)};`,
       "const endpoint = 'http://127.0.0.1:8080/api/v1/library/missing';",
+      "const app = 'http://127.0.0.1:8080';",
       "const countUrl = 'http://sonarr-fixture:8082/__count';",
       "(async () => {",
+      "  const [page, client, modelResponse, styles] = await Promise.all([fetch(app + '/'), fetch(app + '/assets/dashboard.js'), fetch(app + '/assets/dashboard-model.js'), fetch(app + '/assets/dashboard.css')]);",
+      "  const [pageText, clientText, modelText, stylesText] = await Promise.all([page.text(), client.text(), modelResponse.text(), styles.text()]);",
+      "  if (![page, client, modelResponse, styles].every((response) => response.status === 200) || !pageText.includes('id=\"inventory-list\"') || !clientText.includes('credentials: \"omit\"') || !stylesText.includes('@media (max-width: 760px)') || !page.headers.get('content-security-policy')?.includes(\"default-src 'self'\")) throw new Error('dashboard asset contract mismatch');",
+      "  if (/localStor(?:age)|sessionStor(?:age)|document\\.cookie|innerHTML/u.test(clientText)) throw new Error('dashboard client crossed the browser storage or DOM boundary');",
       "  const queryToken = await fetch(endpoint + '?token=' + encodeURIComponent(token));",
       "  const wrong = await fetch(endpoint, { headers: { authorization: 'Bearer synthetic-wrong-access-token-00000001' } });",
       "  const mutation = await fetch(endpoint, { method: 'POST', headers: { authorization: 'Bearer ' + token } });",
@@ -918,6 +924,11 @@ async function packagedMissingInventorySmokeTest() {
       "  const cachedBody = await cached.json();",
       "  const after = Number(await (await fetch(countUrl)).text());",
       "  if (response.status !== 200 || cached.status !== 200 || body.status !== 'ready' || body.mode !== 'read_only' || body.metrics.itemCount !== 4 || cachedBody.metrics.itemCount !== 4 || after !== 4) throw new Error('authorized inventory or cache mismatch');",
+      "  const modelUrl = 'data:text/javascript;base64,' + Buffer.from(modelText).toString('base64');",
+      "  const dashboardModel = await import(modelUrl);",
+      "  const rows = dashboardModel.rowsFromInventory(body);",
+      "  const movies = dashboardModel.selectRows(rows, { kind: 'movie', sort: 'title-asc' });",
+      "  if (rows.length !== 4 || movies.length !== 2 || after !== 4) throw new Error('packaged local dashboard controls mismatch');",
       "  if (response.headers.get('cache-control') !== 'no-store' || response.headers.get('x-content-type-options') !== 'nosniff') throw new Error('security headers missing');",
       "  if (JSON.stringify(body).includes(token)) throw new Error('access token escaped');",
       "  console.log('protected inventory=ready, unauthorized upstream requests=0, cached refresh requests=0');",
@@ -933,6 +944,7 @@ async function packagedMissingInventorySmokeTest() {
     }
     process.stdout.write(`${scenario} packaged missing inventory=ready (two requests, secret-files, read-only, internal-network)\n`);
     process.stdout.write(`${accessScenario} ${protectedInventory.stdout.trim()} (secret-file bearer, internal-network)\n`);
+    process.stdout.write(`${dashboardScenario} packaged dashboard=ready (responsive assets, local controls, zero extra upstream requests)\n`);
   } finally {
     docker(["rm", "--force", appName]);
     docker(["rm", "--force", fixtureName]);

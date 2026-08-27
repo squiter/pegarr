@@ -120,6 +120,10 @@
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |
 | PEG-INVENTORY-004 | Runtime inventory reads share one bounded cache window | `src/runtime.test.ts` |
 | PEG-DOCKER-011 | Packaged authentication blocks unauthorized upstream work | `scripts/harness/docker-build.mjs` |
+| PEG-DASH-001 | Inventory view-model mapping preserves display-safe fields | `src/dashboard-model.test.ts` |
+| PEG-DASH-002 | Dashboard search, filtering, and sorting stay local | `src/dashboard-model.test.ts` |
+| PEG-DASH-003 | Dashboard routes are accessible, responsive, and secret-safe | `src/app.test.ts` |
+| PEG-DOCKER-012 | Packaged dashboard assets and controls cause no upstream requests | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

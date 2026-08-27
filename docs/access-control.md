@@ -39,7 +39,7 @@ docker compose \
 
 The overlay mounts the token at `/run/secrets/pegarr_access_token`. Pegarr rejects `PEGARR_ACCESS_TOKEN` environment values, tokens shorter than 32 characters, and secrets larger than 4096 bytes. Rotate the file and recreate the container to replace the in-memory token.
 
-Bearer authentication does not encrypt traffic. Use HTTPS or a trusted private network. Never place the token in a URL, log, fixture, issue attachment, browser storage, or committed file. The future UI must keep it only in page memory and require it again after reload unless a stronger server-side session design replaces this boundary.
+Bearer authentication does not encrypt traffic. Use HTTPS or a trusted private network. Never place the token in a URL, log, fixture, issue attachment, browser storage, or committed file. The dashboard keeps it only in page memory and requires it again after reload unless a stronger server-side session design replaces this boundary.
 
 ## Request bounds
 

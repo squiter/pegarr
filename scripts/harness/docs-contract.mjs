@@ -14,6 +14,7 @@ const requiredDocs = [
   "docs/harness-scenarios.md",
   "docs/configuration.md",
   "docs/access-control.md",
+  "docs/missing-item-dashboard.md",
   "docs/provider-search-cache.md",
   "docs/episode-feasibility-report.md",
   "docs/movie-feasibility-report.md",

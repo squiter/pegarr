@@ -3,6 +3,8 @@ import { access } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { AccessControl } from "./access-control.js";
+import { dashboardAsset, type DashboardAssetName } from "./dashboard-assets.js";
+import { dashboardPage } from "./dashboard-page.js";
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
 import type {
@@ -28,6 +30,12 @@ export interface RouteAccess {
   readonly control: AccessControl;
   readonly authorization?: string;
 }
+
+const dashboardAssetRoutes = new Map<string, DashboardAssetName>([
+  ["/assets/dashboard.css", "dashboard.css"],
+  ["/assets/dashboard.js", "dashboard.js"],
+  ["/assets/dashboard-model.js", "dashboard-model.js"],
+]);
 
 export function healthResponse(): RouteResult {
   return {
@@ -64,12 +72,14 @@ export async function resolveRoute(
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   const knownReadOnlyRoutes = new Set([
+    "/",
     "/health",
     "/health/ready",
     "/api/v1/feasibility/demo",
     "/api/v1/integrations/sonarr/status",
     "/api/v1/integrations/radarr/status",
     "/api/v1/library/missing",
+    ...dashboardAssetRoutes.keys(),
   ]);
 
   if (knownReadOnlyRoutes.has(pathname) && method !== "GET") {
@@ -82,6 +92,37 @@ export async function resolveRoute(
 
   if (pathname === "/health") {
     return healthResponse();
+  }
+
+  if (pathname === "/") {
+    return {
+      statusCode: 200,
+      headers: {
+        "content-security-policy": "default-src 'self'; base-uri 'none'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'none'; object-src 'none'; script-src 'self'; style-src 'self'",
+        "content-type": "text/html; charset=utf-8",
+      },
+      body: dashboardPage,
+    };
+  }
+
+  const dashboardAssetName = dashboardAssetRoutes.get(pathname);
+  if (dashboardAssetName !== undefined) {
+    try {
+      const asset = await dashboardAsset(dashboardAssetName);
+      return {
+        statusCode: 200,
+        headers: {
+          "cache-control": "public, max-age=300",
+          "content-type": asset.contentType,
+        },
+        body: asset.body,
+      };
+    } catch {
+      return {
+        statusCode: 503,
+        body: { service: "pegarr", status: "asset_unavailable" },
+      };
+    }
   }
 
   if (pathname === "/health/ready") {
@@ -188,7 +229,9 @@ export function createRequestHandler(
           },
     );
     response.writeHead(result.statusCode, { ...jsonHeaders, ...result.headers });
-    response.end(`${JSON.stringify(result.body)}\n`);
+    response.end(
+      typeof result.body === "string" ? result.body : `${JSON.stringify(result.body)}\n`,
+    );
   };
 }
 
