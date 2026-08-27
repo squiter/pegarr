@@ -132,6 +132,9 @@
 | PEG-ITEM-004 | Runtime selection composes Arr, Bazarr, and one provider window | `src/runtime.test.ts` |
 | PEG-DASH-004 | Release view preserves Arr decisions and honest evidence | `src/dashboard-model.test.ts` |
 | PEG-DOCKER-013 | Packaged item analysis is authenticated, cached, and read-only | `scripts/harness/docker-build.mjs` |
+| PEG-ITEM-005 | Explicit refresh bypasses only the bounded item cache | `src/item-feasibility.test.ts` |
+| PEG-DASH-005 | Analysis diagnostics preserve safe request, quota, and cache evidence | `src/dashboard-model.test.ts` |
+| PEG-DOCKER-014 | Packaged refresh reuses the provider window | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

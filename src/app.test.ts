@@ -174,21 +174,25 @@ test("PEG-ACCESS-003 authorized inventory is read-only and rejects mutation meth
 test("PEG-ACCESS-004 item feasibility is hidden, authenticated before work, and read-only", async () => {
   const token = "synthetic-access-token-value-0000000001";
   let feasibilityReads = 0;
+  const refreshValues: boolean[] = [];
   const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
-  services.readItemFeasibility = async (selection) => {
+  services.readItemFeasibility = async (selection, options) => {
     feasibilityReads += 1;
+    refreshValues.push(options?.refresh === true);
     return { kind: "item-feasibility", mode: "read_only", status: "not_found", selection };
   };
   const path = "/api/v1/library/items/sonarr/episode/305/feasibility";
 
   assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control: new AccessControl(undefined) })).statusCode, 404);
-  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control: new AccessControl(new SecretValue(token)), authorization: "Bearer wrong-token-value-000000000000000" })).statusCode, 401);
+  assert.equal((await resolveRoute("GET", `${path}?refresh=1`, tmpdir(), services, { control: new AccessControl(new SecretValue(token)), authorization: "Bearer wrong-token-value-000000000000000" })).statusCode, 401);
   assert.equal(feasibilityReads, 0);
 
   const access = { control: new AccessControl(new SecretValue(token)), authorization: `Bearer ${token}` };
   assert.equal((await resolveRoute("GET", path, tmpdir(), services, access)).statusCode, 404);
+  assert.equal((await resolveRoute("GET", `${path}?refresh=1`, tmpdir(), services, access)).statusCode, 404);
   assert.equal((await resolveRoute("POST", path, tmpdir(), services, access)).statusCode, 405);
-  assert.equal(feasibilityReads, 1);
+  assert.equal(feasibilityReads, 2);
+  assert.deepEqual(refreshValues, [false, true]);
   assert.equal((await resolveRoute("GET", "/api/v1/library/items/sonarr/movie/305/feasibility", tmpdir(), services, access)).statusCode, 404);
 });
 
@@ -208,6 +212,7 @@ test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe"
   assert.match(String(client.body), /authorization: `Bearer \$\{accessToken\}`|credentials: "omit"/u);
   assert.match(String(client.body), /textContent|replaceChildren/u);
   assert.match(String(client.body), /\/api\/v1\/library\/items\/\$\{row\.application\}|feasibilityCache/u);
+  assert.match(String(client.body), /refresh=1/u);
   assert.match(String(model.body), /export function selectRows/u);
   assert.equal(client.headers?.["cache-control"], "no-cache");
   assert.doesNotMatch(

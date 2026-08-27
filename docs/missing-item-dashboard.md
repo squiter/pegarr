@@ -16,8 +16,9 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Partial inventory identifies the unavailable integration without hiding usable results.
 - Selecting an item opens its interactive release table and requests one protected read-only feasibility report.
 - Video acceptance and Arr rejection reasons remain separate from subtitle confidence.
-- Each release exposes per-language confidence, provider state, matching evidence, and warnings.
-- Successful item views are reused in page memory; an explicit refresh uses Pegarr's bounded server cache.
+- Each release exposes per-language confidence, contributing provider count, provider state, matching evidence, and warnings.
+- Analysis timing and safe Arr, Bazarr, and provider request counts stay visible beside provider quota and cache timestamps.
+- Successful item views are reused in page memory. An explicit refresh re-reads Arr and Bazarr while retaining the stable provider-language cache window.
 - The page has a skip link, labelled controls, a polite status region, keyboard focus styles, reduced-motion behavior, and a mobile layout.
 
 The dashboard deliberately has no Grab control. Phase 1 ends at explainable decision support; mutation remains a separately confirmed Phase 2 boundary.
@@ -28,4 +29,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-012`, and `PEG-DOCKER-013` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-005`, `PEG-ITEM-001` through `PEG-ITEM-005`, and `PEG-DOCKER-012` through `PEG-DOCKER-014` are the deterministic evidence for this page.

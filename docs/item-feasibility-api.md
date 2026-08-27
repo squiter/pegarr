@@ -12,6 +12,10 @@ The browser sends only the application, item kind, and positive Arr item ID alre
 
 For a resolved item, Pegarr performs one interactive Arr release search, two Bazarr policy reads, and at most one SubDL request per unique Bazarr policy language with an explicit mapping. Successful reports share one in-flight request and a 30-second, 100-entry in-memory window. The durable provider cache remains authoritative for longer successful item/language reuse.
 
+Every ready response includes `analysis.source`, `analysis.generatedAt`, and `analysis.expiresAt`. `computed` means Pegarr performed the Arr/Bazarr analysis for that response; `memory_cache` means it reused the bounded 30-second item report. Provider cache evidence remains separate in `report.providerStatus[].cache`, together with safe quota metadata when the provider supplies it.
+
+An authenticated user can deliberately refresh the release and policy evidence with `?refresh=1`. This bypasses only Pegarr's item-report cache and still coalesces concurrent refreshes. It does not bypass the provider cache: a stable SubDL item/language window is reused until its provider TTL expires, so refreshing Arr releases or Bazarr policy does not spend another provider request unnecessarily.
+
 ## Honest result states
 
 - `ready`: release candidates include separate Arr and subtitle decisions plus evidence.
@@ -25,4 +29,4 @@ Provider rate limits, timeouts, unsupported mappings, and outages remain visible
 
 Only `GET` is accepted. Missing or invalid credentials are rejected before inventory, release, Bazarr, or provider work. No Grab route exists in Phase 1.
 
-`PEG-ACCESS-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, and `PEG-DOCKER-013` are the deterministic evidence for this route.
+`PEG-ACCESS-004`, `PEG-ITEM-001` through `PEG-ITEM-005`, `PEG-DOCKER-013`, and `PEG-DOCKER-014` are the deterministic evidence for this route.

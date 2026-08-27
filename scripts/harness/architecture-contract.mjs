@@ -77,6 +77,11 @@ if (
 if (!subdlAdapter.includes("authorization: `Bearer ${this.#apiKey}`") || /api_key/u.test(subdlAdapter)) {
   issues.push("The SubDL API key must remain in the authorization header and out of URLs");
 }
+for (const contract of ['status: "hit"', 'status: "miss"', 'value.status !== "success"']) {
+  if (!subdlAdapter.includes(contract)) {
+    issues.push(`The SubDL memory cache must retain ${contract}`);
+  }
+}
 
 const providerCache = readFileSync(resolve(repoRoot, "src/provider-search-cache.ts"), "utf8");
 for (const contract of [
@@ -316,6 +321,13 @@ if (/^phase-[01]-/u.test(manifest.phase)) {
     /\b(?:grabRelease|downloadRelease|deleteItem|updateItem)\b/iu.test(itemFeasibility)
   ) {
     issues.push("Item feasibility must remain server-owned, bounded, and read-only");
+  }
+  if (
+    !itemFeasibility.includes("options.refresh !== true") ||
+    !app.includes('searchParams.get("refresh") === "1"') ||
+    !dashboardClient.includes('?refresh=1')
+  ) {
+    issues.push("Explicit item refresh must bypass only Pegarr's bounded item cache");
   }
   if (
     !app.includes('pathname === "/"') ||

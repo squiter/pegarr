@@ -111,6 +111,59 @@ test("PEG-DASH-004 release view preserves Arr rejections and honest subtitle evi
   );
 });
 
+test("PEG-DASH-005 analysis diagnostics preserve safe request, quota, and cache evidence", () => {
+  const report = buildFeasibilityReport(demoFeasibilityInput);
+  const view = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    selection: { application: "sonarr", kind: "episode", itemId: 305 },
+    analysis: {
+      source: "memory_cache",
+      generatedAt: "2026-08-27T12:00:00.000Z",
+      expiresAt: "2026-08-27T12:00:30.000Z",
+    },
+    report: {
+      ...report,
+      providerStatus: [{
+        provider: "subdl",
+        status: "success",
+        searchedLanguages: ["pt-BR"],
+        quota: { limit: 2_000, remaining: 1_999, resetAtEpochSeconds: 1_788_000_000 },
+        cache: {
+          status: "hit",
+          storedAt: "2026-08-27T11:59:00.000Z",
+          expiresAt: "2026-08-27T12:14:00.000Z",
+        },
+      }],
+    },
+    metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 0, elapsedMs: 17 },
+  });
+
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  assert.deepEqual(view.analysis, {
+    source: "memory_cache",
+    generatedAt: "2026-08-27T12:00:00.000Z",
+    expiresAt: "2026-08-27T12:00:30.000Z",
+    elapsedMs: 17,
+    arrRequests: 1,
+    bazarrRequests: 2,
+    providerRequests: 0,
+  });
+  assert.deepEqual(view.providers, [{
+    provider: "subdl",
+    status: "success",
+    detail: "",
+    cacheStatus: "hit",
+    cachedAt: "2026-08-27T11:59:00.000Z",
+    cacheExpiresAt: "2026-08-27T12:14:00.000Z",
+    quota: { limit: 2_000, remaining: 1_999, resetAtEpochSeconds: 1_788_000_000 },
+  }]);
+  assert.ok(view.releases.some(({ languages }) => languages.some(({ providerCount }) => providerCount > 0)));
+  assert.doesNotMatch(JSON.stringify(view), /token|api.?key|example\.invalid/iu);
+});
+
 test("PEG-DASH-002 search, filtering, and sorting are pure local operations", () => {
   const rows = rowsFromInventory(inventory);
 

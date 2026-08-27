@@ -2,7 +2,7 @@
 
 Pegarr stores successful subtitle-provider search results in a local SQLite file so the same stable media item and language window does not repeatedly consume provider quota. The packaged NAS Compose configuration enables it at `/data/provider-search-cache.sqlite`, inside Pegarr's persistent private data volume.
 
-The cache is used by the packaged Sonarr episode, Sonarr season, and Radarr movie reports. A cache miss performs the normal provider request and reports `cache.status: "miss"`. A hit performs no provider request, reports `cache.status: "hit"`, and contributes zero to `metrics.providerRequests`.
+The cache is used by the dashboard item analysis and the packaged Sonarr episode, Sonarr season, and Radarr movie reports. A cache miss performs the normal provider request and reports `cache.status: "miss"`. A hit performs no provider request, reports `cache.status: "hit"`, and contributes zero to `metrics.providerRequests`. The in-process SubDL window applies the same evidence and successful-result-only rule even when SQLite persistence is disabled.
 
 ## Honest result semantics
 

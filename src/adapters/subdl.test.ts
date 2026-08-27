@@ -183,13 +183,15 @@ test("PEG-SUBDL-002 release evidence is local-matchable and download handles are
 test("PEG-SUBDL-003 successful empty and malformed searches remain distinct", async () => {
   const transport = new FakeTransport();
   transport.response = { status: 200, headers: {}, body: syntheticSubdlV2MovieSearchResponse };
-  assert.deepEqual(
-    await client(transport).search({
-      item: movie,
-      language: { policyCode: "fr", providerCode: "FR" },
-    }),
+  const empty = await client(transport).search({
+    item: movie,
+    language: { policyCode: "fr", providerCode: "FR" },
+  });
+  const { cache, ...emptyEvidence } = empty;
+  assert.deepEqual(emptyEvidence,
     { provider: "subdl", status: "success", searchedLanguages: ["fr"], subtitles: [] },
   );
+  assert.equal(cache?.status, "miss");
 
   transport.response = { status: 200, headers: {}, body: { status: false, error: "private" } };
   await assert.rejects(
@@ -271,8 +273,13 @@ test("PEG-SUBDL-005 one stable item-language window uses one request until expir
   const concurrent = subdl.search(window);
   assert.equal(transport.requests.length, 1);
   releaseGate?.();
-  assert.strictEqual(await first, await concurrent);
-  assert.strictEqual(await subdl.search(window), await first);
+  const firstResult = await first;
+  const concurrentResult = await concurrent;
+  const cachedResult = await subdl.search(window);
+  assert.equal(firstResult.cache?.status, "miss");
+  assert.equal(concurrentResult.cache?.status, "hit");
+  assert.equal(cachedResult.cache?.status, "hit");
+  assert.equal(cachedResult.cache?.storedAt, firstResult.cache?.storedAt);
   assert.equal(transport.requests.length, 1);
 
   now += 60_001;
@@ -285,6 +292,15 @@ test("PEG-SUBDL-005 one stable item-language window uses one request until expir
     language: { policyCode: "es", providerCode: "ES" },
   });
   assert.equal(transport.requests.length, 3);
+
+  transport.response = { status: 503, headers: {}, body: {} };
+  const failedWindow = {
+    item: episode,
+    language: { policyCode: "de", providerCode: "DE" },
+  } as const;
+  assert.equal((await subdl.search(failedWindow)).status, "unavailable");
+  assert.equal((await subdl.search(failedWindow)).status, "unavailable");
+  assert.equal(transport.requests.length, 5);
 });
 
 test("PEG-SUBDL-006 season searches omit episode and retain explicit pack coverage", async () => {

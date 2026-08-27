@@ -50,6 +50,8 @@ export function feasibilityView(value) {
     ? value.report.providerStatus.flatMap(providerView)
     : [];
   const releases = value.report.releases.flatMap(releaseView).toSorted(compareReleases);
+  const metrics = isRecord(value.metrics) ? value.metrics : {};
+  const analysis = isRecord(value.analysis) ? value.analysis : {};
   return {
     state: "ready",
     title,
@@ -58,6 +60,15 @@ export function feasibilityView(value) {
     languages,
     providers,
     releases,
+    analysis: {
+      source: analysis.source === "memory_cache" ? "memory_cache" : "computed",
+      ...(safeTimestamp(analysis.generatedAt) === undefined ? {} : { generatedAt: safeTimestamp(analysis.generatedAt) }),
+      ...(safeTimestamp(analysis.expiresAt) === undefined ? {} : { expiresAt: safeTimestamp(analysis.expiresAt) }),
+      elapsedMs: safeCount(metrics.elapsedMs),
+      arrRequests: safeCount(metrics.sonarrRequests) + safeCount(metrics.radarrRequests),
+      bazarrRequests: safeCount(metrics.bazarrRequests),
+      providerRequests: safeCount(metrics.providerRequests),
+    },
   };
 }
 
@@ -153,12 +164,39 @@ function languageView(value) {
 
 function providerView(value) {
   if (!isRecord(value) || typeof value.provider !== "string" || typeof value.status !== "string") return [];
+  const cache = isRecord(value.cache) ? value.cache : {};
+  const quota = isRecord(value.quota) ? value.quota : {};
   return [{
     provider: value.provider,
     status: value.status,
     detail: typeof value.detail === "string" ? value.detail : "",
-    cacheStatus: isRecord(value.cache) && (value.cache.status === "hit" || value.cache.status === "miss") ? value.cache.status : undefined,
+    cacheStatus: cache.status === "hit" || cache.status === "miss" ? cache.status : undefined,
+    ...(safeTimestamp(cache.storedAt) === undefined ? {} : { cachedAt: safeTimestamp(cache.storedAt) }),
+    ...(safeTimestamp(cache.expiresAt) === undefined ? {} : { cacheExpiresAt: safeTimestamp(cache.expiresAt) }),
+    quota: {
+      ...(safeOptionalCount(quota.remaining) === undefined ? {} : { remaining: safeOptionalCount(quota.remaining) }),
+      ...(safeOptionalCount(quota.limit) === undefined ? {} : { limit: safeOptionalCount(quota.limit) }),
+      ...(safeEpochSeconds(quota.resetAtEpochSeconds) === undefined ? {} : { resetAtEpochSeconds: safeEpochSeconds(quota.resetAtEpochSeconds) }),
+    },
   }];
+}
+
+function safeCount(value) {
+  return Number.isFinite(value) && value >= 0 ? Math.min(Math.round(value), 1_000_000) : 0;
+}
+
+function safeOptionalCount(value) {
+  return Number.isFinite(value) && value >= 0 ? Math.min(Math.round(value), Number.MAX_SAFE_INTEGER) : undefined;
+}
+
+function safeEpochSeconds(value) {
+  return Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000
+    ? Math.round(value)
+    : undefined;
+}
+
+function safeTimestamp(value) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : undefined;
 }
 
 function safeConfidence(value) {

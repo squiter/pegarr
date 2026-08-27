@@ -20,6 +20,7 @@ import {
 } from "./inventory-missing.js";
 import {
   ItemFeasibilityService,
+  type ItemFeasibilityReadOptions,
   type ItemFeasibilityResult,
   type ItemFeasibilitySelection,
 } from "./item-feasibility.js";
@@ -59,7 +60,10 @@ export interface RuntimeServices {
   readSonarrStatus(): Promise<SonarrIntegrationStatus>;
   readRadarrStatus(): Promise<RadarrIntegrationStatus>;
   readMissingInventory(): Promise<MissingInventoryResult>;
-  readItemFeasibility(selection: ItemFeasibilitySelection): Promise<ItemFeasibilityResult>;
+  readItemFeasibility(
+    selection: ItemFeasibilitySelection,
+    options?: ItemFeasibilityReadOptions,
+  ): Promise<ItemFeasibilityResult>;
   close(): void;
 }
 
@@ -266,7 +270,7 @@ export function createRuntimeServices(
     readSonarrStatus,
     readRadarrStatus,
     readMissingInventory,
-    readItemFeasibility: (selection) => itemFeasibility.read(selection),
+    readItemFeasibility: (selection, readOptions) => itemFeasibility.read(selection, readOptions),
     close: () => managedSubdl?.close(),
   };
 }

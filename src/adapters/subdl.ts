@@ -47,6 +47,7 @@ export interface SubdlClientOptions {
 }
 
 interface CachedSearch {
+  readonly storedAt: number;
   readonly expiresAt: number;
   readonly result: Promise<ProviderSearchResult>;
 }
@@ -106,12 +107,15 @@ export class SubdlClient {
     this.#transport = transport;
   }
 
-  search(window: SubdlSearchWindow): Promise<ProviderSearchResult> {
+  async search(window: SubdlSearchWindow): Promise<ProviderSearchResult> {
     const normalized = normalizeSearchWindow(window);
     const now = this.#now();
     const cached = this.#cache.get(normalized.key);
     if (cached !== undefined && cached.expiresAt > now) {
-      return cached.result;
+      const result = await cached.result;
+      return result.cache?.status === "miss"
+        ? { ...result, cache: { ...result.cache, status: "hit" } }
+        : result;
     }
     if (cached !== undefined) {
       this.#cache.delete(normalized.key);
@@ -124,8 +128,22 @@ export class SubdlClient {
       this.#cache.delete(oldest);
     }
 
-    const result = this.#searchOnce(normalized);
-    this.#cache.set(normalized.key, { expiresAt: now + this.#cacheTtlMs, result });
+    const expiresAt = now + this.#cacheTtlMs;
+    const result = this.#searchOnce(normalized).then((value) => {
+      if (value.status !== "success") {
+        if (this.#cache.get(normalized.key)?.result === result) this.#cache.delete(normalized.key);
+        return value;
+      }
+      return {
+        ...value,
+        cache: {
+          status: "miss" as const,
+          storedAt: new Date(now).toISOString(),
+          expiresAt: new Date(expiresAt).toISOString(),
+        },
+      };
+    });
+    this.#cache.set(normalized.key, { storedAt: now, expiresAt, result });
     return result;
   }
 

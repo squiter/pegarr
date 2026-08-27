@@ -68,7 +68,8 @@ export async function resolveRoute(
   services?: RuntimeServices,
   access?: RouteAccess,
 ): Promise<RouteResult> {
-  const pathname = new URL(requestUrl ?? "/", "http://pegarr.invalid").pathname;
+  const parsedUrl = new URL(requestUrl ?? "/", "http://pegarr.invalid");
+  const pathname = parsedUrl.pathname;
   const itemSelection = parseItemFeasibilityPath(pathname);
   const protectedLibraryRoute = pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
@@ -189,7 +190,9 @@ export async function resolveRoute(
             selection: itemSelection,
             missingIntegrations: [itemSelection.application, "bazarr", "subdl"],
           }
-        : await services.readItemFeasibility(itemSelection);
+        : await services.readItemFeasibility(itemSelection, {
+            refresh: parsedUrl.searchParams.get("refresh") === "1",
+          });
       return { statusCode: body.status === "not_found" ? 404 : 200, body };
     } catch {
       return {

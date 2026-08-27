@@ -16,15 +16,24 @@ export type ItemFeasibilitySelection =
   | { readonly application: "sonarr"; readonly kind: "episode"; readonly itemId: number }
   | { readonly application: "radarr"; readonly kind: "movie"; readonly itemId: number };
 
-export type ItemFeasibilityResult =
-  | ({
-      readonly kind: "item-feasibility";
-      readonly selection: ItemFeasibilitySelection;
-    } & SonarrEpisodeFeasibilityOutcome)
-  | ({
-      readonly kind: "item-feasibility";
-      readonly selection: ItemFeasibilitySelection;
-    } & RadarrMovieFeasibilityOutcome)
+export interface ItemAnalysisCacheEvidence {
+  readonly source: "computed" | "memory_cache";
+  readonly generatedAt: string;
+  readonly expiresAt: string;
+}
+
+export interface ItemFeasibilityReadOptions {
+  readonly refresh?: boolean;
+}
+
+type ItemOutcome<Selection extends ItemFeasibilitySelection, Outcome> = {
+  readonly kind: "item-feasibility";
+  readonly selection: Selection;
+} & Outcome;
+
+type ItemFeasibilityBuildResult =
+  | ItemOutcome<Extract<ItemFeasibilitySelection, { readonly kind: "episode" }>, SonarrEpisodeFeasibilityOutcome>
+  | ItemOutcome<Extract<ItemFeasibilitySelection, { readonly kind: "movie" }>, RadarrMovieFeasibilityOutcome>
   | {
       readonly kind: "item-feasibility";
       readonly mode: "read_only";
@@ -46,6 +55,13 @@ export type ItemFeasibilityResult =
       readonly status: "not_found";
       readonly selection: ItemFeasibilitySelection;
     };
+
+type WithAnalysisEvidence<Result> = Result extends { readonly status: "ready" }
+  ? Result & { readonly analysis: ItemAnalysisCacheEvidence }
+  : Result;
+
+export type ItemFeasibilityResult = WithAnalysisEvidence<ItemFeasibilityBuildResult>;
+type ReadyItemFeasibilityResult = Extract<ItemFeasibilityResult, { readonly status: "ready" }>;
 
 export interface EpisodeFeasibilityBuilder {
   build(request: SonarrEpisodeFeasibilityRequest): Promise<SonarrEpisodeFeasibilityOutcome>;
@@ -74,7 +90,7 @@ export class ItemFeasibilityService {
   readonly #now: () => number;
   readonly #ttlMs: number;
   readonly #maxEntries: number;
-  readonly #cache = new Map<string, { readonly value: ItemFeasibilityResult; readonly expiresAt: number }>();
+  readonly #cache = new Map<string, { readonly value: ReadyItemFeasibilityResult; readonly expiresAt: number }>();
   readonly #inFlight = new Map<string, Promise<ItemFeasibilityResult>>();
 
   constructor(options: ItemFeasibilityServiceOptions) {
@@ -84,35 +100,59 @@ export class ItemFeasibilityService {
     this.#maxEntries = boundedInteger(options.maxEntries ?? 100, 1, 1_000, "maxEntries");
   }
 
-  async read(selection: ItemFeasibilitySelection): Promise<ItemFeasibilityResult> {
+  async read(
+    selection: ItemFeasibilitySelection,
+    options: ItemFeasibilityReadOptions = {},
+  ): Promise<ItemFeasibilityResult> {
     const validated = validateSelection(selection);
     const key = `${validated.application}:${validated.kind}:${validated.itemId}`;
     const requestedAt = this.#now();
     const cached = this.#cache.get(key);
-    if (cached !== undefined && requestedAt < cached.expiresAt) return cached.value;
+    if (options.refresh !== true && cached !== undefined && requestedAt < cached.expiresAt) {
+      return {
+        ...cached.value,
+        analysis: { ...cached.value.analysis, source: "memory_cache" },
+      };
+    }
     if (cached !== undefined) this.#cache.delete(key);
     const active = this.#inFlight.get(key);
     if (active !== undefined) return active;
 
-    const current = this.#build(validated);
+    const current = this.#buildAndCache(validated, key);
     this.#inFlight.set(key, current);
     try {
-      const value = await current;
-      if (value.status === "ready") {
-        while (this.#cache.size >= this.#maxEntries) {
-          const oldest = this.#cache.keys().next().value as string | undefined;
-          if (oldest === undefined) break;
-          this.#cache.delete(oldest);
-        }
-        this.#cache.set(key, { value, expiresAt: this.#now() + this.#ttlMs });
-      }
-      return value;
+      return await current;
     } finally {
       if (this.#inFlight.get(key) === current) this.#inFlight.delete(key);
     }
   }
 
-  async #build(selection: ItemFeasibilitySelection): Promise<ItemFeasibilityResult> {
+  async #buildAndCache(
+    selection: ItemFeasibilitySelection,
+    key: string,
+  ): Promise<ItemFeasibilityResult> {
+    const built = await this.#build(selection);
+    if (built.status !== "ready") return built;
+    const generatedAt = this.#now();
+    const expiresAt = generatedAt + this.#ttlMs;
+    const value: ReadyItemFeasibilityResult = {
+      ...built,
+      analysis: {
+        source: "computed",
+        generatedAt: new Date(generatedAt).toISOString(),
+        expiresAt: new Date(expiresAt).toISOString(),
+      },
+    };
+    while (this.#cache.size >= this.#maxEntries) {
+      const oldest = this.#cache.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.#cache.delete(oldest);
+    }
+    this.#cache.set(key, { value, expiresAt });
+    return value;
+  }
+
+  async #build(selection: ItemFeasibilitySelection): Promise<ItemFeasibilityBuildResult> {
     const inventory = await this.#options.readInventory();
     const source = inventory.status === "disabled"
       ? undefined

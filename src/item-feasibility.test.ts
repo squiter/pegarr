@@ -152,9 +152,53 @@ test("PEG-ITEM-003 concurrent and repeated selections share one bounded ready-re
   const cached = await service.read(selection);
   assert.equal(builds, 1);
   assert.deepEqual(concurrent, first);
-  assert.deepEqual(cached, first);
+  assert.equal(first.status, "ready");
+  assert.equal(cached.status, "ready");
+  if (first.status === "ready" && cached.status === "ready") {
+    assert.equal(first.analysis.source, "computed");
+    assert.equal(cached.analysis.source, "memory_cache");
+    assert.equal(cached.analysis.generatedAt, first.analysis.generatedAt);
+  }
 
   currentTime += 30_001;
-  await service.read(selection);
+  const refreshed = await service.read(selection);
   assert.equal(builds, 2);
+  assert.equal(refreshed.status === "ready" && refreshed.analysis.source, "computed");
+});
+
+test("PEG-ITEM-005 explicit refresh bypasses only the item cache and remains single-flight", async () => {
+  let builds = 0;
+  const service = new ItemFeasibilityService({
+    readInventory: async () => readyInventory,
+    episode: {
+      build: async () => {
+        builds += 1;
+        await Promise.resolve();
+        return {
+          status: "ready",
+          mode: "read_only",
+          report: { fixture: "synthetic", mode: "read_only", item: { kind: "episode", title: "Synthetic Show", season: 3, episode: 5, ids: episode.ids }, policy: { source: "bazarr", profileId: "1", profileName: "Synthetic", languages: [] }, providerStatus: [], releases: [] },
+          metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 0, elapsedMs: 1 },
+        };
+      },
+    },
+    subdlLanguages: [],
+    missingIntegrations: { episode: [], movie: [] },
+    now: () => 2_000,
+    ttlMs: 30_000,
+  });
+  const selection = { application: "sonarr" as const, kind: "episode" as const, itemId: 305 };
+
+  const first = await service.read(selection);
+  const cached = await service.read(selection);
+  const [refreshed, concurrentRefresh] = await Promise.all([
+    service.read(selection, { refresh: true }),
+    service.read(selection, { refresh: true }),
+  ]);
+
+  assert.equal(builds, 2);
+  assert.equal(first.status === "ready" && first.analysis.source, "computed");
+  assert.equal(cached.status === "ready" && cached.analysis.source, "memory_cache");
+  assert.equal(refreshed.status === "ready" && refreshed.analysis.source, "computed");
+  assert.deepEqual(concurrentRefresh, refreshed);
 });

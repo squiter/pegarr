@@ -357,14 +357,24 @@ test("PEG-ITEM-004 runtime selection composes inventory, Arr, Bazarr, and one sc
   const selection = { application: "sonarr" as const, kind: "episode" as const, itemId: 305 };
   const first = await services.readItemFeasibility(selection);
   const cached = await services.readItemFeasibility(selection);
+  const refreshed = await services.readItemFeasibility(selection, { refresh: true });
   services.close();
 
   assert.equal(first.status, "ready");
-  assert.deepEqual(cached, first);
+  assert.equal(cached.status, "ready");
+  assert.equal(refreshed.status, "ready");
+  if (first.status === "ready" && cached.status === "ready" && refreshed.status === "ready") {
+    assert.equal(first.analysis.source, "computed");
+    assert.equal(cached.analysis.source, "memory_cache");
+    assert.equal(refreshed.analysis.source, "computed");
+    assert.equal(first.report.providerStatus[0]?.cache?.status, "miss");
+    assert.equal(refreshed.report.providerStatus[0]?.cache?.status, "hit");
+    assert.equal(refreshed.metrics.providerRequests, 0);
+  }
   assert.equal(requests.filter((entry) => entry.endsWith("/api/v3/wanted/missing")).length, 2);
-  assert.equal(requests.filter((entry) => entry.endsWith("/api/v3/release")).length, 1);
-  assert.equal(requests.filter((entry) => entry.includes("bazarr.example.invalid")).length, 2);
+  assert.equal(requests.filter((entry) => entry.endsWith("/api/v3/release")).length, 2);
+  assert.equal(requests.filter((entry) => entry.includes("bazarr.example.invalid")).length, 4);
   assert.equal(requests.filter((entry) => entry.endsWith("/api/v2/subtitles/search")).length, 1);
-  assert.equal(requests.length, 6);
+  assert.equal(requests.length, 9);
   assert.doesNotMatch(JSON.stringify(first), /synthetic-(?:sonarr|radarr|bazarr|subdl)-key|example\.invalid/iu);
 });

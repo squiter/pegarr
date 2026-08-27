@@ -174,7 +174,8 @@ async function loadFeasibility(row, refresh = false) {
   setFeasibilityNotice("Searching releases, resolving Bazarr policy, and checking subtitle evidence…", "loading");
   setBusy(true);
   try {
-    const response = await fetch(`/api/v1/library/items/${row.application}/${row.kind}/${row.itemId}/feasibility`, {
+    const endpoint = `/api/v1/library/items/${row.application}/${row.kind}/${row.itemId}/feasibility${refresh ? "?refresh=1" : ""}`;
+    const response = await fetch(endpoint, {
       method: "GET",
       headers: { authorization: `Bearer ${accessToken}` },
       cache: "no-store",
@@ -218,16 +219,53 @@ function renderFeasibility(view) {
     : view.languages.map(({ code, required }) => `${code}${required ? " required" : ""}`).join(" · ");
   policy.append(policyLabel, languages);
 
+  const analysis = document.createElement("div");
+  analysis.className = "analysis-summary";
+  const analysisSource = document.createElement("strong");
+  analysisSource.textContent = view.analysis.source === "memory_cache"
+    ? "Pegarr item cache"
+    : "Fresh Arr/Bazarr analysis";
+  const analysisTiming = document.createElement("span");
+  analysisTiming.textContent = `${view.analysis.elapsedMs} ms · ${view.analysis.arrRequests} Arr · ${view.analysis.bazarrRequests} Bazarr · ${view.analysis.providerRequests} provider ${view.analysis.providerRequests === 1 ? "request" : "requests"}`;
+  analysis.append(analysisSource, analysisTiming);
+  if (view.analysis.generatedAt) {
+    const generated = document.createElement("time");
+    generated.dateTime = view.analysis.generatedAt;
+    generated.textContent = `Generated ${formatDateTime(view.analysis.generatedAt)}`;
+    analysis.append(generated);
+  }
+
   const providers = document.createElement("div");
   providers.className = "provider-summary";
   providers.replaceChildren(...view.providers.map((provider) => {
+    const card = document.createElement("div");
+    card.className = "provider-card";
     const chip = document.createElement("span");
     chip.className = `provider-chip provider-chip--${provider.status}`;
-    chip.textContent = `${provider.provider}: ${provider.status.replaceAll("_", " ")}${provider.cacheStatus ? ` · cache ${provider.cacheStatus}` : ""}`;
+    chip.textContent = `${provider.provider}: ${provider.status.replaceAll("_", " ")}`;
     if (provider.detail) chip.title = provider.detail;
-    return chip;
+    card.append(chip);
+    if (provider.cacheStatus) {
+      const cache = document.createElement("span");
+      cache.textContent = `Provider cache ${provider.cacheStatus}${provider.cachedAt ? ` · stored ${formatDateTime(provider.cachedAt)}` : ""}`;
+      card.append(cache);
+    }
+    if (provider.quota.remaining !== undefined || provider.quota.limit !== undefined) {
+      const quota = document.createElement("span");
+      quota.textContent = provider.quota.remaining !== undefined && provider.quota.limit !== undefined
+        ? `${provider.quota.remaining.toLocaleString()} of ${provider.quota.limit.toLocaleString()} provider requests remaining`
+        : `${(provider.quota.remaining ?? provider.quota.limit)?.toLocaleString()} provider requests ${provider.quota.remaining !== undefined ? "remaining" : "in quota"}`;
+      card.append(quota);
+    }
+    if (provider.quota.resetAtEpochSeconds !== undefined) {
+      const reset = document.createElement("time");
+      reset.dateTime = new Date(provider.quota.resetAtEpochSeconds * 1_000).toISOString();
+      reset.textContent = `Quota resets ${formatDateTime(reset.dateTime)}`;
+      card.append(reset);
+    }
+    return card;
   }));
-  elements.feasibilitySummary.replaceChildren(policy, providers);
+  elements.feasibilitySummary.replaceChildren(policy, analysis, providers);
   elements.releaseTableBody.replaceChildren(...view.releases.map(renderRelease));
   elements.releaseTableWrap.hidden = false;
   setFeasibilityNotice(
@@ -271,7 +309,7 @@ function renderRelease(row) {
   subtitle.append(confidence);
   for (const language of row.languages) {
     const languageStatus = document.createElement("span");
-    languageStatus.textContent = `${language.language}: ${language.confidence.replaceAll("_", " ")}`;
+    languageStatus.textContent = `${language.language}: ${language.confidence.replaceAll("_", " ")} · ${language.providerCount} ${language.providerCount === 1 ? "provider" : "providers"}`;
     subtitle.append(languageStatus);
   }
 
@@ -336,4 +374,8 @@ function setBusy(busy) {
 function setStatus(message, state) {
   elements.statusMessage.textContent = message;
   elements.statusMessage.dataset.state = state;
+}
+
+function formatDateTime(value) {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }

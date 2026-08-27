@@ -761,6 +761,24 @@
       "title": "Packaged item analysis is authenticated, cached, scoped, and has no Grab",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Four synthetic sibling services and five secret files on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-ITEM-005",
+      "title": "Explicit refresh bypasses only the item cache and preserves single-flight bounds",
+      "evidence": "src/item-feasibility.test.ts",
+      "boundary": "Deterministic clock and injected report builder; no network"
+    },
+    {
+      "id": "PEG-DASH-005",
+      "title": "Analysis diagnostics preserve safe request, provider-count, quota, and cache evidence",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure view mapping over sanitized deterministic feasibility evidence"
+    },
+    {
+      "id": "PEG-DOCKER-014",
+      "title": "Packaged refresh re-reads Arr and Bazarr without repeating the provider window",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Four synthetic sibling services and five secret files on an internal-only Docker network"
     }
   ],
   "manualGaps": [
