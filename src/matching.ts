@@ -32,12 +32,13 @@ export function buildFeasibilityReport(input: FeasibilityInput): FeasibilityRepo
     mode: "read_only",
     item: input.item,
     policy: input.policy,
-    providerStatus: input.providerResults.map(({ provider, status, searchedLanguages, detail, quota }) => ({
+    providerStatus: input.providerResults.map(({ provider, status, searchedLanguages, detail, quota, cache }) => ({
       provider,
       status,
       ...(searchedLanguages === undefined ? {} : { searchedLanguages }),
       ...(detail === undefined ? {} : { detail }),
       ...(quota === undefined ? {} : { quota }),
+      ...(cache === undefined ? {} : { cache }),
     })),
     releases: input.releases.map((release) => assessRelease(input, release)),
   };

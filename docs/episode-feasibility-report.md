@@ -6,6 +6,8 @@ Status: packaged, read-only, and fixture-proven; live SubDL verification remains
 
 It does not expose a browser route and cannot Grab, download, update, or delete anything.
 
+When the [provider search cache](provider-search-cache.md) is enabled, successful item/language windows are reused across command invocations. Cache hits are visible in `report.providerStatus` and count as zero provider requests. Failures and quota responses are never stored in the durable cache.
+
 ## Current provider boundary
 
 Bazarr supplies the subtitle policy, but Pegarr does not reuse Bazarr's configured providers or credentials. Phase 0 supports only a separately configured direct SubDL connection, so users who also enable SubDL in Bazarr currently configure it twice. This is a known temporary setup limitation; Pegarr does not make Bazarr provider internals a core runtime dependency.
@@ -68,4 +70,4 @@ Exit code `0` means a report was built. Exit code `1` means policy resolution or
 
 The successful report intentionally contains the item title, media identifiers, release titles, policy details, and match evidence. Treat it as private library output; inspect and sanitize it before attaching it to a public issue.
 
-`PEG-FLOW-001` through `PEG-FLOW-004`, `PEG-REPORT-001`, `PEG-REPORT-002`, and `PEG-DOCKER-006` are the deterministic completion evidence for this path. They use only sanitized fixtures and internal-only Docker networks.
+`PEG-FLOW-001` through `PEG-FLOW-004`, `PEG-REPORT-001`, `PEG-REPORT-002`, `PEG-CACHE-001` through `PEG-CACHE-008`, `PEG-DOCKER-006`, and `PEG-DOCKER-010` are the deterministic completion evidence for this path. They use only sanitized fixtures and internal-only Docker networks.

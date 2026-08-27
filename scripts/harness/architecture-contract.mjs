@@ -78,6 +78,22 @@ if (!subdlAdapter.includes("authorization: `Bearer ${this.#apiKey}`") || /api_ke
   issues.push("The SubDL API key must remain in the authorization header and out of URLs");
 }
 
+const providerCache = readFileSync(resolve(repoRoot, "src/provider-search-cache.ts"), "utf8");
+for (const contract of [
+  'result.status !== "success"',
+  'createHash("sha256")',
+  "maximumPayloadBytes",
+  'status: "hit"',
+  'status: "miss"',
+]) {
+  if (!providerCache.includes(contract)) {
+    issues.push(`The provider cache must retain ${contract}`);
+  }
+}
+if (/\b(?:apiKey|authorization|downloadUrl)\b/u.test(providerCache)) {
+  issues.push("The provider cache must not persist credentials or provider download handles");
+}
+
 const episodeFlow = readFileSync(resolve(repoRoot, "src/episode-feasibility.ts"), "utf8");
 if (
   !episodeFlow.includes("searchEpisodeReleases") ||

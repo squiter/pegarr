@@ -404,8 +404,10 @@ async function configuredSubdlProbeSmokeTest() {
 async function packagedEpisodeReportSmokeTest() {
   const scenario = "PEG-DOCKER-006";
   const seasonScenario = "PEG-DOCKER-009";
+  const cacheScenario = "PEG-DOCKER-010";
   const suffix = `${process.pid}`;
   const networkName = `pegarr-harness-report-internal-${suffix}`;
+  const volumeName = `pegarr-harness-report-cache-${suffix}`;
   const fixtureName = `pegarr-harness-report-${suffix}`;
   const artifactsDirectory = resolve(".artifacts");
   mkdirSync(artifactsDirectory, { recursive: true });
@@ -455,10 +457,19 @@ async function packagedEpisodeReportSmokeTest() {
     ],
   }), { mode: 0o444 });
 
+  const volume = docker([
+    "volume", "create", "--label", "pegarr.harness=true", volumeName,
+  ]);
+  if (volume.status !== 0) {
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+    throw new Error(`${cacheScenario} could not create a cache volume:\n${outputOf(volume)}`);
+  }
+
   const network = docker([
     "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
   ]);
   if (network.status !== 0) {
+    docker(["volume", "rm", volumeName]);
     rmSync(fixtureDirectory, { recursive: true, force: true });
     throw new Error(`${scenario} could not create an internal network:\n${outputOf(network)}`);
   }
@@ -510,6 +521,9 @@ async function packagedEpisodeReportSmokeTest() {
       "--mount", `type=bind,source=${paths.subdl},target=/run/secrets/subdl_api_key,readonly`,
       "--mount", `type=bind,source=${paths.request},target=/run/pegarr/episode-report.json,readonly`,
       "--mount", `type=bind,source=${paths.seasonRequest},target=/run/pegarr/season-report.json,readonly`,
+      "--mount", `type=volume,source=${volumeName},target=/data`,
+      "--env", "DATA_DIR=/data",
+      "--env", "PEGARR_PROVIDER_CACHE_FILE=/data/provider-search-cache.sqlite",
       "--env", "PEGARR_SONARR_URL=http://sonarr-fixture:8082",
       "--env", "PEGARR_SONARR_ALLOWED_HOSTS=sonarr-fixture",
       "--env", "PEGARR_SONARR_API_KEY_FILE=/run/secrets/sonarr_api_key",
@@ -580,15 +594,33 @@ async function packagedEpisodeReportSmokeTest() {
     ) {
       throw new Error(`${seasonScenario} packaged season report failed:\n${outputOf(seasonReport)}`);
     }
+    const cachedSeasonReport = docker(seasonRunArgs);
+    let parsedCachedSeason;
+    try {
+      parsedCachedSeason = JSON.parse(cachedSeasonReport.stdout ?? "");
+    } catch {
+      parsedCachedSeason = undefined;
+    }
+    if (
+      cachedSeasonReport.status !== 0 ||
+      parsedCachedSeason?.status !== "ready" ||
+      parsedCachedSeason?.metrics?.providerRequests !== 0 ||
+      !parsedCachedSeason?.report?.providerStatus?.every(({ cache }) => cache?.status === "hit") ||
+      /synthetic-report-(?:sonarr|bazarr|subdl)-key|(?:sonarr|bazarr|subdl)-fixture|\/run\/secrets/iu.test(cachedSeasonReport.stdout ?? "")
+    ) {
+      throw new Error(`${cacheScenario} packaged cache reuse failed:\n${outputOf(cachedSeasonReport)}`);
+    }
     const inspection = docker(["network", "inspect", "--format", "{{.Internal}}", networkName]);
     if (inspection.status !== 0 || inspection.stdout.trim() !== "true") {
       throw new Error(`${scenario} network is not internal-only: ${outputOf(inspection).trim()}`);
     }
     process.stdout.write(`${scenario} packaged episode report=ready (three integrations, secret-files, read-only, internal-network)\n`);
     process.stdout.write(`${seasonScenario} packaged season report=ready (full-season coverage, secret-files, read-only, internal-network)\n`);
+    process.stdout.write(`${cacheScenario} packaged provider cache=reused (persistent volume, zero repeated provider requests)\n`);
   } finally {
     docker(["rm", "--force", fixtureName]);
     docker(["network", "rm", networkName]);
+    docker(["volume", "rm", volumeName]);
     rmSync(fixtureDirectory, { recursive: true, force: true });
   }
 }

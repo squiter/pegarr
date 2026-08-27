@@ -127,6 +127,103 @@ test("PEG-SEASONREPORT-002 incomplete season report configuration fails before n
   assert.doesNotMatch(output.join(""), /private|missing/iu);
 });
 
+test("PEG-CACHE-005 packaged reports reuse successful provider windows after cache reopen", async () => {
+  const fixture = await fixtureEnvironment();
+  try {
+    const requests: URL[] = [];
+    const fetchImplementation: FetchImplementation = async (input) => {
+      const url = new URL(input);
+      requests.push(url);
+      if (url.hostname === "sonarr.example.invalid") return json(syntheticSonarrSeasonReleaseResponse);
+      if (url.hostname === "bazarr.example.invalid" && url.pathname.endsWith("/profiles")) {
+        return json(syntheticBazarrLanguageProfilesResponse);
+      }
+      if (url.hostname === "bazarr.example.invalid") return json(syntheticBazarrSeriesAssignmentResponse);
+      if (url.searchParams.get("languages") === "PT-BR") return json(syntheticSubdlV2SeasonSearchResponse);
+      return json({ status: true, subtitles: [] });
+    };
+    const environment = {
+      ...fixture.environment,
+      DATA_DIR: fixture.directory,
+      PEGARR_PROVIDER_CACHE_FILE: join(fixture.directory, "provider-search-cache.sqlite"),
+    };
+    const outputs: string[][] = [[], []];
+    for (const output of outputs) {
+      const exitCode = await runSonarrSeasonReport({
+        environment,
+        fetchImplementation,
+        write: (value) => output.push(value),
+      });
+      assert.equal(exitCode, 0);
+    }
+
+    const first = JSON.parse(outputs[0]?.join("") ?? "");
+    const second = JSON.parse(outputs[1]?.join("") ?? "");
+    assert.equal(first.metrics.providerRequests, 3);
+    assert.equal(second.metrics.providerRequests, 0);
+    assert.deepEqual(
+      first.report.providerStatus.map(({ cache }: { cache: { status: string } }) => cache.status),
+      ["miss", "miss", "miss"],
+    );
+    assert.deepEqual(
+      second.report.providerStatus.map(({ cache }: { cache: { status: string } }) => cache.status),
+      ["hit", "hit", "hit"],
+    );
+    assert.equal(requests.filter(({ hostname }) => hostname === "subdl.example.invalid").length, 3);
+    assert.equal(requests.filter(({ hostname }) => hostname === "sonarr.example.invalid").length, 2);
+    assert.equal(requests.filter(({ hostname }) => hostname === "bazarr.example.invalid").length, 4);
+  } finally {
+    await rm(fixture.directory, { recursive: true });
+  }
+});
+
+test("PEG-CACHE-006 unsafe packaged cache configuration fails before network", async () => {
+  const fixture = await fixtureEnvironment();
+  try {
+    let fetchCalls = 0;
+    const validCache = join(fixture.directory, "provider-search-cache.sqlite");
+    const invalidEnvironments = [
+      {
+        DATA_DIR: fixture.directory,
+        PEGARR_PROVIDER_CACHE_FILE: join(fixture.directory, "..", "escaped.sqlite"),
+      },
+      { DATA_DIR: "relative-data", PEGARR_PROVIDER_CACHE_FILE: validCache },
+      {
+        DATA_DIR: fixture.directory,
+        PEGARR_PROVIDER_CACHE_FILE: validCache,
+        PEGARR_PROVIDER_CACHE_TTL_SECONDS: "0",
+      },
+      {
+        DATA_DIR: fixture.directory,
+        PEGARR_PROVIDER_CACHE_FILE: validCache,
+        PEGARR_PROVIDER_CACHE_MAX_ENTRIES: "100001",
+      },
+    ];
+    for (const invalidEnvironment of invalidEnvironments) {
+      const output: string[] = [];
+      const exitCode = await runSonarrSeasonReport({
+        environment: { ...fixture.environment, ...invalidEnvironment },
+        fetchImplementation: async () => {
+          fetchCalls += 1;
+          return json({});
+        },
+        write: (value) => output.push(value),
+      });
+
+      assert.equal(exitCode, 2);
+      assert.deepEqual(JSON.parse(output.join("")), {
+        kind: "sonarr-season-feasibility",
+        mode: "read_only",
+        status: "invalid_configuration",
+      });
+      assert.doesNotMatch(output.join(""), /escaped|provider-search-cache|\.sqlite/iu);
+    }
+    assert.equal(fetchCalls, 0);
+  } finally {
+    await rm(fixture.directory, { recursive: true });
+  }
+});
+
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,

@@ -4,8 +4,8 @@ import { BazarrClient } from "./adapters/bazarr.js";
 import type { FetchImplementation } from "./adapters/fetch-json-transport.js";
 import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
 import { RadarrClient } from "./adapters/radarr.js";
-import { SubdlClient } from "./adapters/subdl.js";
 import { loadRuntimeConfiguration } from "./config.js";
+import { createConfiguredSubdlSource } from "./configured-subdl-source.js";
 import {
   RadarrMovieFeasibilityService,
   type RadarrMovieFeasibilityRequest,
@@ -62,31 +62,37 @@ export async function runRadarrMovieReport(options: RadarrMovieReportOptions): P
       allowInsecureHttp: configuration.subdl.allowInsecureHttp,
       ...fetchOption,
     });
-    const service = new RadarrMovieFeasibilityService({
-      radarr: new RadarrClient(
-        {
-          instanceId: configuration.radarr.instanceId,
-          apiKey: configuration.radarr.apiKey.reveal(),
-          timeoutMs: 60_000,
-        },
-        radarrTransport,
-      ),
-      bazarr: new BazarrClient(
-        {
-          instanceId: configuration.bazarr.instanceId,
-          apiKey: configuration.bazarr.apiKey.reveal(),
-        },
-        bazarrTransport,
-      ),
-      subdl: new SubdlClient(
-        { apiKey: configuration.subdl.apiKey.reveal() },
-        subdlTransport,
-      ),
-      ...(options.now === undefined ? {} : { now: options.now }),
+    const managedSubdl = createConfiguredSubdlSource({
+      configuration: configuration.subdl,
+      transport: subdlTransport,
+      environment: options.environment,
     });
-    const outcome = await service.build(request);
-    options.write(`${JSON.stringify({ kind: "radarr-movie-feasibility", ...outcome })}\n`);
-    return outcome.status === "ready" ? 0 : 1;
+    try {
+      const service = new RadarrMovieFeasibilityService({
+        radarr: new RadarrClient(
+          {
+            instanceId: configuration.radarr.instanceId,
+            apiKey: configuration.radarr.apiKey.reveal(),
+            timeoutMs: 60_000,
+          },
+          radarrTransport,
+        ),
+        bazarr: new BazarrClient(
+          {
+            instanceId: configuration.bazarr.instanceId,
+            apiKey: configuration.bazarr.apiKey.reveal(),
+          },
+          bazarrTransport,
+        ),
+        subdl: managedSubdl.source,
+        ...(options.now === undefined ? {} : { now: options.now }),
+      });
+      const outcome = await service.build(request);
+      options.write(`${JSON.stringify({ kind: "radarr-movie-feasibility", ...outcome })}\n`);
+      return outcome.status === "ready" ? 0 : 1;
+    } finally {
+      managedSubdl.close();
+    }
   } catch {
     writeState(options, "invalid_configuration");
     return 2;

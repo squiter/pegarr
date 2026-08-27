@@ -4,8 +4,8 @@ import { BazarrClient } from "./adapters/bazarr.js";
 import type { FetchImplementation } from "./adapters/fetch-json-transport.js";
 import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
 import { SonarrClient } from "./adapters/sonarr.js";
-import { SubdlClient } from "./adapters/subdl.js";
 import { loadRuntimeConfiguration } from "./config.js";
+import { createConfiguredSubdlSource } from "./configured-subdl-source.js";
 import {
   SonarrEpisodeFeasibilityService,
   type SonarrEpisodeFeasibilityRequest,
@@ -64,31 +64,37 @@ export async function runSonarrEpisodeReport(
       allowInsecureHttp: configuration.subdl.allowInsecureHttp,
       ...fetchOption,
     });
-    const service = new SonarrEpisodeFeasibilityService({
-      sonarr: new SonarrClient(
-        {
-          instanceId: configuration.sonarr.instanceId,
-          apiKey: configuration.sonarr.apiKey.reveal(),
-          timeoutMs: 60_000,
-        },
-        sonarrTransport,
-      ),
-      bazarr: new BazarrClient(
-        {
-          instanceId: configuration.bazarr.instanceId,
-          apiKey: configuration.bazarr.apiKey.reveal(),
-        },
-        bazarrTransport,
-      ),
-      subdl: new SubdlClient(
-        { apiKey: configuration.subdl.apiKey.reveal() },
-        subdlTransport,
-      ),
-      ...(options.now === undefined ? {} : { now: options.now }),
+    const managedSubdl = createConfiguredSubdlSource({
+      configuration: configuration.subdl,
+      transport: subdlTransport,
+      environment: options.environment,
     });
-    const outcome = await service.build(request);
-    options.write(`${JSON.stringify({ kind: "sonarr-episode-feasibility", ...outcome })}\n`);
-    return outcome.status === "ready" ? 0 : 1;
+    try {
+      const service = new SonarrEpisodeFeasibilityService({
+        sonarr: new SonarrClient(
+          {
+            instanceId: configuration.sonarr.instanceId,
+            apiKey: configuration.sonarr.apiKey.reveal(),
+            timeoutMs: 60_000,
+          },
+          sonarrTransport,
+        ),
+        bazarr: new BazarrClient(
+          {
+            instanceId: configuration.bazarr.instanceId,
+            apiKey: configuration.bazarr.apiKey.reveal(),
+          },
+          bazarrTransport,
+        ),
+        subdl: managedSubdl.source,
+        ...(options.now === undefined ? {} : { now: options.now }),
+      });
+      const outcome = await service.build(request);
+      options.write(`${JSON.stringify({ kind: "sonarr-episode-feasibility", ...outcome })}\n`);
+      return outcome.status === "ready" ? 0 : 1;
+    } finally {
+      managedSubdl.close();
+    }
   } catch {
     writeState(options, "invalid_configuration");
     return 2;

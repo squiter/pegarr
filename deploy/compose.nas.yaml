@@ -3,6 +3,9 @@ services:
     image: ${PEGARR_IMAGE:-ghcr.io/squiter/pegarr:latest}
     environment:
       DATA_DIR: /data
+      PEGARR_PROVIDER_CACHE_FILE: /data/provider-search-cache.sqlite
+      PEGARR_PROVIDER_CACHE_TTL_SECONDS: ${PEGARR_PROVIDER_CACHE_TTL_SECONDS:-900}
+      PEGARR_PROVIDER_CACHE_MAX_ENTRIES: ${PEGARR_PROVIDER_CACHE_MAX_ENTRIES:-5000}
       PORT: 8080
       TZ: ${TZ:-UTC}
     ports:

@@ -37,7 +37,8 @@ The current repository foundation includes:
 - a bounded, transport-injected Sonarr v3 episode release-search adapter proven with a sanitized contract fixture;
 - a bounded, transport-injected Radarr v3 movie release-search adapter that retains edition evidence;
 - a bounded, read-only Bazarr v1 language-profile adapter that preserves cutoff, subtitle type, audio conditions, and release filters beside normalized policy;
-- a bounded SubDL v2 exact-search adapter with header-only authentication, explicit provider language codes, local release matching, and one request per cached item/language window;
+- a bounded SubDL v2 exact-search adapter with header-only authentication, explicit provider language codes, and local release matching;
+- a durable SQLite provider-result cache that reuses only successful item/language windows, never failures or quota responses;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;
 - secret-file-only Sonarr configuration and a browser-safe version/status route;
 - a measured one-shot Sonarr probe with a 30-second status cache and single-flight protection;
@@ -69,7 +70,7 @@ The demo maps a sanitized synthetic Sonarr v3 response into four release candida
 
 Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise.
 
-See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 

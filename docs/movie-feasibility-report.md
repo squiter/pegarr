@@ -6,6 +6,8 @@ Status: packaged, read-only, and fixture-proven; live Radarr and SubDL verificat
 
 It does not expose a browser route and cannot Grab, download, update, or delete anything.
 
+When the [provider search cache](provider-search-cache.md) is enabled, successful item/language windows are reused across command invocations. Cache hits are visible in `report.providerStatus` and count as zero provider requests. Failures and quota responses are never stored in the durable cache.
+
 ## Current provider boundary
 
 Bazarr defines which subtitle languages and variants Pegarr should seek. Pegarr does not reuse Bazarr's configured subtitle-provider credentials or call Bazarr's provider internals. In this phase, Pegarr supports only a separately configured direct SubDL connection.
@@ -68,4 +70,4 @@ Exit code `0` means a report was built. Exit code `1` means policy resolution or
 
 The successful report intentionally contains the item title, media identifiers, release titles, policy details, and match evidence. Treat it as private library output; inspect and sanitize it before attaching it to a public issue.
 
-`PEG-MOVIEFLOW-001` through `PEG-MOVIEFLOW-003`, `PEG-MOVIEREPORT-001`, `PEG-MOVIEREPORT-002`, and `PEG-DOCKER-007` are the deterministic completion evidence for this path. They use only sanitized fixtures and internal-only Docker networks.
+`PEG-MOVIEFLOW-001` through `PEG-MOVIEFLOW-003`, `PEG-MOVIEREPORT-001`, `PEG-MOVIEREPORT-002`, `PEG-CACHE-001` through `PEG-CACHE-008`, `PEG-DOCKER-007`, and `PEG-DOCKER-010` are the deterministic completion evidence for this path. They use only sanitized fixtures and internal-only Docker networks.

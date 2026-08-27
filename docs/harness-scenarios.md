@@ -64,6 +64,7 @@
 | PEG-DOCKER-007 | The packaged movie report composes three integrations on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-008 | The packaged missing inventory reads both Arr services on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-009 | The packaged season report preserves full-season coverage on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-010 | Packaged reports reuse provider windows from a persistent data volume | `scripts/harness/docker-build.mjs` |
 | PEG-BAZARR-001 | Policy reads are bounded GETs authenticated only by header | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-002 | Profiles retain original multilingual and conditional semantics | `src/adapters/bazarr.test.ts` |
 | PEG-BAZARR-003 | Targeted assignments discard private library metadata | `src/adapters/bazarr.test.ts` |
@@ -105,6 +106,14 @@
 | PEG-SEASONFLOW-003 | Sonarr season failure remains classified and stops provider work | `src/season-feasibility.test.ts` |
 | PEG-SEASONREPORT-001 | Packaged season report composes all three read-only integrations | `src/report-sonarr-season.test.ts` |
 | PEG-SEASONREPORT-002 | Incomplete season report configuration fails before network access | `src/report-sonarr-season.test.ts` |
+| PEG-CACHE-001 | Successful provider results survive cache reopen | `src/provider-search-cache.test.ts` |
+| PEG-CACHE-002 | Expired and failed provider searches are not reused | `src/provider-search-cache.test.ts` |
+| PEG-CACHE-003 | Concurrent identical misses share one provider request | `src/provider-search-cache.test.ts` |
+| PEG-CACHE-004 | Cache keys omit titles and raw media identifiers | `src/provider-search-cache.test.ts` |
+| PEG-CACHE-005 | Packaged reports reuse cached provider windows after reopen | `src/report-sonarr-season.test.ts` |
+| PEG-CACHE-006 | Unsafe packaged cache configuration fails before network access | `src/report-sonarr-season.test.ts` |
+| PEG-CACHE-007 | The cache prunes the oldest windows at its configured bound | `src/provider-search-cache.test.ts` |
+| PEG-CACHE-008 | Corrupt cache rows are discarded and fetched again | `src/provider-search-cache.test.ts` |
 
 ## Explicit manual gaps
 

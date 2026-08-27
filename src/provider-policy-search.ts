@@ -48,12 +48,12 @@ export async function searchSubdlPolicy(options: {
       continue;
     }
 
-    requestCount += 1;
     try {
       const result = await options.subdl.search({
         item: options.item,
         language: { policyCode: requirement.code, providerCode: mapping.providerCode },
       });
+      if (result.cache?.status !== "hit") requestCount += 1;
       if (result.status === "success") {
         results.push({ ...result, searchedLanguages: [requirement.code] });
         continue;
@@ -67,6 +67,7 @@ export async function searchSubdlPolicy(options: {
       });
       break;
     } catch (error) {
+      requestCount += 1;
       results.push(providerFailure(error));
       break;
     }

@@ -129,6 +129,12 @@ export interface ProviderQuotaEvidence {
   readonly resetAtEpochSeconds?: number;
 }
 
+export interface ProviderCacheEvidence {
+  readonly status: "hit" | "miss";
+  readonly storedAt: string;
+  readonly expiresAt: string;
+}
+
 export interface ProviderSearchResult {
   readonly provider: string;
   readonly status: ProviderSearchStatus;
@@ -136,6 +142,7 @@ export interface ProviderSearchResult {
   readonly subtitles: readonly SubtitleCandidate[];
   readonly detail?: string;
   readonly quota?: ProviderQuotaEvidence;
+  readonly cache?: ProviderCacheEvidence;
 }
 
 export interface FeasibilityInput {
@@ -189,6 +196,7 @@ export interface FeasibilityReport {
     readonly searchedLanguages?: readonly string[];
     readonly detail?: string;
     readonly quota?: ProviderQuotaEvidence;
+    readonly cache?: ProviderCacheEvidence;
   }[];
   readonly releases: readonly ReleaseAssessment[];
 }

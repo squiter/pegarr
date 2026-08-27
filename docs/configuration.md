@@ -48,6 +48,18 @@ Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADA
 
 The base URL may use a Sonarr URL base, such as `https://media.example.invalid/sonarr`. The allowlist entry for that URL is only `media.example.invalid`.
 
+## Provider cache settings
+
+The packaged feasibility reports can reuse successful SubDL results from a private local SQLite file. NAS Compose enables this inside the persistent `/data` volume. Provider failures, timeouts, malformed responses, authentication failures, and quota responses are never cached.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PEGARR_PROVIDER_CACHE_FILE` | Disabled unless set | Absolute SQLite direct child file path inside the absolute `DATA_DIR` |
+| `PEGARR_PROVIDER_CACHE_TTL_SECONDS` | `900` | Successful-result lifetime from 1 through 86,400 seconds |
+| `PEGARR_PROVIDER_CACHE_MAX_ENTRIES` | `5000` | Oldest-entry pruning limit from 1 through 100,000 |
+
+The database contains private normalized matching evidence such as media identifiers and release names, but never API keys, authorization headers, provider download handles, or upstream URLs. Keep the data volume private. See the [provider search cache guide](provider-search-cache.md) for result and deletion semantics.
+
 ## Docker secret deployment
 
 Create the secret outside the repository and restrict it to the account managing the container:
@@ -83,6 +95,8 @@ PEGARR_SUBDL_PROBE_POLICY_LANGUAGE=en
 PEGARR_SUBDL_PROBE_PROVIDER_LANGUAGE=EN
 PEGARR_SUBDL_PROBE_SEASON=1
 PEGARR_SUBDL_PROBE_EPISODE=1
+PEGARR_PROVIDER_CACHE_TTL_SECONDS=900
+PEGARR_PROVIDER_CACHE_MAX_ENTRIES=5000
 ```
 
 Enable the opt-in overlay alongside either Compose base:

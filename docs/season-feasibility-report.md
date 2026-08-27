@@ -6,6 +6,8 @@ Status: packaged, read-only, fixture-proven, and compatible with the installed S
 
 It cannot Grab, download, update, or delete anything and is not exposed as a browser route.
 
+When the [provider search cache](provider-search-cache.md) is enabled, successful item/language windows are reused across command invocations. Cache hits are visible in `report.providerStatus` and count as zero provider requests. Failures and quota responses are never cached.
+
 ## Coverage semantics
 
 - Sonarr's `fullSeason`, season number, and episode-number coverage remain attached to each release row.
@@ -63,4 +65,4 @@ Exit code `0` means a report was built. Exit code `1` means policy resolution or
 
 The output includes private titles, identifiers, release names, and policy evidence. Sanitize it before sharing publicly.
 
-`PEG-SONARR-009`, `PEG-SUBDL-006`, `PEG-MATCH-009`, `PEG-MATCH-010`, `PEG-SEASONFLOW-001` through `PEG-SEASONFLOW-003`, `PEG-SEASONREPORT-001`, `PEG-SEASONREPORT-002`, and `PEG-DOCKER-009` are the deterministic evidence for this path.
+`PEG-SONARR-009`, `PEG-SUBDL-006`, `PEG-MATCH-009`, `PEG-MATCH-010`, `PEG-SEASONFLOW-001` through `PEG-SEASONFLOW-003`, `PEG-SEASONREPORT-001`, `PEG-SEASONREPORT-002`, `PEG-CACHE-001` through `PEG-CACHE-008`, `PEG-DOCKER-009`, and `PEG-DOCKER-010` are the deterministic evidence for this path.

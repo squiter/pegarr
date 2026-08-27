@@ -355,6 +355,12 @@
       "boundary": "Synthetic sibling services, request file, and three secrets; local Docker architecture only"
     },
     {
+      "id": "PEG-DOCKER-010",
+      "title": "Packaged reports reuse successful provider windows from a persistent data volume",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic sibling services and disposable Docker volume; local Docker architecture only"
+    },
+    {
       "id": "PEG-BAZARR-001",
       "title": "Bazarr policy reads are bounded GETs authenticated only by header",
       "evidence": "src/adapters/bazarr.test.ts",
@@ -599,6 +605,54 @@
       "title": "Incomplete season report configuration fails before network access",
       "evidence": "src/report-sonarr-season.test.ts",
       "boundary": "In-memory environment and fetch spy; no filesystem read or network"
+    },
+    {
+      "id": "PEG-CACHE-001",
+      "title": "Successful provider results survive cache reopen",
+      "evidence": "src/provider-search-cache.test.ts",
+      "boundary": "Temporary SQLite database and injected provider source; no network"
+    },
+    {
+      "id": "PEG-CACHE-002",
+      "title": "Expired and failed provider searches are never reused as successful evidence",
+      "evidence": "src/provider-search-cache.test.ts",
+      "boundary": "Deterministic clock, temporary SQLite database, and injected provider source"
+    },
+    {
+      "id": "PEG-CACHE-003",
+      "title": "Concurrent identical cache misses share one provider request",
+      "evidence": "src/provider-search-cache.test.ts",
+      "boundary": "In-process single-flight test with a disposable SQLite database"
+    },
+    {
+      "id": "PEG-CACHE-004",
+      "title": "Cache keys do not persist titles or raw media identifiers",
+      "evidence": "src/provider-search-cache.test.ts",
+      "boundary": "Direct inspection of one disposable SQLite cache row"
+    },
+    {
+      "id": "PEG-CACHE-005",
+      "title": "Packaged reports reuse provider windows after reopening the cache",
+      "evidence": "src/report-sonarr-season.test.ts",
+      "boundary": "Two packaged report invocations with injected HTTP and a temporary SQLite database"
+    },
+    {
+      "id": "PEG-CACHE-006",
+      "title": "Unsafe packaged cache configuration fails before network access",
+      "evidence": "src/report-sonarr-season.test.ts",
+      "boundary": "Temporary request and secret files with an injected fetch spy"
+    },
+    {
+      "id": "PEG-CACHE-007",
+      "title": "Provider cache prunes the oldest windows at its configured bound",
+      "evidence": "src/provider-search-cache.test.ts",
+      "boundary": "Deterministic clock, disposable SQLite database, and injected provider source"
+    },
+    {
+      "id": "PEG-CACHE-008",
+      "title": "Corrupt provider cache rows are discarded and fetched again",
+      "evidence": "src/provider-search-cache.test.ts",
+      "boundary": "Deliberately corrupted row in a disposable SQLite database; no network"
     }
   ],
   "manualGaps": [
