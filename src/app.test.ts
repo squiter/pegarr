@@ -243,6 +243,21 @@ test("PEG-DASH-010 analyzed-item cards and controls remain page-memory-only asse
   assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
 
+test("PEG-DASH-013 required-language and provider-health controls remain local dashboard assets", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, model.body, styles.body].join("\n");
+
+  assert.match(String(page.body), /required-coverage-filter|provider-evidence-filter/u);
+  assert.match(String(client.body), /requiredCoverageLabel|providerEvidenceLabel|requiredLanguages|providerFailures/u);
+  assert.match(String(model.body), /summarizeRequiredCoverage|summarizeProviderEvidence|matchesProviderEvidence/u);
+  assert.match(String(styles.body), /coverage-strong|provider-partial|provider-unavailable/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
+  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
+});
+
 function fakeServices(
   readMissingInventory: RuntimeServices["readMissingInventory"],
 ): RuntimeServices {

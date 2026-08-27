@@ -10,6 +10,8 @@ export interface DashboardRow {
 }
 
 export type DashboardAnalysisState = "ready" | "stale" | "disabled" | "policy_unresolved" | "inventory_unavailable" | "integration_failure" | "not_found" | "invalid";
+export type RequiredCoverage = "strong" | "possible" | "no_match_found" | "unknown" | "no_accepted_release" | "no_required_languages";
+export type ProviderEvidence = "available" | "partial" | "unavailable" | "unknown";
 export interface DashboardAnalysisSummary {
   readonly state: DashboardAnalysisState;
   readonly bestConfidence: FeasibilityReleaseRow["confidence"] | "none";
@@ -17,6 +19,12 @@ export interface DashboardAnalysisSummary {
   readonly acceptedCount: number;
   readonly policyName?: string;
   readonly languages?: readonly { readonly code: string; readonly required: boolean }[];
+  readonly requiredCoverage: RequiredCoverage;
+  readonly requiredLanguages: readonly { readonly code: string; readonly confidence: FeasibilityReleaseRow["confidence"] }[];
+  readonly providerEvidence: ProviderEvidence;
+  readonly providerResultCount: number;
+  readonly availableProviderResultCount: number;
+  readonly providerFailures: readonly string[];
   readonly generatedAt?: string;
   readonly message?: string;
 }
@@ -24,7 +32,7 @@ export interface DashboardAnalysisSummary {
 export function rowsFromInventory(value: unknown): readonly DashboardRow[];
 export function selectRows(
   rows: readonly DashboardRow[],
-  options: { readonly query?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly sort?: string },
+  options: { readonly query?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly requiredCoverage?: string; readonly providerEvidence?: string; readonly sort?: string },
 ): readonly DashboardRow[];
 export function rowsWithAnalysis(
   rows: readonly DashboardRow[],

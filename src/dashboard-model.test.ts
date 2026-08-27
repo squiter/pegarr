@@ -261,6 +261,12 @@ test("PEG-DASH-008 item summaries use the best Arr-accepted confidence and retai
     acceptedCount: 1,
     policyName: "Original plus Brazilian Portuguese",
     languages: [{ code: "pt-BR", required: true }, { code: "en", required: false }],
+    requiredCoverage: "strong",
+    requiredLanguages: [{ code: "pt-BR", confidence: "likely" }],
+    providerEvidence: "partial",
+    providerResultCount: 2,
+    availableProviderResultCount: 1,
+    providerFailures: ["rate_limited"],
     generatedAt: "2026-08-27T12:00:00.000Z",
   });
   assert.deepEqual(itemAnalysisSummary({ state: "policy_unresolved", message: "No language was assumed." }), {
@@ -268,6 +274,12 @@ test("PEG-DASH-008 item summaries use the best Arr-accepted confidence and retai
     bestConfidence: "none",
     releaseCount: 0,
     acceptedCount: 0,
+    requiredCoverage: "unknown",
+    requiredLanguages: [],
+    providerEvidence: "unknown",
+    providerResultCount: 0,
+    availableProviderResultCount: 0,
+    providerFailures: [],
     message: "No language was assumed.",
   });
   assert.doesNotMatch(JSON.stringify(summary), /release-guid|subtitle-id|token|api.?key/iu);
@@ -283,6 +295,12 @@ test("PEG-DASH-009 analyzed-item filtering and ordering are deterministic page-m
       acceptedCount: 2,
       policyName: "Brazilian Portuguese",
       languages: [{ code: "pt-BR", required: true }],
+      requiredCoverage: "strong" as const,
+      requiredLanguages: [{ code: "pt-BR", confidence: "likely" as const }],
+      providerEvidence: "available" as const,
+      providerResultCount: 1,
+      availableProviderResultCount: 1,
+      providerFailures: [],
       generatedAt: "2026-08-27T12:00:00.000Z",
     }],
     ["radarr:movie:84", {
@@ -292,6 +310,12 @@ test("PEG-DASH-009 analyzed-item filtering and ordering are deterministic page-m
       acceptedCount: 1,
       policyName: "English fallback",
       languages: [{ code: "en", required: false }],
+      requiredCoverage: "no_required_languages" as const,
+      requiredLanguages: [],
+      providerEvidence: "unavailable" as const,
+      providerResultCount: 1,
+      availableProviderResultCount: 0,
+      providerFailures: ["timeout"],
       generatedAt: "2026-08-27T11:00:00.000Z",
     }],
   ]);
@@ -301,14 +325,76 @@ test("PEG-DASH-009 analyzed-item filtering and ordering are deterministic page-m
   assert.deepEqual(selectRows(analyzedRows, { analysis: "needs_attention" }).map(({ key }) => key), ["radarr:movie:84"]);
   assert.deepEqual(selectRows(analyzedRows, { analysis: "stale" }).map(({ key }) => key), ["radarr:movie:84"]);
   assert.deepEqual(selectRows(analyzedRows, { confidence: "likely" }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(analyzedRows, { requiredCoverage: "strong" }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(analyzedRows, { providerEvidence: "unavailable" }).map(({ key }) => key), ["radarr:movie:84"]);
   assert.deepEqual(selectRows(analyzedRows, { query: "pt-br" }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(analyzedRows, { query: "timeout" }).map(({ key }) => key), ["radarr:movie:84"]);
   assert.deepEqual(selectRows(analyzedRows, { sort: "confidence-desc" }).map(({ key }) => key), ["radarr:movie:84", "sonarr:episode:305", "radarr:movie:85"]);
   assert.deepEqual(selectRows(analyzedRows, { sort: "analyzed-desc" }).map(({ key }) => key), ["sonarr:episode:305", "radarr:movie:84", "radarr:movie:85"]);
   const unresolvedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:movie:85", itemAnalysisSummary({ state: "policy_unresolved" })]]));
-  const noAcceptedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:movie:85", { state: "ready", bestConfidence: "none", releaseCount: 2, acceptedCount: 0 }]]));
+  const noAcceptedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:movie:85", {
+    state: "ready",
+    bestConfidence: "none",
+    releaseCount: 2,
+    acceptedCount: 0,
+    requiredCoverage: "no_accepted_release",
+    requiredLanguages: [{ code: "en", confidence: "unknown" }],
+    providerEvidence: "available",
+    providerResultCount: 1,
+    availableProviderResultCount: 1,
+    providerFailures: [],
+  }]]));
   assert.equal(selectRows(unresolvedRow, { confidence: "none" }).length, 0);
   assert.equal(selectRows(noAcceptedRow, { confidence: "none" }).length, 1);
   assert.ok(rows.every((row) => row.analysis === undefined));
+});
+
+test("PEG-DASH-011 required-language coverage uses only Arr-accepted releases and preserves Unknown", () => {
+  const mapped = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    report: buildFeasibilityReport(demoFeasibilityInput),
+  });
+  assert.equal(mapped.state, "ready");
+  if (mapped.state !== "ready") return;
+  const accepted = mapped.releases.find(({ downloadAllowed }) => downloadAllowed)!;
+  const rejected = mapped.releases.find(({ downloadAllowed }) => !downloadAllowed)!;
+  const requiredUnknown = { ...accepted, languages: accepted.languages.map((language) => language.required ? { ...language, confidence: "unknown" as const } : language) };
+  const rejectedConfirmed = { ...rejected, languages: rejected.languages.map((language) => language.required ? { ...language, confidence: "confirmed" as const } : language) };
+  const unknownSummary = itemAnalysisSummary({ ...mapped, releases: [rejectedConfirmed, requiredUnknown] });
+
+  assert.equal(unknownSummary.requiredCoverage, "unknown");
+  assert.deepEqual(unknownSummary.requiredLanguages, [{ code: "pt-BR", confidence: "unknown" }]);
+
+  const noMatch = { ...accepted, languages: accepted.languages.map((language) => language.required ? { ...language, confidence: "no_match_found" as const } : language) };
+  assert.equal(itemAnalysisSummary({ ...mapped, releases: [noMatch] }).requiredCoverage, "no_match_found");
+  assert.equal(itemAnalysisSummary({ ...mapped, releases: [] }).requiredCoverage, "no_accepted_release");
+  assert.equal(itemAnalysisSummary({ ...mapped, languages: mapped.languages.map((language) => ({ ...language, required: false })) }).requiredCoverage, "no_required_languages");
+});
+
+test("PEG-DASH-012 provider-evidence health distinguishes available, partial, unavailable, and unknown", () => {
+  const mapped = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    report: buildFeasibilityReport(demoFeasibilityInput),
+  });
+  assert.equal(mapped.state, "ready");
+  if (mapped.state !== "ready") return;
+
+  const available = itemAnalysisSummary({ ...mapped, providers: [{ provider: "one", status: "success" }] });
+  const partial = itemAnalysisSummary({ ...mapped, providers: [{ provider: "one", status: "success" }, { provider: "two", status: "rate_limited" }] });
+  const unavailable = itemAnalysisSummary({ ...mapped, providers: [{ provider: "one", status: "timeout" }, { provider: "two", status: "unavailable" }] });
+  const unknown = itemAnalysisSummary({ ...mapped, providers: [] });
+
+  assert.deepEqual(
+    [available.providerEvidence, partial.providerEvidence, unavailable.providerEvidence, unknown.providerEvidence],
+    ["available", "partial", "unavailable", "unknown"],
+  );
+  assert.deepEqual(partial.providerFailures, ["rate_limited"]);
+  assert.equal(partial.availableProviderResultCount, 1);
+  assert.equal(partial.providerResultCount, 2);
 });
 
 test("PEG-DASH-002 search, filtering, and sorting are pure local operations", () => {

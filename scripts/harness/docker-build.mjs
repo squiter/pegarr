@@ -772,6 +772,7 @@ async function packagedMissingInventorySmokeTest() {
   const staleScenario = "PEG-DOCKER-015";
   const releaseControlsScenario = "PEG-DOCKER-016";
   const analysisControlsScenario = "PEG-DOCKER-017";
+  const evidenceControlsScenario = "PEG-DOCKER-018";
   const suffix = `${process.pid}`;
   const networkName = `pegarr-harness-inventory-internal-${suffix}`;
   const fixtureName = `pegarr-harness-inventory-${suffix}`;
@@ -957,7 +958,7 @@ async function packagedMissingInventorySmokeTest() {
       "(async () => {",
       "  const [page, client, modelResponse, styles] = await Promise.all([fetch(app + '/'), fetch(app + '/assets/dashboard.js'), fetch(app + '/assets/dashboard-model.js'), fetch(app + '/assets/dashboard.css')]);",
       "  const [pageText, clientText, modelText, stylesText] = await Promise.all([page.text(), client.text(), modelResponse.text(), styles.text()]);",
-      "  if (![page, client, modelResponse, styles].every((response) => response.status === 200) || !pageText.includes('id=\"inventory-list\"') || !pageText.includes('id=\"analysis-filter\"') || !pageText.includes('id=\"best-confidence-filter\"') || !pageText.includes('id=\"release-decision-filter\"') || !pageText.includes('id=\"release-confidence-filter\"') || !pageText.includes('id=\"release-sort-order\"') || !clientText.includes('credentials: \"omit\"') || !clientText.includes('?refresh=1') || !clientText.includes('selectReleases') || !clientText.includes('analysisByItem') || !stylesText.includes('@media (max-width: 760px)') || !stylesText.includes('.release-controls') || !stylesText.includes('.item-analysis-badge') || !page.headers.get('content-security-policy')?.includes(\"default-src 'self'\")) throw new Error('dashboard asset contract mismatch');",
+      "  if (![page, client, modelResponse, styles].every((response) => response.status === 200) || !pageText.includes('id=\"inventory-list\"') || !pageText.includes('id=\"analysis-filter\"') || !pageText.includes('id=\"best-confidence-filter\"') || !pageText.includes('id=\"required-coverage-filter\"') || !pageText.includes('id=\"provider-evidence-filter\"') || !pageText.includes('id=\"release-decision-filter\"') || !pageText.includes('id=\"release-confidence-filter\"') || !pageText.includes('id=\"release-sort-order\"') || !clientText.includes('credentials: \"omit\"') || !clientText.includes('?refresh=1') || !clientText.includes('selectReleases') || !clientText.includes('analysisByItem') || !clientText.includes('providerEvidenceLabel') || !stylesText.includes('@media (max-width: 760px)') || !stylesText.includes('.release-controls') || !stylesText.includes('.item-analysis-badge') || !stylesText.includes('provider-partial') || !page.headers.get('content-security-policy')?.includes(\"default-src 'self'\")) throw new Error('dashboard asset contract mismatch');",
       "  if (/localStor(?:age)|sessionStor(?:age)|document\\.cookie|innerHTML/u.test(clientText)) throw new Error('dashboard client crossed the browser storage or DOM boundary');",
       "  const queryToken = await fetch(endpoint + '?token=' + encodeURIComponent(token));",
       "  const wrong = await fetch(endpoint, { headers: { authorization: 'Bearer synthetic-wrong-access-token-00000001' } });",
@@ -989,9 +990,10 @@ async function packagedMissingInventorySmokeTest() {
       "  const analyzedItems = dashboardModel.selectRows(analyzedRows, { analysis: 'analyzed' });",
       "  const notAnalyzedItems = dashboardModel.selectRows(analyzedRows, { analysis: 'not_analyzed' });",
       "  const matchingPolicy = dashboardModel.selectRows(analyzedRows, { query: 'pt-br', confidence: 'confirmed' });",
+      "  const matchingEvidence = dashboardModel.selectRows(analyzedRows, { requiredCoverage: 'strong', providerEvidence: 'available' });",
       "  const finalCount = Number(await (await fetch(countUrl)).text());",
       "  if (rows.length !== 4 || movies.length !== 2 || after !== 4) throw new Error('packaged local dashboard controls mismatch');",
-      "  if (itemResponse.status !== 200 || cachedItem.status !== 200 || itemBody.status !== 'ready' || itemBody.analysis?.source !== 'computed' || cachedItemBody.analysis?.source !== 'memory_cache' || itemView.state !== 'ready' || itemView.releases.length !== 1 || itemView.releases[0].confidence !== 'confirmed' || acceptedReleases.length !== 1 || rejectedReleases.length !== 0 || itemSummary.state !== 'ready' || itemSummary.bestConfidence !== 'confirmed' || itemSummary.acceptedCount !== 1 || analyzedItems.length !== 1 || notAnalyzedItems.length !== 3 || matchingPolicy.length !== 1 || itemView.analysis.providerRequests !== 1 || finalCount !== 8) throw new Error('packaged item feasibility or local dashboard controls mismatch');",
+      "  if (itemResponse.status !== 200 || cachedItem.status !== 200 || itemBody.status !== 'ready' || itemBody.analysis?.source !== 'computed' || cachedItemBody.analysis?.source !== 'memory_cache' || itemView.state !== 'ready' || itemView.releases.length !== 1 || itemView.releases[0].confidence !== 'confirmed' || acceptedReleases.length !== 1 || rejectedReleases.length !== 0 || itemSummary.state !== 'ready' || itemSummary.bestConfidence !== 'confirmed' || itemSummary.acceptedCount !== 1 || itemSummary.requiredCoverage !== 'strong' || itemSummary.requiredLanguages?.[0]?.confidence !== 'confirmed' || itemSummary.providerEvidence !== 'available' || itemSummary.providerResultCount !== 1 || itemSummary.availableProviderResultCount !== 1 || analyzedItems.length !== 1 || notAnalyzedItems.length !== 3 || matchingPolicy.length !== 1 || matchingEvidence.length !== 1 || itemView.analysis.providerRequests !== 1 || finalCount !== 8) throw new Error('packaged item feasibility or local dashboard controls mismatch');",
       "  const refreshedItem = await fetch(itemEndpoint + '?refresh=1', { headers: { authorization: 'Bearer ' + token } });",
       "  const refreshedItemBody = await refreshedItem.json();",
       "  const refreshedView = dashboardModel.feasibilityView(refreshedItemBody);",
@@ -1025,6 +1027,7 @@ async function packagedMissingInventorySmokeTest() {
     process.stdout.write(`${staleScenario} packaged outage=stale (labeled cached evidence, bounded read-only fallback)\n`);
     process.stdout.write(`${releaseControlsScenario} packaged release controls=local (filtering and sorting, zero extra upstream requests)\n`);
     process.stdout.write(`${analysisControlsScenario} packaged analyzed-item controls=local (safe summaries, confidence and freshness, zero extra upstream requests)\n`);
+    process.stdout.write(`${evidenceControlsScenario} packaged coverage and provider controls=local (accepted releases, honest provider health, zero extra upstream requests)\n`);
   } finally {
     docker(["rm", "--force", appName]);
     docker(["rm", "--force", fixtureName]);

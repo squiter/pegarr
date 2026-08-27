@@ -18,10 +18,14 @@ export function selectRows(rows, options = {}) {
     ? options.analysis
     : "all";
   const confidence = [...confidenceValues, "none"].includes(options.confidence) ? options.confidence : "all";
+  const requiredCoverage = requiredCoverageValues.includes(options.requiredCoverage) ? options.requiredCoverage : "all";
+  const providerEvidence = providerEvidenceValues.includes(options.providerEvidence) ? options.providerEvidence : "all";
   const selected = rows.filter((row) =>
     (kind === "all" || row.kind === kind) &&
     matchesAnalysis(row.analysis, analysis) &&
     matchesSummaryConfidence(row.analysis, confidence) &&
+    matchesRequiredCoverage(row.analysis, requiredCoverage) &&
+    matchesProviderEvidence(row.analysis, providerEvidence) &&
     (!query || rowSearchText(row).includes(query)),
   );
   const sort = options.sort ?? "available-desc";
@@ -48,17 +52,14 @@ export function rowsWithAnalysis(rows, analyses) {
 
 export function itemAnalysisSummary(view) {
   if (!isRecord(view) || typeof view.state !== "string") {
-    return { state: "invalid", bestConfidence: "none", releaseCount: 0, acceptedCount: 0 };
+    return emptyAnalysisSummary("invalid");
   }
   if (view.state !== "ready") {
     const state = ["disabled", "policy_unresolved", "inventory_unavailable", "integration_failure", "not_found"].includes(view.state)
       ? view.state
       : "invalid";
     return {
-      state,
-      bestConfidence: "none",
-      releaseCount: 0,
-      acceptedCount: 0,
+      ...emptyAnalysisSummary(state),
       ...(typeof view.message === "string" ? { message: view.message } : {}),
     };
   }
@@ -70,6 +71,8 @@ export function itemAnalysisSummary(view) {
       ? [{ code: language.code, required: language.required === true }]
       : [])
     : [];
+  const requiredCoverage = summarizeRequiredCoverage(languages, accepted);
+  const providerEvidence = summarizeProviderEvidence(Array.isArray(view.providers) ? view.providers : []);
   return {
     state: analysis.source === "stale_cache" ? "stale" : "ready",
     bestConfidence: accepted[0]?.confidence ?? "none",
@@ -77,7 +80,76 @@ export function itemAnalysisSummary(view) {
     acceptedCount: accepted.length,
     policyName: typeof view.policyName === "string" ? view.policyName : "Resolved Bazarr policy",
     languages,
+    ...requiredCoverage,
+    ...providerEvidence,
     ...(safeTimestamp(analysis.generatedAt) === undefined ? {} : { generatedAt: safeTimestamp(analysis.generatedAt) }),
+  };
+}
+
+function emptyAnalysisSummary(state) {
+  return {
+    state,
+    bestConfidence: "none",
+    releaseCount: 0,
+    acceptedCount: 0,
+    requiredCoverage: "unknown",
+    requiredLanguages: [],
+    providerEvidence: "unknown",
+    providerResultCount: 0,
+    availableProviderResultCount: 0,
+    providerFailures: [],
+  };
+}
+
+function summarizeRequiredCoverage(languages, acceptedReleases) {
+  const required = languages.filter(({ required }) => required);
+  if (required.length === 0) return { requiredCoverage: "no_required_languages", requiredLanguages: [] };
+  if (acceptedReleases.length === 0) {
+    return {
+      requiredCoverage: "no_accepted_release",
+      requiredLanguages: required.map(({ code }) => ({ code, confidence: "unknown" })),
+    };
+  }
+  const requiredLanguages = required.map(({ code }) => {
+    const assessments = acceptedReleases.flatMap(({ languages: releaseLanguages }) =>
+      Array.isArray(releaseLanguages)
+        ? releaseLanguages.filter(({ language }) => language === code).map(({ confidence }) => safeConfidence(confidence))
+        : [],
+    );
+    return { code, confidence: bestLanguageConfidence(assessments) };
+  });
+  const confidences = requiredLanguages.map(({ confidence }) => confidence);
+  const requiredCoverage = confidences.includes("unknown")
+    ? "unknown"
+    : confidences.includes("no_match_found")
+      ? "no_match_found"
+      : confidences.includes("possible")
+        ? "possible"
+        : "strong";
+  return { requiredCoverage, requiredLanguages };
+}
+
+function bestLanguageConfidence(confidences) {
+  for (const confidence of ["confirmed", "likely", "possible"]) {
+    if (confidences.includes(confidence)) return confidence;
+  }
+  if (confidences.includes("unknown") || confidences.length === 0) return "unknown";
+  return "no_match_found";
+}
+
+function summarizeProviderEvidence(providers) {
+  const statuses = providers.flatMap((provider) => isRecord(provider) && typeof provider.status === "string" ? [provider.status] : []);
+  const availableProviderResultCount = statuses.filter((status) => status === "success").length;
+  const providerFailures = [...new Set(statuses.filter((status) => status !== "success"))].toSorted();
+  let providerEvidence = "unknown";
+  if (statuses.length > 0 && availableProviderResultCount === statuses.length) providerEvidence = "available";
+  else if (availableProviderResultCount > 0) providerEvidence = "partial";
+  else if (statuses.length > 0 && statuses.every((status) => providerFailureStatuses.includes(status))) providerEvidence = "unavailable";
+  return {
+    providerEvidence,
+    providerResultCount: statuses.length,
+    availableProviderResultCount,
+    providerFailures,
   };
 }
 
@@ -330,12 +402,26 @@ function matchesSummaryConfidence(summary, confidence) {
   return (summary?.state === "ready" || summary?.state === "stale") && summary.bestConfidence === confidence;
 }
 
+function matchesRequiredCoverage(summary, requiredCoverage) {
+  if (requiredCoverage === "all") return true;
+  return (summary?.state === "ready" || summary?.state === "stale") && summary.requiredCoverage === requiredCoverage;
+}
+
+function matchesProviderEvidence(summary, providerEvidence) {
+  if (providerEvidence === "all") return true;
+  return (summary?.state === "ready" || summary?.state === "stale") && summary.providerEvidence === providerEvidence;
+}
+
 function rowSearchText(row) {
   const policy = row.analysis?.policyName ?? "";
   const languages = Array.isArray(row.analysis?.languages)
     ? row.analysis.languages.map(({ code }) => code).join(" ")
     : "";
-  return `${row.title} ${row.context} ${row.application} ${policy} ${languages}`.toLocaleLowerCase();
+  const requiredLanguages = Array.isArray(row.analysis?.requiredLanguages)
+    ? row.analysis.requiredLanguages.map(({ code, confidence }) => `${code} ${confidence}`).join(" ")
+    : "";
+  const providerFailures = Array.isArray(row.analysis?.providerFailures) ? row.analysis.providerFailures.join(" ") : "";
+  return `${row.title} ${row.context} ${row.application} ${policy} ${languages} ${requiredLanguages} ${providerFailures}`.toLocaleLowerCase();
 }
 
 function compareRowAnalysis(left, right) {
@@ -363,5 +449,8 @@ function isRecord(value) {
 }
 
 const confidenceValues = ["confirmed", "likely", "possible", "no_match_found", "unknown"];
+const requiredCoverageValues = ["strong", "possible", "no_match_found", "unknown", "no_accepted_release", "no_required_languages"];
+const providerEvidenceValues = ["available", "partial", "unavailable", "unknown"];
+const providerFailureStatuses = ["rate_limited", "timeout", "unavailable", "unsupported", "unauthorized", "invalid_response", "unexpected_status"];
 const confidenceRank = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };
 const analysisConfidenceRank = { ...confidenceRank, none: 5, not_analyzed: 6 };

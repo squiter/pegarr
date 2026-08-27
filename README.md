@@ -46,6 +46,8 @@ The current repository foundation includes:
 - an interactive release table that preserves Arr decisions while explaining per-language subtitle confidence and provider state;
 - local release filtering and sorting that reuse the in-memory analysis without new upstream requests;
 - page-memory item summaries with best Arr-accepted confidence, policy/freshness badges, and local attention filters;
+- per-required-language coverage computed only from Arr-accepted releases, with Unknown kept distinct from No match found;
+- provider-evidence health that exposes available, partial, unavailable, and unknown search windows without changing match confidence;
 - transparent analysis timing, provider counts, quota evidence, and separate item/provider cache freshness;
 - bounded, visibly labeled stale item evidence when Arr or Bazarr cannot refresh;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;

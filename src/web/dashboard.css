@@ -225,6 +225,9 @@ button:disabled { cursor: wait; opacity: .55; }
 .item-analysis-badge--confirmed, .item-analysis-badge--likely { color: var(--accent); border-color: rgb(52 211 153 / 45%); }
 .item-analysis-badge--possible, .item-analysis-badge--no_match_found, .item-analysis-badge--stale, .item-analysis-badge--none { color: var(--warning); border-color: rgb(251 191 36 / 45%); }
 .item-analysis-badge--unknown, .item-analysis-badge--disabled, .item-analysis-badge--policy_unresolved, .item-analysis-badge--inventory_unavailable, .item-analysis-badge--integration_failure, .item-analysis-badge--not_found, .item-analysis-badge--invalid { color: var(--danger); border-color: rgb(251 113 133 / 45%); }
+.item-analysis-badge--coverage-strong, .item-analysis-badge--provider-available { color: var(--accent); border-color: rgb(52 211 153 / 45%); }
+.item-analysis-badge--coverage-possible, .item-analysis-badge--coverage-no_match_found, .item-analysis-badge--coverage-no_accepted_release, .item-analysis-badge--coverage-no_required_languages, .item-analysis-badge--provider-partial { color: var(--warning); border-color: rgb(251 191 36 / 45%); }
+.item-analysis-badge--coverage-unknown, .item-analysis-badge--provider-unavailable, .item-analysis-badge--provider-unknown { color: var(--danger); border-color: rgb(251 113 133 / 45%); }
 .item-analysis-detail { min-width: 0; flex: 1 1 12rem; }
 .item-analysis-detail, .item-analysis time { overflow: hidden; color: var(--muted); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
 .item-metadata { display: flex; gap: .75rem; align-items: center; color: var(--muted); font-size: .78rem; }

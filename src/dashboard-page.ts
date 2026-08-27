@@ -86,6 +86,28 @@ export const dashboardPage = `<!doctype html>
             <option value="none">No accepted release</option>
           </select>
         </label>
+        <label for="required-coverage-filter">
+          <span>Required languages</span>
+          <select id="required-coverage-filter">
+            <option value="all">All coverage states</option>
+            <option value="strong">Strong coverage</option>
+            <option value="possible">Possible coverage</option>
+            <option value="no_match_found">No match found</option>
+            <option value="unknown">Unknown</option>
+            <option value="no_accepted_release">No accepted release</option>
+            <option value="no_required_languages">No required languages</option>
+          </select>
+        </label>
+        <label for="provider-evidence-filter">
+          <span>Provider evidence</span>
+          <select id="provider-evidence-filter">
+            <option value="all">All provider states</option>
+            <option value="available">Available</option>
+            <option value="partial">Partial</option>
+            <option value="unavailable">Unavailable</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
         <label for="sort-order">
           <span>Sort</span>
           <select id="sort-order">

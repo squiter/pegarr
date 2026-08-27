@@ -18,6 +18,7 @@ const elements = {
   feasibilityTitle: document.querySelector("#feasibility-title"),
   inventoryList: document.querySelector("#inventory-list"),
   kindFilter: document.querySelector("#kind-filter"),
+  providerEvidenceFilter: document.querySelector("#provider-evidence-filter"),
   refreshButton: document.querySelector("#refresh-button"),
   releaseConfidenceFilter: document.querySelector("#release-confidence-filter"),
   releaseControls: document.querySelector("#release-controls"),
@@ -26,6 +27,7 @@ const elements = {
   releaseTableBody: document.querySelector("#release-table-body"),
   releaseTableWrap: document.querySelector("#release-table-wrap"),
   releaseVisibleCount: document.querySelector("#release-visible-count"),
+  requiredCoverageFilter: document.querySelector("#required-coverage-filter"),
   searchInput: document.querySelector("#search-input"),
   sortOrder: document.querySelector("#sort-order"),
   sourceStatus: document.querySelector("#source-status"),
@@ -57,7 +59,7 @@ elements.accessForm?.addEventListener("submit", async (event) => {
 elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
 elements.feasibilityClose?.addEventListener("click", closeFeasibility);
-for (const control of [elements.searchInput, elements.kindFilter, elements.analysisFilter, elements.bestConfidenceFilter, elements.sortOrder]) {
+for (const control of [elements.searchInput, elements.kindFilter, elements.analysisFilter, elements.bestConfidenceFilter, elements.requiredCoverageFilter, elements.providerEvidenceFilter, elements.sortOrder]) {
   control?.addEventListener("input", renderInventory);
   control?.addEventListener("change", renderInventory);
 }
@@ -131,6 +133,8 @@ function renderInventory() {
     kind: elements.kindFilter?.value,
     analysis: elements.analysisFilter?.value,
     confidence: elements.bestConfidenceFilter?.value,
+    requiredCoverage: elements.requiredCoverageFilter?.value,
+    providerEvidence: elements.providerEvidenceFilter?.value,
     sort: elements.sortOrder?.value,
   });
   elements.inventoryList.replaceChildren(...rows.map(renderItem));
@@ -189,15 +193,29 @@ function renderItemAnalysis(summary) {
   const badgeState = summary.state === "ready" ? summary.bestConfidence : summary.state;
   badge.className = `item-analysis-badge item-analysis-badge--${badgeState}`;
   badge.textContent = analysisBadgeLabel(summary);
+  const coverageBadge = document.createElement("span");
+  coverageBadge.className = `item-analysis-badge item-analysis-badge--coverage-${summary.requiredCoverage}`;
+  coverageBadge.textContent = requiredCoverageLabel(summary.requiredCoverage);
+  const providerBadge = document.createElement("span");
+  providerBadge.className = `item-analysis-badge item-analysis-badge--provider-${summary.providerEvidence}`;
+  providerBadge.textContent = providerEvidenceLabel(summary.providerEvidence);
   const detail = document.createElement("span");
   detail.className = "item-analysis-detail";
   if (summary.state === "ready" || summary.state === "stale") {
-    const languages = (summary.languages ?? []).map(({ code, required }) => `${code}${required ? " required" : ""}`).join(", ");
-    detail.textContent = [summary.policyName, languages, `${summary.acceptedCount} of ${summary.releaseCount} releases accepted by Arr`].filter(Boolean).join(" · ");
+    const requiredLanguages = (summary.requiredLanguages ?? []).map(({ code, confidence }) => `${code} ${confidenceLabel(confidence)}`).join(", ");
+    const providerCount = summary.providerResultCount === 0
+      ? "No provider search result"
+      : `${summary.availableProviderResultCount} of ${summary.providerResultCount} provider searches available`;
+    const providerFailures = (summary.providerFailures ?? []).length > 0
+      ? `Issues: ${summary.providerFailures.map(confidenceLabel).join(", ")}`
+      : "";
+    detail.textContent = [summary.policyName, requiredLanguages, providerCount, providerFailures, `${summary.acceptedCount} of ${summary.releaseCount} releases accepted by Arr`].filter(Boolean).join(" · ");
   } else {
     detail.textContent = summary.message ?? "The analysis needs attention before Pegarr can compare releases.";
   }
-  analysis.append(badge, detail);
+  analysis.append(badge);
+  if (summary.state === "ready" || summary.state === "stale") analysis.append(coverageBadge, providerBadge);
+  analysis.append(detail);
   if (summary.generatedAt) {
     const generated = document.createElement("time");
     generated.dateTime = summary.generatedAt;
@@ -205,6 +223,28 @@ function renderItemAnalysis(summary) {
     analysis.append(generated);
   }
   return analysis;
+}
+
+function requiredCoverageLabel(value) {
+  const labels = {
+    strong: "Required coverage strong",
+    possible: "Required coverage possible",
+    no_match_found: "Required no match",
+    unknown: "Required coverage unknown",
+    no_accepted_release: "Required coverage unavailable",
+    no_required_languages: "No required languages",
+  };
+  return labels[value] ?? "Required coverage unknown";
+}
+
+function providerEvidenceLabel(value) {
+  const labels = {
+    available: "Providers available",
+    partial: "Provider evidence partial",
+    unavailable: "Providers unavailable",
+    unknown: "Provider evidence unknown",
+  };
+  return labels[value] ?? "Provider evidence unknown";
 }
 
 function analysisBadgeLabel(summary) {

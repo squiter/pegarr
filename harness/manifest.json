@@ -833,6 +833,30 @@
       "title": "Packaged item summaries and dashboard analysis controls cause no upstream requests",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Packaged assets and pure summary selection on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-DASH-011",
+      "title": "Required-language coverage uses only Arr-accepted releases and preserves Unknown",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure summary mapping over sanitized accepted, rejected, missing, and unknown language evidence"
+    },
+    {
+      "id": "PEG-DASH-012",
+      "title": "Provider-evidence health distinguishes available, partial, unavailable, and unknown",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure summary mapping over safe synthetic provider statuses"
+    },
+    {
+      "id": "PEG-DASH-013",
+      "title": "Required-language and provider-health controls remain page-memory-only assets",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process HTML, CSS, JavaScript, and storage-boundary inspection"
+    },
+    {
+      "id": "PEG-DOCKER-018",
+      "title": "Packaged required-language and provider-health controls cause no upstream requests",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Packaged assets and pure evidence selection on an internal-only Docker network"
     }
   ],
   "manualGaps": [

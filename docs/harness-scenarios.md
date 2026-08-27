@@ -144,6 +144,10 @@
 | PEG-DASH-009 | Analyzed-item filtering and ordering are deterministic page-memory operations | `src/dashboard-model.test.ts` |
 | PEG-DASH-010 | Analyzed-item cards and controls remain page-memory-only assets | `src/app.test.ts` |
 | PEG-DOCKER-017 | Packaged item summaries and dashboard analysis controls cause no upstream requests | `scripts/harness/docker-build.mjs` |
+| PEG-DASH-011 | Required-language coverage uses only Arr-accepted releases and preserves Unknown | `src/dashboard-model.test.ts` |
+| PEG-DASH-012 | Provider-evidence health distinguishes available, partial, unavailable, and unknown | `src/dashboard-model.test.ts` |
+| PEG-DASH-013 | Required-language and provider-health controls remain page-memory-only assets | `src/app.test.ts` |
+| PEG-DOCKER-018 | Packaged required-language and provider-health controls cause no upstream requests | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 
