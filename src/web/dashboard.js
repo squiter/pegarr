@@ -1,4 +1,4 @@
-import { feasibilityView, rowsFromInventory, selectRows } from "/assets/dashboard-model.js";
+import { feasibilityView, rowsFromInventory, selectReleases, selectRows } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -17,8 +17,13 @@ const elements = {
   inventoryList: document.querySelector("#inventory-list"),
   kindFilter: document.querySelector("#kind-filter"),
   refreshButton: document.querySelector("#refresh-button"),
+  releaseConfidenceFilter: document.querySelector("#release-confidence-filter"),
+  releaseControls: document.querySelector("#release-controls"),
+  releaseDecisionFilter: document.querySelector("#release-decision-filter"),
+  releaseSortOrder: document.querySelector("#release-sort-order"),
   releaseTableBody: document.querySelector("#release-table-body"),
   releaseTableWrap: document.querySelector("#release-table-wrap"),
+  releaseVisibleCount: document.querySelector("#release-visible-count"),
   searchInput: document.querySelector("#search-input"),
   sortOrder: document.querySelector("#sort-order"),
   sourceStatus: document.querySelector("#source-status"),
@@ -30,6 +35,7 @@ const elements = {
 let accessToken;
 let inventoryRows = [];
 let selectedRow;
+let activeFeasibility;
 const feasibilityCache = new Map();
 
 elements.accessForm?.addEventListener("submit", async (event) => {
@@ -50,6 +56,9 @@ elements.feasibilityClose?.addEventListener("click", closeFeasibility);
 for (const control of [elements.searchInput, elements.kindFilter, elements.sortOrder]) {
   control?.addEventListener("input", renderInventory);
   control?.addEventListener("change", renderInventory);
+}
+for (const control of [elements.releaseDecisionFilter, elements.releaseConfidenceFilter, elements.releaseSortOrder]) {
+  control?.addEventListener("change", renderReleaseSelection);
 }
 
 async function loadInventory() {
@@ -162,13 +171,17 @@ function renderItem(row) {
 }
 
 async function loadFeasibility(row, refresh = false) {
+  const changedItem = selectedRow?.key !== row.key;
   selectedRow = row;
+  activeFeasibility = undefined;
+  if (changedItem) resetReleaseControls();
   elements.feasibilityPanel.hidden = false;
   elements.feasibilityTitle.textContent = row.title;
   elements.feasibilityContext.textContent = row.context;
   elements.feasibilitySummary.replaceChildren();
   elements.releaseTableBody.replaceChildren();
   elements.releaseTableWrap.hidden = true;
+  elements.releaseControls.hidden = true;
   const cached = refresh ? undefined : feasibilityCache.get(row.key);
   if (cached !== undefined) {
     renderFeasibility(cached);
@@ -208,7 +221,9 @@ async function loadFeasibility(row, refresh = false) {
 
 function renderFeasibility(view) {
   if (view.state !== "ready") {
+    activeFeasibility = undefined;
     elements.feasibilitySummary.replaceChildren();
+    elements.releaseControls.hidden = true;
     elements.releaseTableWrap.hidden = true;
     setFeasibilityNotice(view.message, view.state === "policy_unresolved" ? "warning" : "error");
     return;
@@ -278,19 +293,39 @@ function renderFeasibility(view) {
     return card;
   }));
   elements.feasibilitySummary.replaceChildren(policy, analysis, providers);
-  elements.releaseTableBody.replaceChildren(...view.releases.map(renderRelease));
-  elements.releaseTableWrap.hidden = false;
+  activeFeasibility = view;
+  elements.releaseControls.hidden = view.releases.length === 0;
+  renderReleaseSelection();
+}
+
+function renderReleaseSelection() {
+  const view = activeFeasibility;
+  if (view === undefined) return;
+  const releases = selectReleases(view.releases, {
+    decision: elements.releaseDecisionFilter?.value,
+    confidence: elements.releaseConfidenceFilter?.value,
+    sort: elements.releaseSortOrder?.value,
+  });
+  elements.releaseTableBody.replaceChildren(...releases.map(renderRelease));
+  elements.releaseTableWrap.hidden = releases.length === 0;
+  elements.releaseVisibleCount.textContent = `${releases.length} of ${view.releases.length} ${view.releases.length === 1 ? "release" : "releases"} shown`;
   const stale = view.analysis.source === "stale_cache";
   const unavailable = view.analysis.unavailableIntegrations.length > 0
     ? view.analysis.unavailableIntegrations.map(capitalize).join(" and ")
     : "an integration";
   setFeasibilityNotice(
     stale
-      ? `${view.releases.length} cached release ${view.releases.length === 1 ? "candidate" : "candidates"} shown because ${unavailable} could not refresh. This evidence is not current.`
+      ? releases.length === 0
+        ? `No cached release candidates match these local filters. ${unavailable} could not refresh, so the underlying evidence is not current.`
+        : `${releases.length}${releases.length === view.releases.length ? "" : ` of ${view.releases.length}`} cached release ${releases.length === 1 ? "candidate" : "candidates"} shown because ${unavailable} could not refresh. This evidence is not current.`
       : view.releases.length === 0
       ? "The Arr search returned no release candidates."
-      : `${view.releases.length} release ${view.releases.length === 1 ? "candidate" : "candidates"} evaluated. Video and subtitle decisions remain separate.`,
-    stale || view.releases.length === 0 ? "warning" : "success",
+      : releases.length === 0
+        ? `No release candidates match these local filters. ${view.releases.length} ${view.releases.length === 1 ? "candidate remains" : "candidates remain"} in the analysis.`
+        : releases.length === view.releases.length
+          ? `${releases.length} release ${releases.length === 1 ? "candidate" : "candidates"} evaluated. Video and subtitle decisions remain separate.`
+          : `${releases.length} of ${view.releases.length} release candidates shown. These filters are local and make no new provider requests.`,
+    stale || view.releases.length === 0 || releases.length === 0 ? "warning" : "success",
   );
 }
 
@@ -356,9 +391,17 @@ function renderRelease(row) {
 
 function closeFeasibility() {
   selectedRow = undefined;
+  activeFeasibility = undefined;
   elements.feasibilityPanel.hidden = true;
   elements.releaseTableBody.replaceChildren();
+  elements.releaseControls.hidden = true;
   elements.feasibilitySummary.replaceChildren();
+}
+
+function resetReleaseControls() {
+  elements.releaseDecisionFilter.value = "all";
+  elements.releaseConfidenceFilter.value = "all";
+  elements.releaseSortOrder.value = "recommended";
 }
 
 function setFeasibilityNotice(message, state) {

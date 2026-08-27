@@ -34,6 +34,11 @@ export interface FeasibilityReleaseRow {
   }[];
 }
 
+export function selectReleases(
+  rows: readonly FeasibilityReleaseRow[],
+  options: { readonly decision?: string; readonly confidence?: string; readonly sort?: string },
+): readonly FeasibilityReleaseRow[];
+
 export type FeasibilityView =
   | { readonly state: "ready"; readonly title: string; readonly context: string; readonly policyName: string; readonly languages: readonly { readonly code: string; readonly required: boolean }[]; readonly providers: readonly { readonly provider: string; readonly status: string; readonly detail: string; readonly cacheStatus?: "hit" | "miss"; readonly cachedAt?: string; readonly cacheExpiresAt?: string; readonly quota: { readonly remaining?: number; readonly limit?: number; readonly resetAtEpochSeconds?: number } }[]; readonly releases: readonly FeasibilityReleaseRow[]; readonly analysis: { readonly source: "computed" | "memory_cache" | "stale_cache"; readonly generatedAt?: string; readonly expiresAt?: string; readonly staleUntil?: string; readonly refreshFailure?: "inventory_unavailable" | "integration_failure" | "unexpected_failure"; readonly unavailableIntegrations: readonly ("sonarr" | "radarr" | "bazarr" | "subdl")[]; readonly elapsedMs: number; readonly arrRequests: number; readonly bazarrRequests: number; readonly providerRequests: number } }
   | { readonly state: "invalid" | "disabled" | "policy_unresolved" | "inventory_unavailable" | "integration_failure" | "not_found"; readonly message: string };

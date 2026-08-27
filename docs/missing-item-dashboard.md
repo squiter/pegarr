@@ -17,6 +17,8 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Selecting an item opens its interactive release table and requests one protected read-only feasibility report.
 - Video acceptance and Arr rejection reasons remain separate from subtitle confidence.
 - Each release exposes per-language confidence, contributing provider count, provider state, matching evidence, and warnings.
+- Release controls filter by Arr decision or subtitle confidence and sort by the combined decision order, subtitle confidence, custom-format score, or title.
+- Release filtering and sorting operate only on the analysis already in page memory. They never repeat Arr, Bazarr, or provider requests, and rejected releases remain available through the Arr-decision filter.
 - Analysis timing and safe Arr, Bazarr, and provider request counts stay visible beside provider quota and cache timestamps.
 - Successful item views are reused in page memory. An explicit refresh re-reads Arr and Bazarr while retaining the stable provider-language cache window.
 - If a transient Arr or Bazarr failure prevents refresh, the last successful in-process report remains available for a bounded period with a prominent stale warning, original generation time, expiry, and affected integration names.
@@ -30,4 +32,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-006`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-015` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-007`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-016` are the deterministic evidence for this page.

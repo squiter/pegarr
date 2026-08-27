@@ -797,6 +797,18 @@
       "title": "Packaged integration outage retains a labeled stale read-only report",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Synthetic integration outage on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-DASH-007",
+      "title": "Release filtering and sorting stay local while preserving Arr decisions",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure selection over sanitized in-memory release rows"
+    },
+    {
+      "id": "PEG-DOCKER-016",
+      "title": "Packaged release controls make no additional upstream requests",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Packaged assets and pure release selection on an internal-only Docker network"
     }
   ],
   "manualGaps": [

@@ -138,6 +138,8 @@
 | PEG-ITEM-006 | Transient integration failures use a bounded labeled stale report | `src/item-feasibility.test.ts` |
 | PEG-DASH-006 | Stale analysis stays visibly distinct from fresh evidence | `src/dashboard-model.test.ts` |
 | PEG-DOCKER-015 | Packaged integration outage retains labeled stale evidence | `scripts/harness/docker-build.mjs` |
+| PEG-DASH-007 | Release filtering and sorting stay local while preserving Arr decisions | `src/dashboard-model.test.ts` |
+| PEG-DOCKER-016 | Packaged release controls make no additional upstream requests | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

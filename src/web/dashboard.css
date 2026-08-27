@@ -257,6 +257,18 @@ button:disabled { cursor: wait; opacity: .55; }
 .feasibility-notice[data-state="success"] { color: var(--accent); }
 .feasibility-notice[data-state="warning"] { color: var(--warning); }
 .feasibility-notice[data-state="error"] { color: var(--danger); }
+.release-controls {
+  display: grid;
+  grid-template-columns: minmax(10rem, .8fr) minmax(12rem, 1fr) minmax(15rem, 1.2fr) auto;
+  gap: .8rem;
+  align-items: end;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  background: rgb(7 16 15 / 45%);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+.release-visible-count { align-self: center; margin: 1.15rem 0 0; color: var(--muted); font-size: .78rem; white-space: nowrap; }
 .release-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 1rem; }
 .release-table { width: 100%; min-width: 860px; border-collapse: collapse; }
 .release-table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -297,6 +309,8 @@ footer {
   .analysis-summary--stale { padding: .75rem; border: 1px solid rgb(251 191 36 / 35%); }
   .provider-summary { justify-content: flex-start; }
   .provider-card { justify-items: start; }
+  .release-controls { grid-template-columns: 1fr; }
+  .release-visible-count { margin-top: 0; }
   .feasibility-actions { width: 100%; }
   .feasibility-actions button { flex: 1; }
   .release-table { min-width: 0; }

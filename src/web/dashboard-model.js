@@ -27,6 +27,36 @@ export function selectRows(rows, options = {}) {
   });
 }
 
+export function selectReleases(rows, options = {}) {
+  const decision = options.decision === "accepted" || options.decision === "rejected"
+    ? options.decision
+    : "all";
+  const confidence = confidenceValues.includes(options.confidence) ? options.confidence : "all";
+  const selected = rows.filter((row) =>
+    (decision === "all" || (decision === "accepted") === row.downloadAllowed) &&
+    (confidence === "all" || row.confidence === confidence),
+  );
+  const sort = options.sort ?? "recommended";
+  return selected.toSorted((left, right) => {
+    if (sort === "title-asc") return left.title.localeCompare(right.title) || left.id.localeCompare(right.id);
+    if (sort === "custom-format-desc") {
+      return right.customFormatScore - left.customFormatScore
+        || compareVideoDecision(left, right)
+        || compareConfidence(left, right)
+        || left.title.localeCompare(right.title)
+        || left.id.localeCompare(right.id);
+    }
+    if (sort === "confidence-desc") {
+      return compareConfidence(left, right)
+        || compareVideoDecision(left, right)
+        || right.customFormatScore - left.customFormatScore
+        || left.title.localeCompare(right.title)
+        || left.id.localeCompare(right.id);
+    }
+    return compareReleases(left, right);
+  });
+}
+
 export function feasibilityView(value) {
   if (!isRecord(value) || value.kind !== "item-feasibility" || typeof value.status !== "string") {
     return { state: "invalid", message: "Pegarr returned an unreadable feasibility report." };
@@ -211,15 +241,24 @@ function safeTimestamp(value) {
 }
 
 function safeConfidence(value) {
-  return ["confirmed", "likely", "possible", "no_match_found", "unknown"].includes(value) ? value : "unknown";
+  return confidenceValues.includes(value) ? value : "unknown";
 }
 
 function compareReleases(left, right) {
-  if (left.downloadAllowed !== right.downloadAllowed) return left.downloadAllowed ? -1 : 1;
-  const confidence = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };
-  return confidence[left.confidence] - confidence[right.confidence]
+  return compareVideoDecision(left, right)
+    || compareConfidence(left, right)
     || right.customFormatScore - left.customFormatScore
-    || left.title.localeCompare(right.title);
+    || left.title.localeCompare(right.title)
+    || left.id.localeCompare(right.id);
+}
+
+function compareVideoDecision(left, right) {
+  if (left.downloadAllowed === right.downloadAllowed) return 0;
+  return left.downloadAllowed ? -1 : 1;
+}
+
+function compareConfidence(left, right) {
+  return confidenceRank[left.confidence] - confidenceRank[right.confidence];
 }
 
 function episodeLabel(season, episode) {
@@ -230,3 +269,6 @@ function episodeLabel(season, episode) {
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+const confidenceValues = ["confirmed", "likely", "possible", "no_match_found", "unknown"];
+const confidenceRank = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };

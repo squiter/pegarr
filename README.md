@@ -44,6 +44,7 @@ The current repository foundation includes:
 - a responsive missing-item dashboard with memory-only authentication and local search, filtering, and sorting;
 - authenticated episode and movie selection routes that derive private matching identity from server-owned inventory;
 - an interactive release table that preserves Arr decisions while explaining per-language subtitle confidence and provider state;
+- local release filtering and sorting that reuse the in-memory analysis without new upstream requests;
 - transparent analysis timing, provider counts, quota evidence, and separate item/provider cache freshness;
 - bounded, visibly labeled stale item evidence when Arr or Bazarr cannot refresh;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;

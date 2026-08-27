@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { feasibilityView, rowsFromInventory, selectRows } from "./web/dashboard-model.js";
+import { feasibilityView, rowsFromInventory, selectReleases, selectRows } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -199,6 +199,34 @@ test("PEG-DASH-006 stale analysis remains visibly distinct from fresh evidence",
   });
   assert.equal(view.releases.length, 4);
   assert.doesNotMatch(JSON.stringify(view), /private-upstream/iu);
+});
+
+test("PEG-DASH-007 release filtering and sorting stay local and preserve Arr decisions", () => {
+  const view = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    selection: { application: "sonarr", kind: "episode", itemId: 305 },
+    report: buildFeasibilityReport(demoFeasibilityInput),
+    metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 2, elapsedMs: 5 },
+  });
+
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  const originalOrder = view.releases.map(({ id }) => id);
+  const rejected = selectReleases(view.releases, { decision: "rejected" });
+  const confirmed = selectReleases(view.releases, { confidence: "confirmed" });
+  const byCustomFormat = selectReleases(view.releases, { sort: "custom-format-desc" });
+  const byTitle = selectReleases(view.releases, { sort: "title-asc" });
+
+  assert.ok(rejected.length > 0);
+  assert.ok(rejected.every(({ downloadAllowed, rejectionReasons }) => !downloadAllowed && rejectionReasons.length > 0));
+  assert.ok(confirmed.length > 0);
+  assert.ok(confirmed.every(({ confidence }) => confidence === "confirmed"));
+  assert.ok(byCustomFormat.every((release, index) => index === 0 || byCustomFormat[index - 1]!.customFormatScore >= release.customFormatScore));
+  assert.deepEqual(byTitle.map(({ title }) => title), byTitle.map(({ title }) => title).toSorted((left, right) => left.localeCompare(right)));
+  assert.deepEqual(view.releases.map(({ id }) => id), originalOrder);
+  assert.deepEqual(selectReleases(view.releases, { decision: "unsafe", confidence: "unsafe", sort: "unsafe" }), view.releases);
 });
 
 test("PEG-DASH-002 search, filtering, and sorting are pure local operations", () => {

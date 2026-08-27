@@ -770,6 +770,7 @@ async function packagedMissingInventorySmokeTest() {
   const selectionScenario = "PEG-DOCKER-013";
   const refreshScenario = "PEG-DOCKER-014";
   const staleScenario = "PEG-DOCKER-015";
+  const releaseControlsScenario = "PEG-DOCKER-016";
   const suffix = `${process.pid}`;
   const networkName = `pegarr-harness-inventory-internal-${suffix}`;
   const fixtureName = `pegarr-harness-inventory-${suffix}`;
@@ -955,7 +956,7 @@ async function packagedMissingInventorySmokeTest() {
       "(async () => {",
       "  const [page, client, modelResponse, styles] = await Promise.all([fetch(app + '/'), fetch(app + '/assets/dashboard.js'), fetch(app + '/assets/dashboard-model.js'), fetch(app + '/assets/dashboard.css')]);",
       "  const [pageText, clientText, modelText, stylesText] = await Promise.all([page.text(), client.text(), modelResponse.text(), styles.text()]);",
-      "  if (![page, client, modelResponse, styles].every((response) => response.status === 200) || !pageText.includes('id=\"inventory-list\"') || !clientText.includes('credentials: \"omit\"') || !clientText.includes('?refresh=1') || !stylesText.includes('@media (max-width: 760px)') || !page.headers.get('content-security-policy')?.includes(\"default-src 'self'\")) throw new Error('dashboard asset contract mismatch');",
+      "  if (![page, client, modelResponse, styles].every((response) => response.status === 200) || !pageText.includes('id=\"inventory-list\"') || !pageText.includes('id=\"release-decision-filter\"') || !pageText.includes('id=\"release-confidence-filter\"') || !pageText.includes('id=\"release-sort-order\"') || !clientText.includes('credentials: \"omit\"') || !clientText.includes('?refresh=1') || !clientText.includes('selectReleases') || !stylesText.includes('@media (max-width: 760px)') || !stylesText.includes('.release-controls') || !page.headers.get('content-security-policy')?.includes(\"default-src 'self'\")) throw new Error('dashboard asset contract mismatch');",
       "  if (/localStor(?:age)|sessionStor(?:age)|document\\.cookie|innerHTML/u.test(clientText)) throw new Error('dashboard client crossed the browser storage or DOM boundary');",
       "  const queryToken = await fetch(endpoint + '?token=' + encodeURIComponent(token));",
       "  const wrong = await fetch(endpoint, { headers: { authorization: 'Bearer synthetic-wrong-access-token-00000001' } });",
@@ -980,9 +981,11 @@ async function packagedMissingInventorySmokeTest() {
       "  const cachedItem = await fetch(itemEndpoint, { headers: { authorization: 'Bearer ' + token } });",
       "  const cachedItemBody = await cachedItem.json();",
       "  const itemView = dashboardModel.feasibilityView(itemBody);",
+      "  const acceptedReleases = dashboardModel.selectReleases(itemView.releases, { decision: 'accepted', sort: 'custom-format-desc' });",
+      "  const rejectedReleases = dashboardModel.selectReleases(itemView.releases, { decision: 'rejected' });",
       "  const finalCount = Number(await (await fetch(countUrl)).text());",
       "  if (rows.length !== 4 || movies.length !== 2 || after !== 4) throw new Error('packaged local dashboard controls mismatch');",
-      "  if (itemResponse.status !== 200 || cachedItem.status !== 200 || itemBody.status !== 'ready' || itemBody.analysis?.source !== 'computed' || cachedItemBody.analysis?.source !== 'memory_cache' || itemView.state !== 'ready' || itemView.releases.length !== 1 || itemView.releases[0].confidence !== 'confirmed' || itemView.analysis.providerRequests !== 1 || finalCount !== 8) throw new Error('packaged item feasibility mismatch');",
+      "  if (itemResponse.status !== 200 || cachedItem.status !== 200 || itemBody.status !== 'ready' || itemBody.analysis?.source !== 'computed' || cachedItemBody.analysis?.source !== 'memory_cache' || itemView.state !== 'ready' || itemView.releases.length !== 1 || itemView.releases[0].confidence !== 'confirmed' || acceptedReleases.length !== 1 || rejectedReleases.length !== 0 || itemView.analysis.providerRequests !== 1 || finalCount !== 8) throw new Error('packaged item feasibility or local release controls mismatch');",
       "  const refreshedItem = await fetch(itemEndpoint + '?refresh=1', { headers: { authorization: 'Bearer ' + token } });",
       "  const refreshedItemBody = await refreshedItem.json();",
       "  const refreshedView = dashboardModel.feasibilityView(refreshedItemBody);",
@@ -1014,6 +1017,7 @@ async function packagedMissingInventorySmokeTest() {
     process.stdout.write(`${selectionScenario} packaged item analysis=ready (authenticated, cached, one provider window, no Grab)\n`);
     process.stdout.write(`${refreshScenario} packaged refresh=ready (Arr/Bazarr refreshed, provider window reused)\n`);
     process.stdout.write(`${staleScenario} packaged outage=stale (labeled cached evidence, bounded read-only fallback)\n`);
+    process.stdout.write(`${releaseControlsScenario} packaged release controls=local (filtering and sorting, zero extra upstream requests)\n`);
   } finally {
     docker(["rm", "--force", appName]);
     docker(["rm", "--force", fixtureName]);

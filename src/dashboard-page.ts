@@ -95,6 +95,37 @@ export const dashboardPage = `<!doctype html>
         </div>
       </div>
       <div id="feasibility-summary" class="feasibility-summary"></div>
+      <div id="release-controls" class="release-controls" aria-label="Release controls" hidden>
+        <label for="release-decision-filter">
+          <span>Arr decision</span>
+          <select id="release-decision-filter">
+            <option value="all">All decisions</option>
+            <option value="accepted">Accepted</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </label>
+        <label for="release-confidence-filter">
+          <span>Subtitle confidence</span>
+          <select id="release-confidence-filter">
+            <option value="all">All confidence levels</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="likely">Likely</option>
+            <option value="possible">Possible</option>
+            <option value="no_match_found">No match found</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
+        <label for="release-sort-order">
+          <span>Sort</span>
+          <select id="release-sort-order">
+            <option value="recommended">Arr decision, then confidence</option>
+            <option value="confidence-desc">Subtitle confidence</option>
+            <option value="custom-format-desc">Custom format score</option>
+            <option value="title-asc">Release title A–Z</option>
+          </select>
+        </label>
+        <p id="release-visible-count" class="release-visible-count"></p>
+      </div>
       <div id="feasibility-notice" class="feasibility-notice" role="status" aria-live="polite"></div>
       <div id="release-table-wrap" class="release-table-wrap" hidden>
         <table class="release-table">
