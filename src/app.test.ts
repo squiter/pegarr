@@ -274,6 +274,22 @@ test("PEG-DASH-019 richer release controls and shortlist remain page-memory-only
   assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
 
+test("PEG-DASH-025 policy semantics, language fit, and leading candidate remain page-memory-only assets", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, model.body, styles.body].join("\n");
+
+  assert.match(String(page.body), /release-required-fit-filter|release-language-filter|release-language-confidence-filter/u);
+  assert.match(String(page.body), /Decision support only|Leading Arr-accepted candidate|does not Grab/u);
+  assert.match(String(client.body), /policyLanguageChip|populatePolicyLanguageFilter|renderLeadingRelease|requiredFitLabel/u);
+  assert.match(String(model.body), /policySource|requiredLanguageFit|matchesLanguageAssessment|leadingRelease/u);
+  assert.match(String(styles.body), /policy-language-chip|required-fit-badge|release-leading/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
+  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
+});
+
 function fakeServices(
   readMissingInventory: RuntimeServices["readMissingInventory"],
 ): RuntimeServices {

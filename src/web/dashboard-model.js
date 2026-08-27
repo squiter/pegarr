@@ -160,10 +160,19 @@ export function selectReleases(rows, options = {}) {
     : "all";
   const confidence = confidenceValues.includes(options.confidence) ? options.confidence : "all";
   const protocol = releaseProtocols.includes(options.protocol) ? options.protocol : "all";
+  const requiredFit = requiredFitValues.includes(options.requiredFit) ? options.requiredFit : "all";
+  const language = typeof options.language === "string" && options.language.trim()
+    ? options.language.trim().toLocaleLowerCase()
+    : "all";
+  const languageConfidence = confidenceValues.includes(options.languageConfidence)
+    ? options.languageConfidence
+    : "all";
   const selected = rows.filter((row) =>
     (decision === "all" || (decision === "accepted") === row.downloadAllowed) &&
     (confidence === "all" || row.confidence === confidence) &&
     (protocol === "all" || row.protocol.toLocaleLowerCase() === protocol) &&
+    (requiredFit === "all" || row.requiredFit === requiredFit) &&
+    matchesLanguageAssessment(row.languages, language, languageConfidence) &&
     (!query || releaseSearchText(row).includes(query)),
   );
   const sort = options.sort ?? "recommended";
@@ -205,6 +214,10 @@ export function selectReleases(rows, options = {}) {
   });
 }
 
+export function leadingRelease(rows) {
+  return selectReleases(rows, { decision: "accepted", sort: "recommended" })[0];
+}
+
 export function shortlistedReleases(rows, releaseIds) {
   if (!Array.isArray(releaseIds)) return [];
   const byId = new Map(rows.map((row) => [row.id, row]));
@@ -237,7 +250,14 @@ export function feasibilityView(value) {
     : Number.isSafeInteger(item.year) ? String(item.year) : item.kind === "movie" ? "Movie" : "Item";
   const languages = Array.isArray(policy.languages)
     ? policy.languages.flatMap((language) => isRecord(language) && typeof language.code === "string"
-      ? [{ code: language.code, required: language.required === true }]
+      ? [{
+          code: language.code,
+          required: language.required === true,
+          forced: language.forced === true,
+          hearingImpaired: hearingImpairedValues.includes(language.hearingImpaired) ? language.hearingImpaired : "either",
+          ...(applicabilityValues.includes(language.applicability) ? { applicability: language.applicability } : {}),
+          ...(typeof language.cutoff === "boolean" ? { cutoff: language.cutoff } : {}),
+        }]
       : [])
     : [];
   const providers = Array.isArray(value.report.providerStatus)
@@ -257,6 +277,7 @@ export function feasibilityView(value) {
     title,
     context,
     policyName: typeof policy.profileName === "string" ? policy.profileName : "Resolved Bazarr policy",
+    policySource: policy.source === "bazarr" || policy.source === "explicit_default" ? policy.source : "unknown",
     languages,
     providers,
     releases,
@@ -356,7 +377,18 @@ function releaseView(value) {
     ...(typeof traits.edition === "string" ? { edition: traits.edition } : {}),
     confidence: safeConfidence(value.subtitle.confidence),
     languages,
+    requiredFit: requiredLanguageFit(languages),
   }];
+}
+
+function requiredLanguageFit(languages) {
+  const required = languages.filter(({ required }) => required);
+  if (required.length === 0) return "no_required_languages";
+  const confidences = required.map(({ confidence }) => confidence);
+  if (confidences.includes("unknown")) return "unknown";
+  if (confidences.includes("no_match_found")) return "no_match_found";
+  if (confidences.includes("possible")) return "possible";
+  return "strong";
 }
 
 function languageView(value) {
@@ -462,6 +494,14 @@ function releaseSearchText(row) {
   ].filter(Boolean).join(" ").toLocaleLowerCase();
 }
 
+function matchesLanguageAssessment(languages, language, confidence) {
+  const targeted = language === "all"
+    ? languages
+    : languages.filter(({ language: code }) => code.toLocaleLowerCase() === language);
+  return (language === "all" || targeted.length > 0) &&
+    (confidence === "all" || targeted.some((assessment) => assessment.confidence === confidence));
+}
+
 function matchesAnalysis(summary, filter) {
   if (filter === "all") return true;
   if (filter === "not_analyzed") return summary === undefined;
@@ -528,6 +568,9 @@ const requiredCoverageValues = ["strong", "possible", "no_match_found", "unknown
 const providerEvidenceValues = ["available", "partial", "unavailable", "unknown"];
 const providerFailureStatuses = ["rate_limited", "timeout", "unavailable", "unsupported", "unauthorized", "invalid_response", "unexpected_status"];
 const releaseProtocols = ["torrent", "usenet"];
+const hearingImpairedValues = ["required", "prefer", "avoid", "either"];
+const applicabilityValues = ["always", "audio_matches", "audio_does_not_match"];
+const requiredFitValues = ["strong", "possible", "no_match_found", "unknown", "no_required_languages"];
 const maximumShortlistSize = 3;
 const confidenceRank = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };
 const analysisConfidenceRank = { ...confidenceRank, none: 5, not_analyzed: 6 };

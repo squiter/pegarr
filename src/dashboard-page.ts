@@ -173,6 +173,34 @@ export const dashboardPage = `<!doctype html>
             <option value="usenet">Usenet</option>
           </select>
         </label>
+        <label for="release-required-fit-filter">
+          <span>Required-language fit</span>
+          <select id="release-required-fit-filter">
+            <option value="all">All required-language fits</option>
+            <option value="strong">Strong fit</option>
+            <option value="possible">Possible fit</option>
+            <option value="no_match_found">No match found</option>
+            <option value="unknown">Unknown</option>
+            <option value="no_required_languages">No required languages</option>
+          </select>
+        </label>
+        <label for="release-language-filter">
+          <span>Policy language</span>
+          <select id="release-language-filter">
+            <option value="all">All policy languages</option>
+          </select>
+        </label>
+        <label for="release-language-confidence-filter">
+          <span>Language confidence</span>
+          <select id="release-language-confidence-filter">
+            <option value="all">All language confidence</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="likely">Likely</option>
+            <option value="possible">Possible</option>
+            <option value="no_match_found">No match found</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
         <label for="release-sort-order">
           <span>Sort</span>
           <select id="release-sort-order">
@@ -188,6 +216,17 @@ export const dashboardPage = `<!doctype html>
         </label>
         <p id="release-visible-count" class="release-visible-count"></p>
       </div>
+      <section id="release-leading" class="release-leading" aria-labelledby="release-leading-heading" hidden>
+        <div>
+          <p class="eyebrow">Decision support only</p>
+          <strong id="release-leading-heading">Leading Arr-accepted candidate</strong>
+          <span>Recommended ordering keeps Arr acceptance first. Pegarr does not Grab in this phase.</span>
+        </div>
+        <div class="release-leading-result">
+          <strong id="release-leading-title"></strong>
+          <span id="release-leading-detail"></span>
+        </div>
+      </section>
       <section id="release-shortlist" class="release-shortlist" aria-labelledby="release-shortlist-title" hidden>
         <div>
           <strong id="release-shortlist-title">Release shortlist</strong>

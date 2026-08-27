@@ -905,6 +905,48 @@
       "title": "Packaged rich release exploration causes no upstream requests",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Packaged metadata, search, protocol, sorts, and shortlist on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-DASH-020",
+      "title": "Release analysis preserves full Bazarr policy semantics",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure display mapping over explicit-default and Bazarr-shaped policy evidence"
+    },
+    {
+      "id": "PEG-DASH-021",
+      "title": "Per-release required-language fit is honest and required-only",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure fit derivation over confirmed, likely, possible, empty, and unavailable language evidence"
+    },
+    {
+      "id": "PEG-DASH-022",
+      "title": "Required-language fit filtering is deterministic and local",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure selection over in-memory release assessments"
+    },
+    {
+      "id": "PEG-DASH-023",
+      "title": "Policy-language confidence filters target loaded assessments",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure language selection over the policy-derived release evidence already in memory"
+    },
+    {
+      "id": "PEG-DASH-024",
+      "title": "Leading candidate is deterministic and never overrides Arr rejection",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure recommended ordering over accepted and rejected in-memory rows"
+    },
+    {
+      "id": "PEG-DASH-025",
+      "title": "Policy semantics, language fit, and leading candidate remain page-memory-only assets",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process HTML, CSS, JavaScript, and storage-boundary inspection"
+    },
+    {
+      "id": "PEG-DOCKER-020",
+      "title": "Packaged subtitle decision controls cause no upstream requests",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Packaged policy, fit, language, and leading-candidate logic on an internal-only Docker network"
     }
   ],
   "manualGaps": [

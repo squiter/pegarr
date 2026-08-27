@@ -1,4 +1,4 @@
-import { feasibilityView, itemAnalysisSummary, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "/assets/dashboard-model.js";
+import { feasibilityView, itemAnalysisSummary, leadingRelease, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -23,7 +23,13 @@ const elements = {
   releaseConfidenceFilter: document.querySelector("#release-confidence-filter"),
   releaseControls: document.querySelector("#release-controls"),
   releaseDecisionFilter: document.querySelector("#release-decision-filter"),
+  releaseLanguageConfidenceFilter: document.querySelector("#release-language-confidence-filter"),
+  releaseLanguageFilter: document.querySelector("#release-language-filter"),
+  releaseLeading: document.querySelector("#release-leading"),
+  releaseLeadingDetail: document.querySelector("#release-leading-detail"),
+  releaseLeadingTitle: document.querySelector("#release-leading-title"),
   releaseProtocolFilter: document.querySelector("#release-protocol-filter"),
+  releaseRequiredFitFilter: document.querySelector("#release-required-fit-filter"),
   releaseSearchInput: document.querySelector("#release-search-input"),
   releaseShortlist: document.querySelector("#release-shortlist"),
   releaseShortlistClear: document.querySelector("#release-shortlist-clear"),
@@ -71,7 +77,7 @@ for (const control of [elements.searchInput, elements.kindFilter, elements.analy
   control?.addEventListener("input", renderInventory);
   control?.addEventListener("change", renderInventory);
 }
-for (const control of [elements.releaseSearchInput, elements.releaseDecisionFilter, elements.releaseConfidenceFilter, elements.releaseProtocolFilter, elements.releaseSortOrder]) {
+for (const control of [elements.releaseSearchInput, elements.releaseDecisionFilter, elements.releaseConfidenceFilter, elements.releaseProtocolFilter, elements.releaseRequiredFitFilter, elements.releaseLanguageFilter, elements.releaseLanguageConfidenceFilter, elements.releaseSortOrder]) {
   control?.addEventListener("input", renderReleaseSelection);
   control?.addEventListener("change", renderReleaseSelection);
 }
@@ -339,11 +345,23 @@ function renderFeasibility(view) {
   policy.className = "policy-summary";
   const policyLabel = document.createElement("strong");
   policyLabel.textContent = view.policyName;
-  const languages = document.createElement("span");
-  languages.textContent = view.languages.length === 0
-    ? "No policy languages"
-    : view.languages.map(({ code, required }) => `${code}${required ? " required" : ""}`).join(" · ");
-  policy.append(policyLabel, languages);
+  const policySource = document.createElement("span");
+  policySource.textContent = view.policySource === "bazarr"
+    ? "Resolved from Bazarr"
+    : view.policySource === "explicit_default"
+      ? "Resolved from explicit default"
+      : "Policy source unresolved";
+  const languages = document.createElement("div");
+  languages.className = "policy-languages";
+  if (view.languages.length === 0) {
+    const emptyLanguage = document.createElement("span");
+    emptyLanguage.className = "policy-language-chip";
+    emptyLanguage.textContent = "No policy languages";
+    languages.append(emptyLanguage);
+  } else {
+    languages.replaceChildren(...view.languages.map(policyLanguageChip));
+  }
+  policy.append(policyLabel, policySource, languages);
 
   const analysis = document.createElement("div");
   analysis.className = `analysis-summary${view.analysis.source === "stale_cache" ? " analysis-summary--stale" : ""}`;
@@ -401,6 +419,8 @@ function renderFeasibility(view) {
   }));
   elements.feasibilitySummary.replaceChildren(policy, analysis, providers);
   activeFeasibility = view;
+  populatePolicyLanguageFilter(view.languages);
+  renderLeadingRelease(view.releases);
   elements.releaseControls.hidden = view.releases.length === 0;
   renderReleaseSelection();
 }
@@ -413,6 +433,9 @@ function renderReleaseSelection() {
     decision: elements.releaseDecisionFilter?.value,
     confidence: elements.releaseConfidenceFilter?.value,
     protocol: elements.releaseProtocolFilter?.value,
+    requiredFit: elements.releaseRequiredFitFilter?.value,
+    language: elements.releaseLanguageFilter?.value,
+    languageConfidence: elements.releaseLanguageConfidenceFilter?.value,
     sort: elements.releaseSortOrder?.value,
   });
   pruneShortlist(view.releases);
@@ -496,7 +519,10 @@ function renderRelease(row) {
   const confidence = document.createElement("span");
   confidence.className = `confidence-badge confidence-badge--${row.confidence}`;
   confidence.textContent = row.confidence.replaceAll("_", " ");
-  subtitle.append(confidence);
+  const requiredFit = document.createElement("span");
+  requiredFit.className = `required-fit-badge required-fit-badge--${row.requiredFit}`;
+  requiredFit.textContent = requiredFitLabel(row.requiredFit);
+  subtitle.append(confidence, requiredFit);
   for (const language of row.languages) {
     const languageStatus = document.createElement("span");
     languageStatus.textContent = `${language.language}: ${language.confidence.replaceAll("_", " ")} · ${language.providerCount} ${language.providerCount === 1 ? "provider" : "providers"}`;
@@ -533,6 +559,56 @@ function renderRelease(row) {
   shortlistCell.append(shortlist);
   tableRow.append(release, video, subtitle, evidenceCell, shortlistCell);
   return tableRow;
+}
+
+function policyLanguageChip(language) {
+  const chip = document.createElement("span");
+  chip.className = "policy-language-chip";
+  const traits = [
+    language.required ? "required" : "optional",
+    language.forced ? "forced" : "regular",
+    `HI ${language.hearingImpaired.replaceAll("_", " ")}`,
+    language.applicability ? language.applicability.replaceAll("_", " ") : "applicability unspecified",
+    language.cutoff === true ? "cutoff" : language.cutoff === false ? "not cutoff" : "cutoff unspecified",
+  ];
+  chip.textContent = `${language.code} · ${traits.join(" · ")}`;
+  return chip;
+}
+
+function populatePolicyLanguageFilter(languages) {
+  const previous = elements.releaseLanguageFilter.value;
+  const options = [new Option("All policy languages", "all")];
+  for (const language of languages) options.push(new Option(`${language.code}${language.required ? " · required" : " · optional"}`, language.code));
+  elements.releaseLanguageFilter.replaceChildren(...options);
+  elements.releaseLanguageFilter.value = options.some(({ value }) => value === previous) ? previous : "all";
+}
+
+function renderLeadingRelease(releases) {
+  const leading = leadingRelease(releases);
+  elements.releaseLeading.hidden = leading === undefined;
+  if (leading === undefined) {
+    elements.releaseLeadingTitle.textContent = "";
+    elements.releaseLeadingDetail.textContent = "";
+    return;
+  }
+  elements.releaseLeadingTitle.textContent = leading.title;
+  elements.releaseLeadingDetail.textContent = [
+    confidenceLabel(leading.confidence),
+    requiredFitLabel(leading.requiredFit),
+    `custom format ${leading.customFormatScore}`,
+    ...releaseFacts(leading),
+  ].join(" · ");
+}
+
+function requiredFitLabel(value) {
+  const labels = {
+    strong: "Required languages strong",
+    possible: "Required languages possible",
+    no_match_found: "Required languages no match",
+    unknown: "Required languages unknown",
+    no_required_languages: "No required languages",
+  };
+  return labels[value] ?? "Required languages unknown";
 }
 
 function releaseFacts(row) {
@@ -623,6 +699,7 @@ function closeFeasibility() {
   elements.feasibilityPanel.hidden = true;
   elements.releaseTableBody.replaceChildren();
   elements.releaseControls.hidden = true;
+  elements.releaseLeading.hidden = true;
   shortlistedReleaseIds.clear();
   elements.releaseShortlist.hidden = true;
   elements.releaseShortlistItems.replaceChildren();
@@ -634,6 +711,9 @@ function resetReleaseControls() {
   elements.releaseDecisionFilter.value = "all";
   elements.releaseConfidenceFilter.value = "all";
   elements.releaseProtocolFilter.value = "all";
+  elements.releaseRequiredFitFilter.value = "all";
+  elements.releaseLanguageFilter.replaceChildren(new Option("All policy languages", "all"));
+  elements.releaseLanguageConfidenceFilter.value = "all";
   elements.releaseSortOrder.value = "recommended";
   shortlistedReleaseIds.clear();
 }

@@ -156,6 +156,13 @@
 | PEG-DASH-018 | Release shortlist is bounded, deterministic, and page-memory safe | `src/dashboard-model.test.ts` |
 | PEG-DASH-019 | Richer release controls and shortlist remain page-memory-only assets | `src/app.test.ts` |
 | PEG-DOCKER-019 | Packaged rich release exploration causes no upstream requests | `scripts/harness/docker-build.mjs` |
+| PEG-DASH-020 | Release analysis preserves full Bazarr policy semantics | `src/dashboard-model.test.ts` |
+| PEG-DASH-021 | Per-release required-language fit is honest and required-only | `src/dashboard-model.test.ts` |
+| PEG-DASH-022 | Required-language fit filtering is deterministic and local | `src/dashboard-model.test.ts` |
+| PEG-DASH-023 | Policy-language confidence filters target loaded assessments | `src/dashboard-model.test.ts` |
+| PEG-DASH-024 | Leading candidate is deterministic and never overrides Arr rejection | `src/dashboard-model.test.ts` |
+| PEG-DASH-025 | Policy semantics, language fit, and leading candidate remain page-memory-only assets | `src/app.test.ts` |
+| PEG-DOCKER-020 | Packaged subtitle decision controls cause no upstream requests | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

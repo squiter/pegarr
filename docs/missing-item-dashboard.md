@@ -19,10 +19,14 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Partial inventory identifies the unavailable integration without hiding usable results.
 - Selecting an item opens its interactive release table and requests one protected read-only feasibility report.
 - Video acceptance and Arr rejection reasons remain separate from subtitle confidence.
+- The resolved policy states whether it came from Bazarr or an explicit default and shows every language's required/optional, forced, hearing-impaired, audio-applicability, and cutoff semantics without guessing missing values.
 - Each release exposes per-language confidence, contributing provider count, provider state, matching evidence, and warnings.
+- Each release also gets an honest required-language fit: Strong, Possible, No match found, Unknown, or No required languages. Unknown wins whenever required evidence is incomplete, so an outage cannot masquerade as absence.
 - Release rows also show safe Arr size, age, seeders/leechers when supplied, release group/edition, language names, and matched custom formats. Download handles and credentials never enter the browser model.
 - Release search matches the loaded title, indexer, quality, protocol, group, edition, Arr languages, and custom-format names. Protocol filtering keeps torrent and Usenet decisions separate without hiding Arr rejection state.
 - Release controls sort by the combined decision order, subtitle confidence, custom-format score, seeders, size, age, or title. Missing numeric evidence is always placed last.
+- Required-language fit, policy-language, and language-confidence filters are derived from the current policy and operate only on loaded assessments. A confidence filter without a selected language matches any policy language with that confidence.
+- A clearly labeled leading Arr-accepted candidate shows the first row in the deterministic recommended ordering. It is decision support only, never promotes an Arr-rejected release, and cannot trigger a Grab.
 - A page-memory shortlist holds up to three release candidates in selection order so their Arr decision, subtitle confidence, quality, group, size, age, and peer evidence can be compared. It clears when the item or page changes and never persists to browser storage.
 - Release filtering and sorting operate only on the analysis already in page memory. They never repeat Arr, Bazarr, or provider requests, and rejected releases remain available through the Arr-decision filter.
 - Analysis timing and safe Arr, Bazarr, and provider request counts stay visible beside provider quota and cache timestamps.
@@ -40,4 +44,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-019`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-019` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-025`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-020` are the deterministic evidence for this page.

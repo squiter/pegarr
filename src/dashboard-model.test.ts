@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { feasibilityView, itemAnalysisSummary, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "./web/dashboard-model.js";
+import { feasibilityView, itemAnalysisSummary, leadingRelease, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -305,6 +305,109 @@ test("PEG-DASH-018 release shortlist is bounded, deterministic, and page-memory 
   assert.deepEqual(shortlistedReleases(view.releases, [ids[2]!, ids[0]!, ids[2]!, "missing", ids[1]!, ids[3]!]).map(({ id }) => id), [ids[2], ids[0], ids[1]]);
   assert.deepEqual(shortlistedReleases(view.releases, undefined), []);
   assert.doesNotMatch(JSON.stringify(shortlistedReleases(view.releases, ids)), /downloadUrl|magnet|infoHash/iu);
+});
+
+test("PEG-DASH-020 release analysis preserves full Bazarr policy semantics", () => {
+  const report = buildFeasibilityReport({
+    ...demoFeasibilityInput,
+    policy: {
+      ...demoFeasibilityInput.policy,
+      source: "explicit_default",
+      languages: [
+        { code: "pt-BR", required: true, forced: true, hearingImpaired: "required", applicability: "audio_does_not_match", cutoff: true },
+        { code: "en", required: false, forced: false, hearingImpaired: "prefer", applicability: "always", cutoff: false },
+      ],
+    },
+  });
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report });
+
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  assert.equal(view.policySource, "explicit_default");
+  assert.deepEqual(view.languages, [
+    { code: "pt-BR", required: true, forced: true, hearingImpaired: "required", applicability: "audio_does_not_match", cutoff: true },
+    { code: "en", required: false, forced: false, hearingImpaired: "prefer", applicability: "always", cutoff: false },
+  ]);
+  assert.doesNotMatch(JSON.stringify(view.languages), /sourceItemId|profileId|api.?key/iu);
+  const unknownSource = feasibilityView({ kind: "item-feasibility", status: "ready", report: { ...report, policy: { ...report.policy, source: "unexpected" } } });
+  assert.equal(unknownSource.state === "ready" ? unknownSource.policySource : undefined, "unknown");
+});
+
+test("PEG-DASH-021 per-release required-language fit is honest and required-only", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  const base = view.releases[0]!;
+  const report = buildFeasibilityReport(demoFeasibilityInput);
+  const withRequired = (confidence: "confirmed" | "likely" | "possible" | "no_match_found" | "unknown") => ({
+    ...base,
+    languages: base.languages.map((language) => language.required ? { ...language, confidence } : language),
+  });
+  const mapped = (release: typeof base, languages = view.languages) => feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    report: { ...report, policy: { ...report.policy, languages }, releases: [{
+      releaseId: release.id,
+      releaseTitle: release.title,
+      video: { downloadAllowed: release.downloadAllowed, rejectionReasons: [], customFormatScore: 0, evidence: {}, traits: {} },
+      subtitle: { confidence: release.confidence, languages: release.languages },
+    }] },
+  });
+
+  const fits = ["confirmed", "likely", "possible", "no_match_found", "unknown"].map((confidence) => {
+    const result = mapped(withRequired(confidence as "confirmed" | "likely" | "possible" | "no_match_found" | "unknown"));
+    return result.state === "ready" ? result.releases[0]?.requiredFit : undefined;
+  });
+  assert.deepEqual(fits, ["strong", "strong", "possible", "no_match_found", "unknown"]);
+  const mixedUnavailable = mapped({
+    ...base,
+    languages: base.languages.map((language) => ({
+      ...language,
+      required: true,
+      confidence: language.language === "pt-BR" ? "no_match_found" as const : "unknown" as const,
+    })),
+  });
+  assert.equal(mixedUnavailable.state === "ready" ? mixedUnavailable.releases[0]?.requiredFit : undefined, "unknown");
+  const noRequired = mapped(
+    { ...base, languages: base.languages.map((language) => ({ ...language, required: false })) },
+    view.languages.map((language) => ({ ...language, required: false })),
+  );
+  assert.equal(noRequired.state === "ready" ? noRequired.releases[0]?.requiredFit : undefined, "no_required_languages");
+});
+
+test("PEG-DASH-022 required-language fit filtering is a deterministic local operation", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+
+  assert.equal(selectReleases(view.releases, { requiredFit: "strong" }).length, 3);
+  assert.equal(selectReleases(view.releases, { requiredFit: "possible" }).length, 1);
+  assert.deepEqual(selectReleases(view.releases, { requiredFit: "unsafe" }), view.releases);
+});
+
+test("PEG-DASH-023 policy-language and confidence filters target loaded assessments", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+
+  assert.equal(selectReleases(view.releases, { language: "pt-br", languageConfidence: "confirmed" }).length, 2);
+  assert.equal(selectReleases(view.releases, { language: "PT-BR", languageConfidence: "possible" }).length, 1);
+  assert.equal(selectReleases(view.releases, { language: "en", languageConfidence: "unknown" }).length, 4);
+  assert.equal(selectReleases(view.releases, { language: "missing" }).length, 0);
+  assert.equal(selectReleases(view.releases, { languageConfidence: "likely" }).length, 1);
+});
+
+test("PEG-DASH-024 leading candidate is deterministic and never overrides Arr rejection", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  const accepted = view.releases.filter(({ downloadAllowed }) => downloadAllowed);
+  const rejected = view.releases.filter(({ downloadAllowed }) => !downloadAllowed);
+
+  assert.equal(leadingRelease(view.releases)?.id, accepted[0]?.id);
+  assert.equal(leadingRelease([...rejected, ...accepted])?.id, accepted[0]?.id);
+  assert.equal(leadingRelease(rejected), undefined);
+  assert.ok(leadingRelease(view.releases)?.downloadAllowed);
 });
 
 test("PEG-DASH-008 item summaries use the best Arr-accepted confidence and retain freshness", () => {

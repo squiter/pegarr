@@ -57,6 +57,7 @@ export interface FeasibilityReleaseRow {
   readonly releaseGroup?: string;
   readonly edition?: string;
   readonly confidence: "confirmed" | "likely" | "possible" | "no_match_found" | "unknown";
+  readonly requiredFit: "strong" | "possible" | "no_match_found" | "unknown" | "no_required_languages";
   readonly languages: readonly {
     readonly language: string;
     readonly required: boolean;
@@ -69,15 +70,16 @@ export interface FeasibilityReleaseRow {
 
 export function selectReleases(
   rows: readonly FeasibilityReleaseRow[],
-  options: { readonly query?: string; readonly decision?: string; readonly confidence?: string; readonly protocol?: string; readonly sort?: string },
+  options: { readonly query?: string; readonly decision?: string; readonly confidence?: string; readonly protocol?: string; readonly requiredFit?: string; readonly language?: string; readonly languageConfidence?: string; readonly sort?: string },
 ): readonly FeasibilityReleaseRow[];
+export function leadingRelease(rows: readonly FeasibilityReleaseRow[]): FeasibilityReleaseRow | undefined;
 export function shortlistedReleases(
   rows: readonly FeasibilityReleaseRow[],
   releaseIds: readonly string[] | unknown,
 ): readonly FeasibilityReleaseRow[];
 
 export type FeasibilityView =
-  | { readonly state: "ready"; readonly title: string; readonly context: string; readonly policyName: string; readonly languages: readonly { readonly code: string; readonly required: boolean }[]; readonly providers: readonly { readonly provider: string; readonly status: string; readonly detail: string; readonly cacheStatus?: "hit" | "miss"; readonly cachedAt?: string; readonly cacheExpiresAt?: string; readonly quota: { readonly remaining?: number; readonly limit?: number; readonly resetAtEpochSeconds?: number } }[]; readonly releases: readonly FeasibilityReleaseRow[]; readonly analysis: { readonly source: "computed" | "memory_cache" | "stale_cache"; readonly generatedAt?: string; readonly expiresAt?: string; readonly staleUntil?: string; readonly refreshFailure?: "inventory_unavailable" | "integration_failure" | "unexpected_failure"; readonly unavailableIntegrations: readonly ("sonarr" | "radarr" | "bazarr" | "subdl")[]; readonly elapsedMs: number; readonly arrRequests: number; readonly bazarrRequests: number; readonly providerRequests: number } }
+  | { readonly state: "ready"; readonly title: string; readonly context: string; readonly policyName: string; readonly policySource: "bazarr" | "explicit_default" | "unknown"; readonly languages: readonly { readonly code: string; readonly required: boolean; readonly forced: boolean; readonly hearingImpaired: "required" | "prefer" | "avoid" | "either"; readonly applicability?: "always" | "audio_matches" | "audio_does_not_match"; readonly cutoff?: boolean }[]; readonly providers: readonly { readonly provider: string; readonly status: string; readonly detail: string; readonly cacheStatus?: "hit" | "miss"; readonly cachedAt?: string; readonly cacheExpiresAt?: string; readonly quota: { readonly remaining?: number; readonly limit?: number; readonly resetAtEpochSeconds?: number } }[]; readonly releases: readonly FeasibilityReleaseRow[]; readonly analysis: { readonly source: "computed" | "memory_cache" | "stale_cache"; readonly generatedAt?: string; readonly expiresAt?: string; readonly staleUntil?: string; readonly refreshFailure?: "inventory_unavailable" | "integration_failure" | "unexpected_failure"; readonly unavailableIntegrations: readonly ("sonarr" | "radarr" | "bazarr" | "subdl")[]; readonly elapsedMs: number; readonly arrRequests: number; readonly bazarrRequests: number; readonly providerRequests: number } }
   | { readonly state: "invalid" | "disabled" | "policy_unresolved" | "inventory_unavailable" | "integration_failure" | "not_found"; readonly message: string };
 
 export function feasibilityView(value: unknown): FeasibilityView;
