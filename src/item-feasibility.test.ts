@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { MissingMediaItem } from "./domain.js";
-import type { SonarrEpisodeFeasibilityRequest } from "./episode-feasibility.js";
+import type {
+  SonarrEpisodeFeasibilityOutcome,
+  SonarrEpisodeFeasibilityRequest,
+} from "./episode-feasibility.js";
 import { ItemFeasibilityService } from "./item-feasibility.js";
 import type { RadarrMovieFeasibilityRequest } from "./movie-feasibility.js";
 
@@ -201,4 +204,62 @@ test("PEG-ITEM-005 explicit refresh bypasses only the item cache and remains sin
   assert.equal(cached.status === "ready" && cached.analysis.source, "memory_cache");
   assert.equal(refreshed.status === "ready" && refreshed.analysis.source, "computed");
   assert.deepEqual(concurrentRefresh, refreshed);
+});
+
+test("PEG-ITEM-006 transient failures use a labeled stale report only inside the bounded window", async () => {
+  let builds = 0;
+  let currentTime = 1_000;
+  let outcome: SonarrEpisodeFeasibilityOutcome = {
+    status: "ready",
+    mode: "read_only",
+    report: { fixture: "synthetic", mode: "read_only", item: { kind: "episode", title: "Synthetic Show", season: 3, episode: 5, ids: episode.ids }, policy: { source: "bazarr", profileId: "1", profileName: "Synthetic", languages: [] }, providerStatus: [], releases: [] },
+    metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 0, elapsedMs: 1 },
+  };
+  const service = new ItemFeasibilityService({
+    readInventory: async () => readyInventory,
+    episode: { build: async () => { builds += 1; return outcome; } },
+    subdlLanguages: [],
+    missingIntegrations: { episode: [], movie: [] },
+    now: () => currentTime,
+    ttlMs: 100,
+    staleTtlMs: 5_000,
+  });
+  const selection = { application: "sonarr" as const, kind: "episode" as const, itemId: 305 };
+  const first = await service.read(selection);
+  outcome = {
+    status: "integration_failure",
+    mode: "read_only",
+    failures: [{ integration: "bazarr", operation: "profile_list", state: "unavailable" }],
+    releases: [],
+    metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 0, elapsedMs: 2 },
+  };
+
+  currentTime = 1_101;
+  const stale = await service.read(selection, { refresh: true });
+  assert.equal(builds, 2);
+  assert.equal(stale.status, "ready");
+  if (first.status === "ready" && stale.status === "ready") {
+    assert.strictEqual(stale.report, first.report);
+    assert.deepEqual(stale.analysis, {
+      ...first.analysis,
+      source: "stale_cache",
+      refreshFailure: "integration_failure",
+      unavailableIntegrations: ["bazarr"],
+    });
+    assert.equal(stale.analysis.staleUntil, "1970-01-01T00:00:06.100Z");
+  }
+
+  currentTime = 1_150;
+  const throttled = await service.read(selection);
+  assert.equal(builds, 2);
+  assert.equal(throttled.status === "ready" && throttled.analysis.source, "stale_cache");
+
+  currentTime = 1_202;
+  assert.equal((await service.read(selection)).status, "ready");
+  assert.equal(builds, 3);
+
+  currentTime = 6_100;
+  const expired = await service.read(selection);
+  assert.equal(expired.status, "integration_failure");
+  assert.equal(builds, 4);
 });

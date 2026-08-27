@@ -146,6 +146,7 @@ test("PEG-DASH-005 analysis diagnostics preserve safe request, quota, and cache 
     source: "memory_cache",
     generatedAt: "2026-08-27T12:00:00.000Z",
     expiresAt: "2026-08-27T12:00:30.000Z",
+    unavailableIntegrations: [],
     elapsedMs: 17,
     arrRequests: 1,
     bazarrRequests: 2,
@@ -162,6 +163,42 @@ test("PEG-DASH-005 analysis diagnostics preserve safe request, quota, and cache 
   }]);
   assert.ok(view.releases.some(({ languages }) => languages.some(({ providerCount }) => providerCount > 0)));
   assert.doesNotMatch(JSON.stringify(view), /token|api.?key|example\.invalid/iu);
+});
+
+test("PEG-DASH-006 stale analysis remains visibly distinct from fresh evidence", () => {
+  const view = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    selection: { application: "sonarr", kind: "episode", itemId: 305 },
+    analysis: {
+      source: "stale_cache",
+      generatedAt: "2026-08-27T12:00:00.000Z",
+      expiresAt: "2026-08-27T12:00:30.000Z",
+      staleUntil: "2026-08-27T18:00:30.000Z",
+      refreshFailure: "integration_failure",
+      unavailableIntegrations: ["sonarr", "bazarr", "private-upstream"],
+    },
+    report: buildFeasibilityReport(demoFeasibilityInput),
+    metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 1, elapsedMs: 8 },
+  });
+
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  assert.deepEqual(view.analysis, {
+    source: "stale_cache",
+    generatedAt: "2026-08-27T12:00:00.000Z",
+    expiresAt: "2026-08-27T12:00:30.000Z",
+    staleUntil: "2026-08-27T18:00:30.000Z",
+    refreshFailure: "integration_failure",
+    unavailableIntegrations: ["sonarr", "bazarr"],
+    elapsedMs: 8,
+    arrRequests: 1,
+    bazarrRequests: 2,
+    providerRequests: 1,
+  });
+  assert.equal(view.releases.length, 4);
+  assert.doesNotMatch(JSON.stringify(view), /private-upstream/iu);
 });
 
 test("PEG-DASH-002 search, filtering, and sorting are pure local operations", () => {

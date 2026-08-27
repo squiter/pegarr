@@ -45,7 +45,7 @@ export const dashboardPage = `<!doctype html>
       <div class="summary-row">
         <div>
           <p class="eyebrow">Monitored and missing</p>
-          <h2 id="inventory-title"><span id="visible-count">0</span> items</h2>
+          <h2 id="inventory-title"><span id="visible-count">0</span> <span id="visible-label">items</span></h2>
         </div>
         <div id="source-status" class="source-status" aria-label="Integration status"></div>
         <button id="refresh-button" class="secondary-button" type="button">Refresh inventory</button>

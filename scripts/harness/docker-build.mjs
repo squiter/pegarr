@@ -769,6 +769,7 @@ async function packagedMissingInventorySmokeTest() {
   const dashboardScenario = "PEG-DOCKER-012";
   const selectionScenario = "PEG-DOCKER-013";
   const refreshScenario = "PEG-DOCKER-014";
+  const staleScenario = "PEG-DOCKER-015";
   const suffix = `${process.pid}`;
   const networkName = `pegarr-harness-inventory-internal-${suffix}`;
   const fixtureName = `pegarr-harness-inventory-${suffix}`;
@@ -813,16 +814,17 @@ async function packagedMissingInventorySmokeTest() {
     "const profiles = [{ profileId: 7, name: 'Synthetic policy', cutoff: 1, items: [{ id: 1, language: 'pt-BR', hi: 'False', forced: 'False', audio_exclude: 'False', audio_only_include: 'False' }], mustContain: [], mustNotContain: [], originalFormat: 0 }];",
     "const assignment = { data: [{ sonarrSeriesId: 42, profileId: 7 }], total: 1 };",
     "const subtitles = { status: true, subtitles: [{ n_id: 'synthetic-subtitle', release_name: 'Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP', language: 'PT-BR', season: 3, episode: 5, hi: false, full_season: false }] };",
-    "let requestCount = 0;",
+    "let requestCount = 0; let outage = false;",
     "createServer((request, response) => {",
     "  const host = String(request.headers.host || '').split(':')[0];",
     "  const url = new URL(request.url || '/', 'http://fixture.invalid');",
     "  let body; let expectedKey;",
     "  if (request.method === 'GET' && url.pathname === '/__count') { response.writeHead(200); response.end(String(requestCount)); return; }",
+    "  if (request.method === 'GET' && url.pathname === '/__outage') { outage = true; response.writeHead(200); response.end('enabled'); return; }",
     "  if (request.method !== 'GET') { response.writeHead(405); response.end('{}'); return; }",
     "  if (host === 'sonarr-fixture' && url.pathname === '/api/v3/wanted/missing' && url.searchParams.get('pageSize') === '2' && url.searchParams.get('monitored') === 'true') { body = sonarr; expectedKey = keys.sonarr; }",
     "  else if (host === 'radarr-fixture' && url.pathname === '/api/v3/wanted/missing' && url.searchParams.get('pageSize') === '2' && url.searchParams.get('monitored') === 'true') { body = radarr; expectedKey = keys.radarr; }",
-    "  else if (host === 'sonarr-fixture' && url.pathname === '/api/v3/release' && url.searchParams.get('episodeId') === '305') { body = releases; expectedKey = keys.sonarr; }",
+    "  else if (host === 'sonarr-fixture' && url.pathname === '/api/v3/release' && url.searchParams.get('episodeId') === '305') { body = outage ? {} : releases; expectedKey = keys.sonarr; }",
     "  else if (host === 'bazarr-fixture' && url.pathname === '/api/system/languages/profiles') { body = profiles; expectedKey = keys.bazarr; }",
     "  else if (host === 'bazarr-fixture' && url.pathname === '/api/series' && url.searchParams.get('seriesid[]') === '42') { body = assignment; expectedKey = keys.bazarr; }",
     "  else if (host === 'subdl-fixture' && url.pathname === '/api/v2/subtitles/search' && url.searchParams.get('languages') === 'PT-BR') { body = subtitles; expectedKey = keys.subdl; }",
@@ -830,7 +832,7 @@ async function packagedMissingInventorySmokeTest() {
     "  const providedKey = host === 'subdl-fixture' ? String(request.headers.authorization || '').replace(/^Bearer /, '') : request.headers['x-api-key'];",
     "  if (providedKey !== expectedKey) { response.writeHead(401, { 'content-type': 'application/json' }); response.end('{}'); return; }",
     "  requestCount += 1;",
-    "  response.writeHead(200, { 'content-type': 'application/json' });",
+    "  response.writeHead(outage && host === 'sonarr-fixture' && url.pathname === '/api/v3/release' ? 503 : 200, { 'content-type': 'application/json' });",
     "  response.end(JSON.stringify(body));",
     "}).listen(8082, '0.0.0.0');",
   ].join("\n");
@@ -986,6 +988,12 @@ async function packagedMissingInventorySmokeTest() {
       "  const refreshedView = dashboardModel.feasibilityView(refreshedItemBody);",
       "  const refreshedCount = Number(await (await fetch(countUrl)).text());",
       "  if (refreshedItem.status !== 200 || refreshedItemBody.analysis?.source !== 'computed' || refreshedItemBody.metrics?.providerRequests !== 0 || refreshedItemBody.report?.providerStatus?.[0]?.cache?.status !== 'hit' || refreshedView.state !== 'ready' || refreshedView.providers[0]?.cacheStatus !== 'hit' || refreshedCount !== 11) throw new Error('packaged refresh repeated the stable provider window');",
+      "  await fetch('http://sonarr-fixture:8082/__outage');",
+      "  const staleItem = await fetch(itemEndpoint + '?refresh=1', { headers: { authorization: 'Bearer ' + token } });",
+      "  const staleItemBody = await staleItem.json();",
+      "  const staleView = dashboardModel.feasibilityView(staleItemBody);",
+      "  const staleCount = Number(await (await fetch(countUrl)).text());",
+      "  if (staleItem.status !== 200 || staleItemBody.status !== 'ready' || staleItemBody.analysis?.source !== 'stale_cache' || staleItemBody.analysis?.refreshFailure !== 'integration_failure' || !staleItemBody.analysis?.unavailableIntegrations?.includes('sonarr') || staleView.state !== 'ready' || staleView.analysis.source !== 'stale_cache' || staleView.releases.length !== 1 || staleCount !== 14) throw new Error('packaged outage did not retain labeled stale evidence');",
       "  if (clientText.includes('/grab') || pageText.includes('Grab selected release')) throw new Error('Grab crossed the Phase 1 boundary');",
       "  if (response.headers.get('cache-control') !== 'no-store' || response.headers.get('x-content-type-options') !== 'nosniff') throw new Error('security headers missing');",
       "  if (JSON.stringify(body).includes(token)) throw new Error('access token escaped');",
@@ -1005,6 +1013,7 @@ async function packagedMissingInventorySmokeTest() {
     process.stdout.write(`${dashboardScenario} packaged dashboard=ready (responsive assets, local controls, zero extra upstream requests)\n`);
     process.stdout.write(`${selectionScenario} packaged item analysis=ready (authenticated, cached, one provider window, no Grab)\n`);
     process.stdout.write(`${refreshScenario} packaged refresh=ready (Arr/Bazarr refreshed, provider window reused)\n`);
+    process.stdout.write(`${staleScenario} packaged outage=stale (labeled cached evidence, bounded read-only fallback)\n`);
   } finally {
     docker(["rm", "--force", appName]);
     docker(["rm", "--force", fixtureName]);

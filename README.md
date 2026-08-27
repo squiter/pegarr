@@ -45,6 +45,7 @@ The current repository foundation includes:
 - authenticated episode and movie selection routes that derive private matching identity from server-owned inventory;
 - an interactive release table that preserves Arr decisions while explaining per-language subtitle confidence and provider state;
 - transparent analysis timing, provider counts, quota evidence, and separate item/provider cache freshness;
+- bounded, visibly labeled stale item evidence when Arr or Bazarr cannot refresh;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;
 - secret-file-only Sonarr configuration and a browser-safe version/status route;
 - a measured one-shot Sonarr probe with a 30-second status cache and single-flight protection;

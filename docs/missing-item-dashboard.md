@@ -19,6 +19,7 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Each release exposes per-language confidence, contributing provider count, provider state, matching evidence, and warnings.
 - Analysis timing and safe Arr, Bazarr, and provider request counts stay visible beside provider quota and cache timestamps.
 - Successful item views are reused in page memory. An explicit refresh re-reads Arr and Bazarr while retaining the stable provider-language cache window.
+- If a transient Arr or Bazarr failure prevents refresh, the last successful in-process report remains available for a bounded period with a prominent stale warning, original generation time, expiry, and affected integration names.
 - The page has a skip link, labelled controls, a polite status region, keyboard focus styles, reduced-motion behavior, and a mobile layout.
 
 The dashboard deliberately has no Grab control. Phase 1 ends at explainable decision support; mutation remains a separately confirmed Phase 2 boundary.
@@ -29,4 +30,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-005`, `PEG-ITEM-001` through `PEG-ITEM-005`, and `PEG-DOCKER-012` through `PEG-DOCKER-014` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-006`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-015` are the deterministic evidence for this page.

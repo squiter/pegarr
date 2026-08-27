@@ -779,6 +779,24 @@
       "title": "Packaged refresh re-reads Arr and Bazarr without repeating the provider window",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Four synthetic sibling services and five secret files on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-ITEM-006",
+      "title": "Transient integration failures serve a labeled stale report only within a bounded window",
+      "evidence": "src/item-feasibility.test.ts",
+      "boundary": "Deterministic clock, synthetic inventory, and injected report outcomes; no network"
+    },
+    {
+      "id": "PEG-DASH-006",
+      "title": "Stale analysis remains visibly distinct from fresh and current evidence",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure view mapping over sanitized stale-cache evidence"
+    },
+    {
+      "id": "PEG-DOCKER-015",
+      "title": "Packaged integration outage retains a labeled stale read-only report",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Synthetic integration outage on an internal-only Docker network"
     }
   ],
   "manualGaps": [

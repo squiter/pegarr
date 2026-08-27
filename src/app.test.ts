@@ -206,13 +206,15 @@ test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe"
   assert.equal(page.headers?.["content-type"], "text/html; charset=utf-8");
   assert.match(page.headers?.["content-security-policy"] ?? "", /default-src 'self'/u);
   assert.match(String(page.body), /<main id="main"|role="status"|aria-live="polite"/u);
-  assert.match(String(page.body), /release-table|feasibility-panel|No Grab actions/u);
+  assert.match(String(page.body), /release-table|feasibility-panel|visible-label|No Grab actions/u);
   assert.match(String(page.body), /type="password"|autocomplete="off"/u);
   assert.match(String(styles.body), /@media \(max-width: 760px\)|prefers-reduced-motion/u);
   assert.match(String(client.body), /authorization: `Bearer \$\{accessToken\}`|credentials: "omit"/u);
   assert.match(String(client.body), /textContent|replaceChildren/u);
   assert.match(String(client.body), /\/api\/v1\/library\/items\/\$\{row\.application\}|feasibilityCache/u);
   assert.match(String(client.body), /refresh=1/u);
+  assert.match(String(client.body), /Stale cached analysis|stale_cache/u);
+  assert.match(String(styles.body), /analysis-summary--stale/u);
   assert.match(String(model.body), /export function selectRows/u);
   assert.equal(client.headers?.["cache-control"], "no-cache");
   assert.doesNotMatch(

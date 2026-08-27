@@ -52,6 +52,12 @@ export function feasibilityView(value) {
   const releases = value.report.releases.flatMap(releaseView).toSorted(compareReleases);
   const metrics = isRecord(value.metrics) ? value.metrics : {};
   const analysis = isRecord(value.analysis) ? value.analysis : {};
+  const analysisSource = analysis.source === "memory_cache" || analysis.source === "stale_cache"
+    ? analysis.source
+    : "computed";
+  const refreshFailure = ["inventory_unavailable", "integration_failure", "unexpected_failure"].includes(analysis.refreshFailure)
+    ? analysis.refreshFailure
+    : undefined;
   return {
     state: "ready",
     title,
@@ -61,9 +67,14 @@ export function feasibilityView(value) {
     providers,
     releases,
     analysis: {
-      source: analysis.source === "memory_cache" ? "memory_cache" : "computed",
+      source: analysisSource,
       ...(safeTimestamp(analysis.generatedAt) === undefined ? {} : { generatedAt: safeTimestamp(analysis.generatedAt) }),
       ...(safeTimestamp(analysis.expiresAt) === undefined ? {} : { expiresAt: safeTimestamp(analysis.expiresAt) }),
+      ...(safeTimestamp(analysis.staleUntil) === undefined ? {} : { staleUntil: safeTimestamp(analysis.staleUntil) }),
+      ...(refreshFailure === undefined ? {} : { refreshFailure }),
+      unavailableIntegrations: Array.isArray(analysis.unavailableIntegrations)
+        ? analysis.unavailableIntegrations.filter((integration) => ["sonarr", "radarr", "bazarr", "subdl"].includes(integration))
+        : [],
       elapsedMs: safeCount(metrics.elapsedMs),
       arrRequests: safeCount(metrics.sonarrRequests) + safeCount(metrics.radarrRequests),
       bazarrRequests: safeCount(metrics.bazarrRequests),

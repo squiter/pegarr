@@ -75,6 +75,7 @@ export interface RuntimeServicesOptions {
   readonly missingInventoryTtlMs?: number;
   readonly missingInventoryPageSize?: number;
   readonly itemFeasibilityTtlMs?: number;
+  readonly itemFeasibilityStaleTtlMs?: number;
   readonly itemFeasibilityMaxEntries?: number;
   readonly environment?: Readonly<Record<string, string | undefined>>;
 }
@@ -263,6 +264,9 @@ export function createRuntimeServices(
       options.itemFeasibilityTtlMs ?? defaultStatusTtlMs,
       "itemFeasibilityTtlMs",
     ),
+    ...(options.itemFeasibilityStaleTtlMs === undefined
+      ? {}
+      : { staleTtlMs: options.itemFeasibilityStaleTtlMs }),
     maxEntries: options.itemFeasibilityMaxEntries ?? 100,
   });
 

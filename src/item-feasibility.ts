@@ -16,10 +16,15 @@ export type ItemFeasibilitySelection =
   | { readonly application: "sonarr"; readonly kind: "episode"; readonly itemId: number }
   | { readonly application: "radarr"; readonly kind: "movie"; readonly itemId: number };
 
+type IntegrationName = "sonarr" | "radarr" | "bazarr" | "subdl";
+
 export interface ItemAnalysisCacheEvidence {
-  readonly source: "computed" | "memory_cache";
+  readonly source: "computed" | "memory_cache" | "stale_cache";
   readonly generatedAt: string;
   readonly expiresAt: string;
+  readonly staleUntil: string;
+  readonly refreshFailure?: "inventory_unavailable" | "integration_failure" | "unexpected_failure";
+  readonly unavailableIntegrations?: readonly IntegrationName[];
 }
 
 export interface ItemFeasibilityReadOptions {
@@ -62,6 +67,16 @@ type WithAnalysisEvidence<Result> = Result extends { readonly status: "ready" }
 
 export type ItemFeasibilityResult = WithAnalysisEvidence<ItemFeasibilityBuildResult>;
 type ReadyItemFeasibilityResult = Extract<ItemFeasibilityResult, { readonly status: "ready" }>;
+type RefreshFailure = "inventory_unavailable" | "integration_failure" | "unexpected_failure";
+
+interface ReadyCacheEntry {
+  readonly value: ReadyItemFeasibilityResult;
+  readonly expiresAt: number;
+  readonly staleUntil: number;
+  readonly retryAfter?: number;
+  readonly refreshFailure?: RefreshFailure;
+  readonly unavailableIntegrations?: readonly IntegrationName[];
+}
 
 export interface EpisodeFeasibilityBuilder {
   build(request: SonarrEpisodeFeasibilityRequest): Promise<SonarrEpisodeFeasibilityOutcome>;
@@ -82,6 +97,7 @@ export interface ItemFeasibilityServiceOptions {
   }>;
   readonly now?: () => number;
   readonly ttlMs?: number;
+  readonly staleTtlMs?: number;
   readonly maxEntries?: number;
 }
 
@@ -89,14 +105,21 @@ export class ItemFeasibilityService {
   readonly #options: ItemFeasibilityServiceOptions;
   readonly #now: () => number;
   readonly #ttlMs: number;
+  readonly #staleTtlMs: number;
   readonly #maxEntries: number;
-  readonly #cache = new Map<string, { readonly value: ReadyItemFeasibilityResult; readonly expiresAt: number }>();
+  readonly #cache = new Map<string, ReadyCacheEntry>();
   readonly #inFlight = new Map<string, Promise<ItemFeasibilityResult>>();
 
   constructor(options: ItemFeasibilityServiceOptions) {
     this.#options = options;
     this.#now = options.now ?? Date.now;
     this.#ttlMs = boundedInteger(options.ttlMs ?? 30_000, 0, 300_000, "ttlMs");
+    this.#staleTtlMs = boundedInteger(
+      options.staleTtlMs ?? 6 * 60 * 60 * 1_000,
+      0,
+      7 * 24 * 60 * 60 * 1_000,
+      "staleTtlMs",
+    );
     this.#maxEntries = boundedInteger(options.maxEntries ?? 100, 1, 1_000, "maxEntries");
   }
 
@@ -107,18 +130,34 @@ export class ItemFeasibilityService {
     const validated = validateSelection(selection);
     const key = `${validated.application}:${validated.kind}:${validated.itemId}`;
     const requestedAt = this.#now();
-    const cached = this.#cache.get(key);
+    let cached = this.#cache.get(key);
+    if (
+      options.refresh !== true &&
+      cached?.refreshFailure !== undefined &&
+      cached.retryAfter !== undefined &&
+      requestedAt < cached.retryAfter &&
+      requestedAt < cached.staleUntil
+    ) {
+      return staleResult(
+        cached,
+        cached.refreshFailure,
+        cached.unavailableIntegrations ?? [],
+      );
+    }
     if (options.refresh !== true && cached !== undefined && requestedAt < cached.expiresAt) {
       return {
         ...cached.value,
         analysis: { ...cached.value.analysis, source: "memory_cache" },
       };
     }
-    if (cached !== undefined) this.#cache.delete(key);
+    if (cached !== undefined && requestedAt >= cached.staleUntil) {
+      this.#cache.delete(key);
+      cached = undefined;
+    }
     const active = this.#inFlight.get(key);
     if (active !== undefined) return active;
 
-    const current = this.#buildAndCache(validated, key);
+    const current = this.#buildAndCache(validated, key, cached);
     this.#inFlight.set(key, current);
     try {
       return await current;
@@ -130,17 +169,33 @@ export class ItemFeasibilityService {
   async #buildAndCache(
     selection: ItemFeasibilitySelection,
     key: string,
+    stale: ReadyCacheEntry | undefined,
   ): Promise<ItemFeasibilityResult> {
-    const built = await this.#build(selection);
-    if (built.status !== "ready") return built;
+    let built: ItemFeasibilityBuildResult;
+    try {
+      built = await this.#build(selection);
+    } catch (error) {
+      if (stale !== undefined) return this.#recordStaleFailure(key, stale, "unexpected_failure", []);
+      throw error;
+    }
+    if (built.status !== "ready") {
+      const failure = staleFailure(built);
+      if (stale !== undefined && failure !== undefined) {
+        return this.#recordStaleFailure(key, stale, failure.reason, failure.integrations);
+      }
+      this.#cache.delete(key);
+      return built;
+    }
     const generatedAt = this.#now();
     const expiresAt = generatedAt + this.#ttlMs;
+    const staleUntil = expiresAt + this.#staleTtlMs;
     const value: ReadyItemFeasibilityResult = {
       ...built,
       analysis: {
         source: "computed",
         generatedAt: new Date(generatedAt).toISOString(),
         expiresAt: new Date(expiresAt).toISOString(),
+        staleUntil: new Date(staleUntil).toISOString(),
       },
     };
     while (this.#cache.size >= this.#maxEntries) {
@@ -148,8 +203,24 @@ export class ItemFeasibilityService {
       if (oldest === undefined) break;
       this.#cache.delete(oldest);
     }
-    this.#cache.set(key, { value, expiresAt });
+    this.#cache.set(key, { value, expiresAt, staleUntil });
     return value;
+  }
+
+  #recordStaleFailure(
+    key: string,
+    stale: ReadyCacheEntry,
+    refreshFailure: RefreshFailure,
+    unavailableIntegrations: readonly IntegrationName[],
+  ): ReadyItemFeasibilityResult {
+    const failed: ReadyCacheEntry = {
+      ...stale,
+      retryAfter: Math.min(stale.staleUntil, this.#now() + this.#ttlMs),
+      refreshFailure,
+      unavailableIntegrations,
+    };
+    this.#cache.set(key, failed);
+    return staleResult(failed, refreshFailure, unavailableIntegrations);
   }
 
   async #build(selection: ItemFeasibilitySelection): Promise<ItemFeasibilityBuildResult> {
@@ -198,6 +269,40 @@ export class ItemFeasibilityService {
       ? this.#options.missingIntegrations.episode
       : this.#options.missingIntegrations.movie;
   }
+}
+
+function staleFailure(result: ItemFeasibilityBuildResult): {
+  readonly reason: "inventory_unavailable" | "integration_failure";
+  readonly integrations: readonly IntegrationName[];
+} | undefined {
+  if (result.status === "inventory_unavailable") {
+    return { reason: "inventory_unavailable", integrations: [result.selection.application] };
+  }
+  if (result.status !== "integration_failure") return undefined;
+  return {
+    reason: "integration_failure",
+    integrations: [...new Set(result.failures.map(({ integration }) => integration))],
+  };
+}
+
+function staleResult(
+  cached: {
+    readonly value: ReadyItemFeasibilityResult;
+    readonly staleUntil: number;
+  },
+  refreshFailure: RefreshFailure,
+  unavailableIntegrations: readonly IntegrationName[],
+): ReadyItemFeasibilityResult {
+  return {
+    ...cached.value,
+    analysis: {
+      ...cached.value.analysis,
+      source: "stale_cache",
+      refreshFailure,
+      unavailableIntegrations,
+      staleUntil: new Date(cached.staleUntil).toISOString(),
+    },
+  };
 }
 
 function episodeRequest(

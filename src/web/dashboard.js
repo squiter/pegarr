@@ -24,6 +24,7 @@ const elements = {
   sourceStatus: document.querySelector("#source-status"),
   statusMessage: document.querySelector("#status-message"),
   visibleCount: document.querySelector("#visible-count"),
+  visibleLabel: document.querySelector("#visible-label"),
 };
 
 let accessToken;
@@ -88,7 +89,9 @@ async function loadInventory() {
     setStatus(
       inventory.status === "partial"
         ? "Inventory loaded with one unavailable integration."
-        : `Inventory loaded. ${inventoryRows.length} missing items are ready to review.`,
+        : inventoryRows.length === 1
+          ? "Inventory loaded. 1 missing item is ready to review."
+          : `Inventory loaded. ${inventoryRows.length} missing items are ready to review.`,
       inventory.status === "partial" ? "warning" : "success",
     );
   } catch {
@@ -113,6 +116,7 @@ function renderInventory() {
   });
   elements.inventoryList.replaceChildren(...rows.map(renderItem));
   elements.visibleCount.textContent = String(rows.length);
+  elements.visibleLabel.textContent = rows.length === 1 ? "item" : "items";
   elements.emptyState.hidden = rows.length !== 0;
 }
 
@@ -220,11 +224,13 @@ function renderFeasibility(view) {
   policy.append(policyLabel, languages);
 
   const analysis = document.createElement("div");
-  analysis.className = "analysis-summary";
+  analysis.className = `analysis-summary${view.analysis.source === "stale_cache" ? " analysis-summary--stale" : ""}`;
   const analysisSource = document.createElement("strong");
-  analysisSource.textContent = view.analysis.source === "memory_cache"
-    ? "Pegarr item cache"
-    : "Fresh Arr/Bazarr analysis";
+  analysisSource.textContent = view.analysis.source === "stale_cache"
+    ? "Stale cached analysis"
+    : view.analysis.source === "memory_cache"
+      ? "Pegarr item cache"
+      : "Fresh Arr/Bazarr analysis";
   const analysisTiming = document.createElement("span");
   analysisTiming.textContent = `${view.analysis.elapsedMs} ms · ${view.analysis.arrRequests} Arr · ${view.analysis.bazarrRequests} Bazarr · ${view.analysis.providerRequests} provider ${view.analysis.providerRequests === 1 ? "request" : "requests"}`;
   analysis.append(analysisSource, analysisTiming);
@@ -233,6 +239,12 @@ function renderFeasibility(view) {
     generated.dateTime = view.analysis.generatedAt;
     generated.textContent = `Generated ${formatDateTime(view.analysis.generatedAt)}`;
     analysis.append(generated);
+  }
+  if (view.analysis.source === "stale_cache" && view.analysis.staleUntil) {
+    const staleUntil = document.createElement("time");
+    staleUntil.dateTime = view.analysis.staleUntil;
+    staleUntil.textContent = `Stale fallback expires ${formatDateTime(view.analysis.staleUntil)}`;
+    analysis.append(staleUntil);
   }
 
   const providers = document.createElement("div");
@@ -268,11 +280,17 @@ function renderFeasibility(view) {
   elements.feasibilitySummary.replaceChildren(policy, analysis, providers);
   elements.releaseTableBody.replaceChildren(...view.releases.map(renderRelease));
   elements.releaseTableWrap.hidden = false;
+  const stale = view.analysis.source === "stale_cache";
+  const unavailable = view.analysis.unavailableIntegrations.length > 0
+    ? view.analysis.unavailableIntegrations.map(capitalize).join(" and ")
+    : "an integration";
   setFeasibilityNotice(
-    view.releases.length === 0
+    stale
+      ? `${view.releases.length} cached release ${view.releases.length === 1 ? "candidate" : "candidates"} shown because ${unavailable} could not refresh. This evidence is not current.`
+      : view.releases.length === 0
       ? "The Arr search returned no release candidates."
-      : `${view.releases.length} release candidates evaluated. Video and subtitle decisions remain separate.`,
-    view.releases.length === 0 ? "warning" : "success",
+      : `${view.releases.length} release ${view.releases.length === 1 ? "candidate" : "candidates"} evaluated. Video and subtitle decisions remain separate.`,
+    stale || view.releases.length === 0 ? "warning" : "success",
   );
 }
 
@@ -378,4 +396,8 @@ function setStatus(message, state) {
 
 function formatDateTime(value) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function capitalize(value) {
+  return value ? `${value[0].toUpperCase()}${value.slice(1)}` : "Integration";
 }

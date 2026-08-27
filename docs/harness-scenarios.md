@@ -135,6 +135,9 @@
 | PEG-ITEM-005 | Explicit refresh bypasses only the bounded item cache | `src/item-feasibility.test.ts` |
 | PEG-DASH-005 | Analysis diagnostics preserve safe request, quota, and cache evidence | `src/dashboard-model.test.ts` |
 | PEG-DOCKER-014 | Packaged refresh reuses the provider window | `scripts/harness/docker-build.mjs` |
+| PEG-ITEM-006 | Transient integration failures use a bounded labeled stale report | `src/item-feasibility.test.ts` |
+| PEG-DASH-006 | Stale analysis stays visibly distinct from fresh evidence | `src/dashboard-model.test.ts` |
+| PEG-DOCKER-015 | Packaged integration outage retains labeled stale evidence | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

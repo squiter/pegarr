@@ -329,6 +329,19 @@ if (/^phase-[01]-/u.test(manifest.phase)) {
   ) {
     issues.push("Explicit item refresh must bypass only Pegarr's bounded item cache");
   }
+  for (const contract of [
+    'source: "stale_cache"',
+    "#staleTtlMs",
+    "staleFailure",
+    "retryAfter",
+  ]) {
+    if (!itemFeasibility.includes(contract)) {
+      issues.push(`The stale item fallback must retain ${contract}`);
+    }
+  }
+  if (!dashboardClient.includes('view.analysis.source === "stale_cache"')) {
+    issues.push("The dashboard must label stale analysis explicitly");
+  }
   if (
     !app.includes('pathname === "/"') ||
     !app.includes("content-security-policy") ||
