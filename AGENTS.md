@@ -8,7 +8,7 @@ Read `ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md` before making architectural or pr
 
 ## Current phase
 
-The Phase 1 read-only MVP, Phase 2 controlled Grab, and Phase 3 reliability/provider expansion are complete and ratcheted by their ledgers under `harness/`. Phase 4 optional workflow adapters have not started. Keep the default read-only, live routes authenticated, caches bounded, logs redacted, and behavior deterministic. Never execute an automated Grab against a live service.
+The Phase 1 read-only MVP, Phase 2 controlled Grab, and Phase 3 reliability/provider expansion are complete and ratcheted by their ledgers under `harness/`. The active next cycle is the local-first [release-candidate roadmap](docs/release-candidate-roadmap.md); Phase 4 optional workflow adapters have not started. Keep the default read-only, live routes authenticated, caches bounded, logs redacted, and behavior deterministic. Never execute an automated Grab against a live service.
 
 ## Non-negotiable behavior
 

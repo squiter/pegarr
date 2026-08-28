@@ -1,0 +1,123 @@
+# Release-candidate roadmap
+
+Pegarr's API-feasibility milestone and implementation Phases 1 through 3 are complete. The next cycle is release-candidate validation: proving the packaged behavior against operator-owned services without weakening the default read-only boundary or claiming that synthetic coverage proves a production environment.
+
+At the start of this cycle, the repository has 228 deterministic automated scenarios and six explicit manual gaps. The implementation baseline is signed commit [`f1c1576`](https://github.com/squiter/pegarr/commit/f1c1576d57a12426cdaf0cd2a163946836580ff1). Treat the scenario manifest and phase ledgers as authoritative if those numbers later change.
+
+## Ordered work
+
+### 1. Local read-only acceptance
+
+Use the local Colima environment before touching the NAS. Exercise real, authenticated reads for every locally available integration:
+
+- Sonarr status, missing inventory, release search, and item analysis;
+- Radarr status, missing inventory, release search, and item analysis when a local instance is available;
+- Bazarr profile listing and targeted series/movie assignment resolution;
+- one bounded SubDL movie or episode search with an explicit Bazarr-to-provider language mapping;
+- one bounded OpenSubtitles movie or episode search with an explicit language mapping;
+- the authenticated dashboard from inventory selection through release comparison.
+
+Success requires measured request shapes and safe outcomes, not copied provider bodies. Never retain API keys, authorization headers, private paths, download handles, raw provider responses, or unredacted media records in the repository or harness artifacts.
+
+This work advances `PEG-MANUAL-001`, `PEG-MANUAL-002`, `PEG-MANUAL-005`, and `PEG-MANUAL-006`. Update a gap's reason with the observed version, date, and remaining boundary. Remove or close a gap only when its entire statement is proven.
+
+### 2. Local controlled-Grab acceptance
+
+Use a disposable or otherwise harmless local Sonarr/Radarr target. Do not use the NAS for the first mutation test.
+
+Verify one complete operator-owned flow:
+
+1. Controlled Grab is disabled by default.
+2. Enabling it still requires the independent administrator secret.
+3. Pegarr revalidates the exact release before preparation and execution.
+4. An incorrect confirmation phrase causes no mutation.
+5. The exact release-and-target phrase permits one Grab.
+6. Audit history records the bounded outcome without selection handles or credentials.
+7. A repeated idempotency key and a recent duplicate remain blocked.
+8. A simulated or observed unknown outcome remains `timeout_unknown` until exact reconciliation.
+9. Restart recovery keeps unresolved work Unknown and allows progress only after reconciliation.
+
+This advances `PEG-MANUAL-004`. It never authorizes an automated live Grab, a production Grab, or an arbitrary download.
+
+### 3. Portainer deployment example
+
+Create the planned secret-safe example showing Pegarr beside Sonarr, Radarr, Bazarr, SubDL, and OpenSubtitles. It should compose the existing overlays instead of making those services core runtime dependencies.
+
+The guide must include:
+
+- private secret-file mounts rather than credentials in environment values;
+- an explicit persistent Pegarr data volume for provider cache and Grab audit data;
+- internal service names and an authenticated browser route;
+- the default read-only deployment and a visibly separate controlled-Grab opt-in;
+- `linux/amd64` and `linux/arm64` compatibility without NAS-specific paths;
+- first deployment, health checks, persistence checks, reversible update, and rollback steps;
+- a warning to preserve the operator's existing Arr/Bazarr mounts, paths, and data.
+
+This is deployment documentation, not ownership of the media stack. Never replace a live Portainer definition from an example without first exporting and comparing it.
+
+### 4. NAS production smoke test
+
+The NAS is the production environment and comes last. Start read-only, use the exact image digest already validated locally, and preserve a rollback unit.
+
+Verify:
+
+- image pull and expected architecture;
+- non-root startup, read-only filesystem, health, and readiness;
+- authentication before any upstream work;
+- private secret-file permissions;
+- persistence across a controlled restart;
+- bounded Sonarr, Radarr, Bazarr, and provider reads;
+- provider cache reuse without extra quota consumption;
+- dashboard behavior through the private production route;
+- logs and diagnostics remain redacted.
+
+This advances `PEG-MANUAL-003` and may add installed-service evidence to the other gaps. It does not automatically authorize controlled Grab in production.
+
+### 5. First public release
+
+After local acceptance and the read-only NAS smoke test:
+
+- run `npm run check` on the exact release commit;
+- require the GitHub CI and multi-architecture container workflows to pass for that commit;
+- record unresolved manual boundaries in the release notes;
+- choose and apply the first semantic version tag;
+- deploy the immutable version tag or digest rather than relying on `latest`;
+- verify the published release and container metadata.
+
+Do not call the build production-proven before the relevant manual evidence exists.
+
+## Known implementation limitations
+
+These are honest follow-up candidates, not regressions in the completed Phase 3 contract:
+
+- OpenSubtitles season-pack search is not implemented; its adapter currently supports exact movie and episode searches.
+- Specials season `0` remains unsupported until provider season identity is validated.
+- Provider credentials and Bazarr-to-provider language mappings are configured independently in Pegarr. A future onboarding helper may reduce duplication, but Pegarr must not depend on Bazarr provider internals.
+- Release-name parsing will need new sanitized fixtures when real providers expose previously unseen notation.
+
+## Phase 4 boundary
+
+Optional workflow adapters have not started:
+
+- Jellyfin item-menu link;
+- Seerr request webhook;
+- notifications containing a Pegarr deep link;
+- browser extension or userscript.
+
+Start one only when real usage demonstrates its value. Optional adapters must contain no matching logic and must not become core dependencies.
+
+## Handoff for the next agent
+
+Start with local read-only acceptance. Read `AGENTS.md`, the research document, the relevant integration contract, and `harness/manifest.json` before acting. Prefer the packaged probes and existing injected boundaries over ad hoc requests.
+
+For every result:
+
+- distinguish implementation evidence from installed-environment evidence;
+- preserve the six manual gaps until their complete claims are proven;
+- improve a fixture, guide, tool, or sensor when a failure would otherwise recur;
+- add a stable harness scenario for every behavior change;
+- use `npm run check:affected` as the local completion gate;
+- never execute an automated Grab against a live service;
+- never mutate the NAS without explicit authority for that exact operation.
+
+If local credentials or a required service are unavailable, move to the Portainer documentation slice instead of weakening a validation claim.
