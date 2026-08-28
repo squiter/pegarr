@@ -20,8 +20,8 @@ The guides are `AGENTS.md`, this document, the research record, the scenario led
 The computational sensors currently enforce:
 
 - scenario-to-test traceability and explicit manual gaps;
-- Phase 1 criterion-to-scenario traceability and an explicit completion state;
-- read-only phase, authentication, and confidence-state architecture ratchets;
+- completed Phase 1 and active Phase 2 criterion-to-scenario traceability;
+- default-read-only, controlled-mutation, authentication, audit, and confidence-state architecture ratchets;
 - core matching isolation from Node, adapters, and fixtures;
 - local Markdown links and required contributor documentation;
 - secret-safe tracked files and absence of browser credential storage;
@@ -42,7 +42,7 @@ For Sonarr, Radarr, Bazarr, or a subtitle provider:
 6. Add the new scenario IDs and update the manual-gap boundary.
 7. Run the affected completion gate before using a live read-only probe.
 
-No harness test may perform Grab or another external mutation. A future Grab workflow needs explicit human confirmation plus a separate design and sensor set.
+No harness test may perform Grab or another external mutation against a live service. Phase 2 tests inject synthetic Arr transports or run disposable fixture containers, and the controlled path must retain independent administration, exact confirmation, audit-before-mutation, idempotency, and timeout reconciliation semantics.
 
 ## Improving the harness
 

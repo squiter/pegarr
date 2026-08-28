@@ -1,7 +1,7 @@
 # Sonarr v3 episode release-search contract
 
-Snapshot date: 2026-08-25
-Status: fixture-proven against the verified installed Sonarr `4.0.19.2979`; live release response not yet captured
+Snapshot date: 2026-08-28
+Status: search fixture-proven and read-only compatible with local Sonarr `4.0.16.2944`; controlled Grab is synthetic-only
 
 ## Primary evidence
 
@@ -15,7 +15,17 @@ X-Api-Key: <server-side secret>
 Accept: application/json
 ```
 
-Sonarr's Grab operation is a separate `POST` on the release controller. Pegarr does not expose or call it in Phase 0.
+Sonarr's official controller and OpenAPI expose Grab as a separate `POST /api/v3/release` whose request schema is `ReleaseResource`. The controller resolves the cached release from its GUID and indexer ID. Phase 2 therefore performs a fresh GET search, keeps the matching handle server-side, and sends only:
+
+```http
+POST /api/v3/release
+X-Api-Key: <server-side secret>
+Content-Type: application/json
+
+{"guid":"<revalidated server-side handle>","indexerId":<positive integer>}
+```
+
+Pegarr never accepts either handle field from the browser. It revalidates once during confirmation preparation and again immediately before POST.
 
 ## Fields Pegarr retains
 
@@ -41,7 +51,7 @@ The read-only report must not contain:
 - magnet URLs or info hashes;
 - arbitrary unvalidated response properties.
 
-A later controlled-Grab phase will need a server-side, expiring selection cache. That cache must not make raw selection data browser-visible.
+The raw selection handle lives only in the short revalidation call stack. The expiring browser challenge contains the opaque Pegarr release ID and display evidence, never the raw handle.
 
 ## Failure contract
 
@@ -56,6 +66,8 @@ The adapter distinguishes:
 
 Transport exception messages are replaced with stable Pegarr messages so private topology or credentials cannot escape through errors.
 
+For Grab, `200` is accepted. Authentication, unavailable-release, quota, and other upstream failures remain distinct. A transport timeout becomes `timeout_unknown`; Pegarr audits it as requiring reconciliation and blocks an immediate duplicate instead of claiming failure.
+
 ## Remaining proof
 
-The installed Sonarr version and authentication requirement are verified separately in the system-status contract. `PEG-MANUAL-001` remains open until a separately authorized, read-only probe verifies this release endpoint's authentication header, response shape, response size, and latency. No live Grab is part of that probe.
+The installed Sonarr version and authentication requirement are verified separately in the system-status contract. `PEG-MANUAL-004` remains open until an operator explicitly authorizes a harmless live Grab and reconciles the observed Arr activity. Automated tests use only injected transports and disposable fixture containers.

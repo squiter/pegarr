@@ -44,12 +44,19 @@ export type RadarrRuntimeConfiguration = ServiceRuntimeConfiguration;
 export type BazarrRuntimeConfiguration = ServiceRuntimeConfiguration;
 export type SubdlRuntimeConfiguration = ServiceRuntimeConfiguration;
 
+export interface ControlledGrabRuntimeConfiguration {
+  readonly enabled: true;
+  readonly adminToken: SecretValue;
+  readonly auditFile: string;
+}
+
 export interface RuntimeConfiguration {
   readonly sonarr?: SonarrRuntimeConfiguration;
   readonly radarr?: RadarrRuntimeConfiguration;
   readonly bazarr?: BazarrRuntimeConfiguration;
   readonly subdl?: SubdlRuntimeConfiguration;
   readonly accessToken?: SecretValue;
+  readonly controlledGrab?: ControlledGrabRuntimeConfiguration;
   readonly missingPageSize?: number;
   readonly subdlLanguageMappings?: readonly ProviderLanguageMapping[];
 }
@@ -91,6 +98,17 @@ export async function loadRuntimeConfiguration(
     secretFormat: "bearer",
   });
   const accessToken = await loadAccessToken(environment);
+  const controlledGrab = await loadControlledGrabConfiguration(environment);
+  if (controlledGrab !== undefined && accessToken === undefined) {
+    throw new ConfigurationError(
+      "Controlled Grab requires PEGARR_ACCESS_TOKEN_FILE for the read-only library boundary",
+    );
+  }
+  if (controlledGrab !== undefined && accessToken?.reveal() === controlledGrab.adminToken.reveal()) {
+    throw new ConfigurationError(
+      "Controlled Grab administrator and read-only access tokens must be different",
+    );
+  }
   const missingPageSize = parseOptionalBoundedInteger(
     environment.PEGARR_MISSING_PAGE_SIZE,
     1,
@@ -107,9 +125,46 @@ export async function loadRuntimeConfiguration(
     ...(bazarr === undefined ? {} : { bazarr }),
     ...(subdl === undefined ? {} : { subdl }),
     ...(accessToken === undefined ? {} : { accessToken }),
+    ...(controlledGrab === undefined ? {} : { controlledGrab }),
     ...(missingPageSize === undefined ? {} : { missingPageSize }),
     ...(subdlLanguageMappings === undefined ? {} : { subdlLanguageMappings }),
   };
+}
+
+async function loadControlledGrabConfiguration(
+  environment: Readonly<Record<string, string | undefined>>,
+): Promise<ControlledGrabRuntimeConfiguration | undefined> {
+  if (present(environment.PEGARR_ADMIN_TOKEN)) {
+    throw new ConfigurationError(
+      "Direct administrator tokens are not supported; use PEGARR_ADMIN_TOKEN_FILE",
+    );
+  }
+  const enabled = parseBoolean(environment.PEGARR_GRAB_ENABLED, "PEGARR_GRAB_ENABLED");
+  const tokenFile = optional(environment.PEGARR_ADMIN_TOKEN_FILE);
+  const auditFile = optional(environment.PEGARR_GRAB_AUDIT_FILE);
+  if (!enabled) {
+    if (tokenFile !== undefined || auditFile !== undefined) {
+      throw new ConfigurationError(
+        "Administrator token and Grab audit configuration require PEGARR_GRAB_ENABLED=true",
+      );
+    }
+    return undefined;
+  }
+  if (tokenFile === undefined || auditFile === undefined) {
+    throw new ConfigurationError(
+      "Controlled Grab requires PEGARR_ADMIN_TOKEN_FILE and PEGARR_GRAB_AUDIT_FILE",
+    );
+  }
+  if (!isAbsolute(auditFile)) {
+    throw new ConfigurationError("PEGARR_GRAB_AUDIT_FILE must be an absolute path");
+  }
+  const adminToken = await readSecret(
+    tokenFile,
+    "Pegarr",
+    "PEGARR_ADMIN_TOKEN_FILE",
+    "admin",
+  );
+  return { enabled: true, adminToken, auditFile };
 }
 
 function parseSubdlLanguageMappings(
@@ -263,7 +318,7 @@ async function readSecret(
   path: string,
   displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL" | "Pegarr",
   apiKeyFileName: string,
-  secretFormat: "arr" | "bearer" | "access",
+  secretFormat: "arr" | "bearer" | "access" | "admin",
 ): Promise<SecretValue> {
   if (!isAbsolute(path)) {
     throw new ConfigurationError(`${apiKeyFileName} must be an absolute path`);
@@ -280,13 +335,13 @@ async function readSecret(
     const value = buffer.subarray(0, bytesRead).toString("utf8").trim();
     const valid = secretFormat === "arr"
       ? /^[a-z0-9_-]{16,256}$/iu.test(value)
-      : secretFormat === "access"
+      : secretFormat === "access" || secretFormat === "admin"
         ? /^[a-z0-9._~+/=-]{32,4096}$/iu.test(value)
         : /^[a-z0-9._~+/=-]{16,4096}$/iu.test(value);
     if (!valid) {
       throw new ConfigurationError(
-        secretFormat === "access"
-          ? "Pegarr access token file does not contain one valid token"
+        secretFormat === "access" || secretFormat === "admin"
+          ? `Pegarr ${secretFormat === "admin" ? "administrator" : "access"} token file does not contain one valid token`
           : `${displayName} API key file does not contain one valid API key`,
       );
     }
@@ -296,8 +351,8 @@ async function readSecret(
       throw error;
     }
     throw new ConfigurationError(
-      secretFormat === "access"
-        ? "Pegarr access token file could not be read"
+      secretFormat === "access" || secretFormat === "admin"
+        ? `Pegarr ${secretFormat === "admin" ? "administrator" : "access"} token file could not be read`
         : `${displayName} API key file could not be read`,
     );
   } finally {

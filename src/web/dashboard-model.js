@@ -343,6 +343,7 @@ export function feasibilityView(value) {
   const releases = value.report.releases.flatMap(releaseView).toSorted(compareReleases);
   const metrics = isRecord(value.metrics) ? value.metrics : {};
   const analysis = isRecord(value.analysis) ? value.analysis : {};
+  const capabilities = isRecord(value.capabilities) ? value.capabilities : {};
   const analysisSource = analysis.source === "memory_cache" || analysis.source === "stale_cache"
     ? analysis.source
     : "computed";
@@ -358,6 +359,7 @@ export function feasibilityView(value) {
     languages,
     providers,
     releases,
+    controlledGrab: capabilities.controlledGrab === true,
     analysis: {
       source: analysisSource,
       ...(safeTimestamp(analysis.generatedAt) === undefined ? {} : { generatedAt: safeTimestamp(analysis.generatedAt) }),

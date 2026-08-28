@@ -47,13 +47,29 @@ for (const [file, allowedImports] of Object.entries(adapterImports)) {
 }
 
 const sonarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/sonarr.ts"), "utf8");
-if (!sonarrAdapter.includes('method: "GET"') || sonarrAdapter.includes('method: "POST"')) {
-  issues.push("The Phase 0 Sonarr adapter must remain read-only");
+if (
+  !sonarrAdapter.includes('method: "GET"') ||
+  !sonarrAdapter.includes("revalidateEpisodeRelease") ||
+  !sonarrAdapter.includes("grabRelease(handle: ArrReleaseHandle)") ||
+  !sonarrAdapter.includes('method: "POST"') ||
+  !sonarrAdapter.includes("body: normalized") ||
+  (sonarrAdapter.match(/method: "POST"/gu) ?? []).length !== 1 ||
+  /method: "(?:PUT|PATCH|DELETE)"/u.test(sonarrAdapter)
+) {
+  issues.push("The Sonarr adapter must retain one narrow revalidated release Grab boundary");
 }
 
 const radarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/radarr.ts"), "utf8");
-if (!radarrAdapter.includes('method: "GET"') || radarrAdapter.includes('method: "POST"')) {
-  issues.push("The Phase 0 Radarr adapter must remain read-only");
+if (
+  !radarrAdapter.includes('method: "GET"') ||
+  !radarrAdapter.includes("revalidateMovieRelease") ||
+  !radarrAdapter.includes("grabRelease(handle: ArrReleaseHandle)") ||
+  !radarrAdapter.includes('method: "POST"') ||
+  !radarrAdapter.includes("body: normalized") ||
+  (radarrAdapter.match(/method: "POST"/gu) ?? []).length !== 1 ||
+  /method: "(?:PUT|PATCH|DELETE)"/u.test(radarrAdapter)
+) {
+  issues.push("The Radarr adapter must retain one narrow revalidated release Grab boundary");
 }
 
 const bazarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/bazarr.ts"), "utf8");
@@ -155,6 +171,9 @@ for (const contract of [
   'return "[redacted]"',
   "PEGARR_ACCESS_TOKEN_FILE",
   "PEGARR_SUBDL_LANGUAGE_MAPPINGS",
+  "PEGARR_GRAB_ENABLED",
+  "PEGARR_ADMIN_TOKEN_FILE",
+  "PEGARR_GRAB_AUDIT_FILE",
 ]) {
   if (!configuration.includes(contract)) {
     issues.push(`The runtime configuration must retain ${contract}`);
@@ -191,6 +210,18 @@ if (!accessCompose.includes("PEGARR_ACCESS_TOKEN_FILE: /run/secrets/pegarr_acces
 }
 if (/PEGARR_ACCESS_TOKEN\s*:/u.test(accessCompose)) {
   issues.push("The access Compose overlay may not pass the bearer token as an environment value");
+}
+
+const grabCompose = readFileSync(resolve(repoRoot, "deploy/compose.grab.yaml"), "utf8");
+for (const contract of [
+  'PEGARR_GRAB_ENABLED: "true"',
+  "PEGARR_ADMIN_TOKEN_FILE: /run/secrets/pegarr_admin_token",
+  "PEGARR_GRAB_AUDIT_FILE: /data/grab-audit.sqlite",
+]) {
+  if (!grabCompose.includes(contract)) issues.push(`The controlled Grab Compose overlay must retain ${contract}`);
+}
+if (/PEGARR_ADMIN_TOKEN\s*:/u.test(grabCompose)) {
+  issues.push("The controlled Grab Compose overlay may not pass the administrator token as an environment value");
 }
 
 const sonarrCompose = readFileSync(resolve(repoRoot, "deploy/compose.sonarr.yaml"), "utf8");
@@ -348,6 +379,46 @@ if (/^phase-[01]-/u.test(manifest.phase)) {
     !app.includes("dashboardPage")
   ) {
     issues.push("The Phase 1 dashboard must retain its same-origin security boundary");
+  }
+}
+
+if (/^phase-2-/u.test(manifest.phase)) {
+  const app = readFileSync(resolve(repoRoot, "src/app.ts"), "utf8");
+  const controlledGrab = readFileSync(resolve(repoRoot, "src/controlled-grab.ts"), "utf8");
+  const grabAudit = readFileSync(resolve(repoRoot, "src/grab-audit.ts"), "utf8");
+  for (const contract of [
+    "authorizeAdministratorRoute(access)",
+    "parsePrepareGrabBody",
+    "parseExecuteGrabBody",
+    'pathname === "/api/v1/grabs/history"',
+    "readBoundedJsonBody(request)",
+  ]) {
+    if (!app.includes(contract)) issues.push(`The Phase 2 API boundary must retain ${contract}`);
+  }
+  for (const contract of [
+    "source.revalidate(validated, normalizedReleaseId)",
+    "confirmationText(releaseTitle, targetLabel)",
+    "this.#options.audit.begin",
+    "source.revalidate(selection, challenge.releaseId)",
+    "await source.grab(revalidated.handle)",
+    '"timeout_unknown"',
+    '"reconciliation_required"',
+  ]) {
+    if (!controlledGrab.includes(contract)) issues.push(`The controlled Grab service must retain ${contract}`);
+  }
+  for (const forbidden of ["api_key", "authorization", "guid", "indexer_id"]) {
+    if (grabAudit.toLocaleLowerCase().includes(forbidden)) issues.push(`The Grab audit must not persist ${forbidden}`);
+  }
+  for (const contract of ["idempotency_key TEXT NOT NULL UNIQUE", "status = 'in_progress'", "LIMIT ?"]) {
+    if (!grabAudit.includes(contract)) issues.push(`The Grab audit must retain ${contract}`);
+  }
+  for (const contract of [
+    "administratorToken = undefined",
+    "crypto.randomUUID()",
+    'credentials: "omit"',
+    "activeFeasibility?.controlledGrab === true",
+  ]) {
+    if (!dashboardClient.includes(contract)) issues.push(`The controlled Grab dashboard must retain ${contract}`);
   }
 }
 

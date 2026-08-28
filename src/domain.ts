@@ -91,6 +91,22 @@ export interface ArrReleaseCandidate {
   readonly traits?: ReleaseTraits;
 }
 
+/** Server-only handle returned by Arr release search and never serialized to the browser. */
+export interface ArrReleaseHandle {
+  readonly guid: string;
+  readonly indexerId: number;
+}
+
+export interface RevalidatedArrRelease {
+  readonly candidate: ArrReleaseCandidate;
+  readonly handle: ArrReleaseHandle;
+}
+
+export interface ArrGrabReceipt {
+  readonly status: "accepted";
+  readonly responseStatus: 200;
+}
+
 export interface SubtitleLanguageRequirement {
   readonly code: string;
   readonly required: boolean;

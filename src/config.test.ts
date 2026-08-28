@@ -235,3 +235,66 @@ test("PEG-CONFIG-007 runtime SubDL language mappings are explicit, bounded, and 
     /policy:provider/u,
   );
 });
+
+test("PEG-CONFIG-008 controlled Grab is opt-in and requires independent secret-file administration", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-grab-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const accessPath = join(directory, "access-token");
+  const adminPath = join(directory, "admin-token");
+  const auditPath = join(directory, "grab-audit.sqlite");
+  const access = "synthetic-access-token-value-0000000001";
+  const admin = "synthetic-admin-token-value-00000000001";
+  await Promise.all([
+    writeFile(accessPath, access, { mode: 0o600 }),
+    writeFile(adminPath, admin, { mode: 0o600 }),
+  ]);
+
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_ACCESS_TOKEN_FILE: accessPath,
+    PEGARR_GRAB_ENABLED: "true",
+    PEGARR_ADMIN_TOKEN_FILE: adminPath,
+    PEGARR_GRAB_AUDIT_FILE: auditPath,
+  });
+  assert.equal(configuration.controlledGrab?.enabled, true);
+  assert.equal(configuration.controlledGrab?.adminToken.reveal(), admin);
+  assert.equal(configuration.controlledGrab?.auditFile, auditPath);
+  assert.doesNotMatch(JSON.stringify(configuration), new RegExp(admin, "u"));
+
+  await assert.rejects(
+    loadRuntimeConfiguration({ PEGARR_ADMIN_TOKEN: admin }),
+    /PEGARR_ADMIN_TOKEN_FILE/u,
+  );
+  await assert.rejects(
+    loadRuntimeConfiguration({ PEGARR_ADMIN_TOKEN_FILE: adminPath }),
+    /PEGARR_GRAB_ENABLED=true/u,
+  );
+  await assert.rejects(
+    loadRuntimeConfiguration({
+      PEGARR_GRAB_ENABLED: "true",
+      PEGARR_ADMIN_TOKEN_FILE: adminPath,
+      PEGARR_GRAB_AUDIT_FILE: auditPath,
+    }),
+    /PEGARR_ACCESS_TOKEN_FILE/u,
+  );
+  await assert.rejects(
+    loadRuntimeConfiguration({
+      PEGARR_ACCESS_TOKEN_FILE: accessPath,
+      PEGARR_GRAB_ENABLED: "true",
+      PEGARR_ADMIN_TOKEN_FILE: adminPath,
+      PEGARR_GRAB_AUDIT_FILE: "relative.sqlite",
+    }),
+    /absolute path/u,
+  );
+  await assert.rejects(
+    loadRuntimeConfiguration({
+      PEGARR_ACCESS_TOKEN_FILE: accessPath,
+      PEGARR_GRAB_ENABLED: "true",
+      PEGARR_ADMIN_TOKEN_FILE: accessPath,
+      PEGARR_GRAB_AUDIT_FILE: auditPath,
+    }),
+    /must be different/u,
+  );
+});

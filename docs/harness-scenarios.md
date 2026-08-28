@@ -180,6 +180,22 @@
 | PEG-DASH-036 | Release comparison and navigation remain page-memory-only assets | `src/app.test.ts` |
 | PEG-DOCKER-022 | Packaged release comparison causes no upstream requests | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-023 | Packaged request logs are structured, redacted, and read-only | `scripts/harness/docker-build.mjs` |
+| PEG-HTTP-006 | Bounded POST JSON retains the transport security policy | `src/adapters/fetch-json-transport.test.ts` |
+| PEG-CONFIG-008 | Controlled Grab is opt-in with independent secret-file administration | `src/config.test.ts` |
+| PEG-SONARR-010 | Sonarr revalidation and Grab use only a server-side release handle | `src/adapters/sonarr.test.ts` |
+| PEG-RADARR-009 | Radarr revalidation and Grab preserve unknown timeout outcomes | `src/adapters/radarr.test.ts` |
+| PEG-GRAB-001 | Preparation binds exact release and target confirmation | `src/controlled-grab.test.ts` |
+| PEG-GRAB-002 | Execution revalidates again and mutates exactly once | `src/controlled-grab.test.ts` |
+| PEG-GRAB-003 | Idempotent replay cannot produce another mutation | `src/controlled-grab.test.ts` |
+| PEG-GRAB-004 | Timeout stays Unknown and blocks duplicate attempts | `src/controlled-grab.test.ts` |
+| PEG-GRAB-005 | Durable audit excludes credentials and Arr handles | `src/grab-audit.test.ts` |
+| PEG-GRAB-006 | Interrupted mutations recover as Unknown and require reconciliation | `src/grab-audit.test.ts` |
+| PEG-GRABAPI-001 | Grab routes require the independent administrator token | `src/app.test.ts` |
+| PEG-GRABAPI-002 | Execution and history expose only bounded public outcomes | `src/app.test.ts` |
+| PEG-DASH-037 | Controlled Grab UI is confirmation-bound and page-memory-only | `src/app.test.ts` |
+| PEG-DASH-038 | Controlled Grab capability is explicit and defaults off | `src/dashboard-model.test.ts` |
+| PEG-HARNESS-006 | Phase 2 progress preserves Phase 1 and maps active evidence | `scripts/harness/phase-contract.mjs` |
+| PEG-DOCKER-024 | Packaged controlled Grab performs one confirmed synthetic Arr mutation | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 
@@ -188,7 +204,7 @@
 | PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima refreshed Sonarr 4.0.16.2944 status and monitored missing-page shapes on 2026-08-28 after a measured release search on 2026-08-26; no local Radarr is available, and NAS production validation remains separate |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima refreshed authenticated profile-list and targeted series-assignment shapes on 2026-08-28 without retaining policy contents; installed NAS compatibility remains intentionally untested |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
-| PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside the read-only MVP and require explicit confirmation |
+| PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.

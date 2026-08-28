@@ -14,7 +14,7 @@ export const dashboardPage = `<!doctype html>
       <span class="brand-mark" aria-hidden="true">P</span>
       <span><strong>Pegarr</strong><small>Subtitle-aware release selection</small></span>
     </a>
-    <span class="phase-badge">Read-only MVP</span>
+    <span class="phase-badge">Phase 2 · controlled Grab</span>
   </header>
 
   <main id="main" class="shell">
@@ -253,7 +253,7 @@ export const dashboardPage = `<!doctype html>
         <div>
           <p class="eyebrow">Decision support only</p>
           <strong id="release-leading-heading">Leading Arr-accepted candidate</strong>
-          <span>Recommended ordering keeps Arr acceptance first. Pegarr does not Grab in this phase.</span>
+          <span>Recommended ordering keeps Arr acceptance first. Pegarr never Grabs automatically.</span>
         </div>
         <div class="release-leading-result">
           <strong id="release-leading-title"></strong>
@@ -272,16 +272,49 @@ export const dashboardPage = `<!doctype html>
       <div id="release-table-wrap" class="release-table-wrap" hidden>
         <table class="release-table">
           <caption>Interactive release candidates enriched with subtitle evidence</caption>
-          <thead><tr><th scope="col">Video release</th><th scope="col">Arr decision</th><th scope="col">Subtitle confidence</th><th scope="col">Evidence</th><th scope="col">Shortlist</th></tr></thead>
+          <thead><tr><th scope="col">Video release</th><th scope="col">Arr decision</th><th scope="col">Subtitle confidence</th><th scope="col">Evidence</th><th scope="col">Shortlist</th><th scope="col">Controlled Grab</th></tr></thead>
           <tbody id="release-table-body"></tbody>
         </table>
       </div>
     </section>
   </main>
 
+  <dialog id="grab-dialog" class="grab-dialog" aria-labelledby="grab-dialog-title">
+    <form id="grab-form" method="dialog" class="grab-dialog-card">
+      <div class="grab-dialog-heading">
+        <div>
+          <p class="eyebrow">Administrator action</p>
+          <h2 id="grab-dialog-title">Revalidate before Grab</h2>
+        </div>
+        <button id="grab-close" class="quiet-button" type="button">Cancel</button>
+      </div>
+      <p class="grab-warning">This asks Sonarr or Radarr to Grab one release. Pegarr will revalidate it twice, preserve Arr rejection decisions, and audit the outcome.</p>
+      <dl class="grab-selection">
+        <div><dt>Target</dt><dd id="grab-target"></dd></div>
+        <div><dt>Release</dt><dd id="grab-release"></dd></div>
+      </dl>
+      <section id="grab-auth-step" class="grab-step">
+        <label for="grab-admin-token"><span>Administrator token</span>
+          <input id="grab-admin-token" type="password" minlength="32" required autocomplete="off" spellcheck="false">
+        </label>
+        <p>The token stays only in this dialog's page memory and is cleared when the dialog closes.</p>
+        <button id="grab-prepare" class="primary-button" type="button">Revalidate release</button>
+      </section>
+      <section id="grab-confirm-step" class="grab-step" hidden>
+        <p>Type this exact phrase to authorize the action:</p>
+        <code id="grab-confirmation-phrase" class="grab-confirmation-phrase"></code>
+        <label for="grab-confirmation"><span>Exact confirmation</span>
+          <input id="grab-confirmation" type="text" autocomplete="off" spellcheck="false">
+        </label>
+        <button id="grab-execute" class="danger-button" type="button" disabled>Confirm Grab</button>
+      </section>
+      <p id="grab-status" class="grab-status" role="status" aria-live="polite"></p>
+    </form>
+  </dialog>
+
   <footer>
     <span>Pegarr keeps video decisions in Sonarr and Radarr.</span>
-    <span>No Grab actions are available in this phase.</span>
+    <span>Controlled Grab is opt-in, administrator-only, confirmed, and audited.</span>
   </footer>
   <script type="module" src="/assets/dashboard.js"></script>
 </body>

@@ -7,6 +7,18 @@ export interface ReadonlyJsonRequest {
   readonly maxResponseBytes: number;
 }
 
+export interface MutatingJsonRequest {
+  readonly method: "POST";
+  readonly path: string;
+  readonly query: Readonly<Record<string, string>>;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: Readonly<Record<string, unknown>>;
+  readonly timeoutMs: number;
+  readonly maxResponseBytes: number;
+}
+
+export type JsonRequest = ReadonlyJsonRequest | MutatingJsonRequest;
+
 export interface JsonResponse {
   readonly status: number;
   readonly headers: Readonly<Record<string, string>>;
@@ -15,7 +27,7 @@ export interface JsonResponse {
 }
 
 export interface JsonTransport {
-  requestJson(request: ReadonlyJsonRequest): Promise<JsonResponse>;
+  requestJson(request: JsonRequest): Promise<JsonResponse>;
 }
 
 export type JsonTransportErrorCode =

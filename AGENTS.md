@@ -8,7 +8,7 @@ Read `ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md` before making architectural or pr
 
 ## Current phase
 
-The Phase 1 read-only MVP implementation is complete and ratcheted by `harness/phase-1.json`. Keep live library routes authenticated, caches bounded, logs redacted, and behavior deterministic. Phase 2 Grab work must not begin without an explicit product decision and a new mutation-specific harness boundary.
+The Phase 1 read-only MVP is complete and ratcheted by `harness/phase-1.json`. Phase 2 controlled Grab is in progress behind an explicit opt-in boundary and `harness/phase-2.json`. Keep the default read-only, live routes authenticated, caches bounded, logs redacted, and behavior deterministic. Never execute an automated Grab against a live service.
 
 ## Non-negotiable behavior
 

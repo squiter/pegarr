@@ -1,8 +1,8 @@
 import {
   JsonTransportError,
+  type JsonRequest,
   type JsonResponse,
   type JsonTransport,
-  type ReadonlyJsonRequest,
 } from "./http.js";
 
 export type FetchImplementation = (
@@ -17,7 +17,7 @@ export interface FetchJsonTransportOptions {
   readonly fetchImplementation?: FetchImplementation;
 }
 
-const allowedRequestHeaders = new Set(["accept", "authorization", "user-agent", "x-api-key"]);
+const allowedRequestHeaders = new Set(["accept", "authorization", "content-type", "user-agent", "x-api-key"]);
 const safeResponseHeaders = new Set([
   "content-type",
   "retry-after",
@@ -26,6 +26,7 @@ const safeResponseHeaders = new Set([
   "x-ratelimit-reset",
 ]);
 const maximumResponseBytes = 10 * 1024 * 1024;
+const maximumRequestBytes = 64 * 1024;
 const safeQueryName = /^[a-z][a-z0-9_-]*(?:\[\])?$/iu;
 
 export class FetchJsonTransport implements JsonTransport {
@@ -50,7 +51,7 @@ export class FetchJsonTransport implements JsonTransport {
     this.#fetch = options.fetchImplementation ?? fetch;
   }
 
-  async requestJson(request: ReadonlyJsonRequest): Promise<JsonResponse> {
+  async requestJson(request: JsonRequest): Promise<JsonResponse> {
     const timeoutMs = boundedInteger(request.timeoutMs, 1, 60_000, "timeoutMs");
     const maxResponseBytes = boundedInteger(
       request.maxResponseBytes,
@@ -60,13 +61,16 @@ export class FetchJsonTransport implements JsonTransport {
     );
     const target = this.#targetUrl(request);
     const headers = requestHeaders(request.headers);
+    const requestBodyJson = request.method === "POST" ? requestBody(request.body) : undefined;
+    if (requestBodyJson !== undefined) headers.set("content-type", "application/json");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const response = await this.#fetch(target, {
-        method: "GET",
+        method: request.method,
         headers,
+        ...(requestBodyJson === undefined ? {} : { body: requestBodyJson }),
         signal: controller.signal,
         redirect: "error",
         credentials: "omit",
@@ -74,12 +78,12 @@ export class FetchJsonTransport implements JsonTransport {
         referrerPolicy: "no-referrer",
       });
       const boundedBody = await readBoundedBody(response, maxResponseBytes);
-      const body = parseBody(boundedBody.text, response.status);
+      const responseBody = parseBody(boundedBody.text, response.status);
 
       return {
         status: response.status,
         headers: responseHeaders(response.headers),
-        body,
+        body: responseBody,
         responseBytes: boundedBody.bytes,
       };
     } catch (error) {
@@ -95,7 +99,7 @@ export class FetchJsonTransport implements JsonTransport {
     }
   }
 
-  #targetUrl(request: ReadonlyJsonRequest): URL {
+  #targetUrl(request: JsonRequest): URL {
     const path = safeRequestPath(request.path);
     const target = new URL(this.#origin);
     target.pathname = `${this.#basePath}${path}`;
@@ -110,6 +114,19 @@ export class FetchJsonTransport implements JsonTransport {
     }
     return target;
   }
+}
+
+function requestBody(value: Readonly<Record<string, unknown>>): string {
+  let body: string;
+  try {
+    body = JSON.stringify(value);
+  } catch {
+    throw new JsonTransportError("invalid_request", "Request body is not JSON serializable");
+  }
+  if (Buffer.byteLength(body, "utf8") > maximumRequestBytes) {
+    throw new JsonTransportError("invalid_request", "Request body exceeded its size limit");
+  }
+  return body;
 }
 
 function parseBaseUrl(value: string, allowInsecureHttp: boolean): URL {

@@ -201,6 +201,20 @@ test("PEG-DASH-006 stale analysis remains visibly distinct from fresh evidence",
   assert.doesNotMatch(JSON.stringify(view), /private-upstream/iu);
 });
 
+test("PEG-DASH-038 controlled Grab capability is explicit and defaults off", () => {
+  const report = buildFeasibilityReport(demoFeasibilityInput);
+  const disabled = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report });
+  const enabled = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    mode: "read_only",
+    capabilities: { controlledGrab: true },
+    report,
+  });
+  assert.equal(disabled.state === "ready" && disabled.controlledGrab, false);
+  assert.equal(enabled.state === "ready" && enabled.controlledGrab, true);
+});
+
 test("PEG-DASH-007 release filtering and sorting stay local and preserve Arr decisions", () => {
   const view = feasibilityView({
     kind: "item-feasibility",

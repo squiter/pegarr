@@ -45,6 +45,8 @@ The overlay mounts the token at `/run/secrets/pegarr_access_token`. Pegarr rejec
 
 Bearer authentication does not encrypt traffic. Use HTTPS or a trusted private network. Never place the token in a URL, log, fixture, issue attachment, browser storage, or committed file. The dashboard keeps it only in page memory and requires it again after reload unless a stronger server-side session design replaces this boundary.
 
+The read-only token is deliberately unable to authorize a controlled Grab. Phase 2 uses a second administrator token, loaded from its own secret file, for the mutation routes. See [controlled Grab](controlled-grab.md).
+
 ## Request bounds
 
 Authorized inventory reads request at most one configured page from each Arr instance. Concurrent requests share one in-flight operation, and completed results are reused for 30 seconds. `PEGARR_MISSING_PAGE_SIZE` defaults to 50 and accepts values from 1 through 100.

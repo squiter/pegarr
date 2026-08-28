@@ -1,7 +1,7 @@
 # Radarr v3 movie release-search contract
 
-Snapshot date: 2026-08-25
-Status: fixture-proven, not yet verified against the installed NAS version
+Snapshot date: 2026-08-28
+Status: search and controlled Grab fixture-proven, not yet verified against a live installed Radarr
 
 ## Primary evidence
 
@@ -15,7 +15,17 @@ X-Api-Key: <server-side secret>
 Accept: application/json
 ```
 
-Radarr's Grab operation is a separate `POST` on the same controller. Pegarr does not expose or call it in Phase 0.
+Radarr's official OpenAPI exposes Grab as a separate `POST /api/v3/release` using `ReleaseResource`. Phase 2 performs a fresh movie release search, retains the matched handle only on the server, and sends only:
+
+```http
+POST /api/v3/release
+X-Api-Key: <server-side secret>
+Content-Type: application/json
+
+{"guid":"<revalidated server-side handle>","indexerId":<positive integer>}
+```
+
+Pegarr revalidates during preparation and again immediately before POST. The browser never receives or supplies either handle field.
 
 ## Fields Pegarr retains
 
@@ -41,7 +51,7 @@ The read-only report must not contain:
 - info hashes, TMDb/IMDb selection metadata, download-client fields, or override flags;
 - arbitrary unvalidated response properties.
 
-A later controlled-Grab phase will need a server-side, expiring selection cache. That cache must not make raw selection data browser-visible.
+The expiring confirmation challenge contains only the opaque Pegarr release ID and display evidence. Raw selection data exists only inside the revalidation and mutation call stack.
 
 ## Failure contract
 
@@ -56,6 +66,8 @@ The adapter distinguishes:
 
 Transport exception messages are replaced with stable Pegarr messages so private topology or credentials cannot escape through errors.
 
+For Grab, `200` is accepted. Authentication, unavailable-release, quota, and other upstream failures remain distinct. A timeout is `timeout_unknown`, is audited for reconciliation, and blocks an immediate duplicate.
+
 ## Remaining proof
 
-`PEG-MANUAL-001` remains open until a separately authorized, read-only probe verifies the installed Radarr version, authentication header, response shape, response size, and latency. No live Grab is part of that probe.
+`PEG-MANUAL-001` remains open for live read compatibility, while `PEG-MANUAL-004` covers a separately authorized harmless Grab and reconciliation drill. Automated tests never call a live Radarr.

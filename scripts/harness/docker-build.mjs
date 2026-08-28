@@ -794,6 +794,7 @@ async function packagedMissingInventorySmokeTest() {
   const subtitleDecisionScenario = "PEG-DOCKER-020";
   const triageScenario = "PEG-DOCKER-021";
   const comparisonScenario = "PEG-DOCKER-022";
+  const controlledGrabScenario = "PEG-DOCKER-024";
   const suffix = `${process.pid}`;
   const networkName = `pegarr-harness-inventory-internal-${suffix}`;
   const fixtureName = `pegarr-harness-inventory-${suffix}`;
@@ -807,6 +808,7 @@ async function packagedMissingInventorySmokeTest() {
     bazarr: "synthetic-inventory-bazarr-key",
     subdl: "synthetic-inventory-subdl-key",
     access: "synthetic-inventory-access-token-00000001",
+    admin: "synthetic-inventory-admin-token-000000002",
   };
   const paths = {
     sonarr: join(fixtureDirectory, "sonarr_api_key"),
@@ -814,12 +816,14 @@ async function packagedMissingInventorySmokeTest() {
     bazarr: join(fixtureDirectory, "bazarr_api_key"),
     subdl: join(fixtureDirectory, "subdl_api_key"),
     access: join(fixtureDirectory, "pegarr_access_token"),
+    admin: join(fixtureDirectory, "pegarr_admin_token"),
   };
   writeFileSync(paths.sonarr, keys.sonarr, { mode: 0o444 });
   writeFileSync(paths.radarr, keys.radarr, { mode: 0o444 });
   writeFileSync(paths.bazarr, keys.bazarr, { mode: 0o444 });
   writeFileSync(paths.subdl, keys.subdl, { mode: 0o444 });
   writeFileSync(paths.access, keys.access, { mode: 0o444 });
+  writeFileSync(paths.admin, keys.admin, { mode: 0o444 });
 
   const network = docker([
     "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
@@ -838,13 +842,21 @@ async function packagedMissingInventorySmokeTest() {
     "const profiles = [{ profileId: 7, name: 'Synthetic policy', cutoff: 1, items: [{ id: 1, language: 'pt-BR', hi: 'False', forced: 'False', audio_exclude: 'False', audio_only_include: 'False' }], mustContain: [], mustNotContain: [], originalFormat: 0 }];",
     "const assignment = { data: [{ sonarrSeriesId: 42, profileId: 7 }], total: 1 };",
     "const subtitles = { status: true, subtitles: [{ n_id: 'synthetic-subtitle', release_name: 'Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP', language: 'PT-BR', season: 3, episode: 5, hi: false, full_season: false }] };",
-    "let requestCount = 0; let outage = false;",
-    "createServer((request, response) => {",
+    "let requestCount = 0; let grabCount = 0; let outage = false;",
+    "createServer(async (request, response) => {",
     "  const host = String(request.headers.host || '').split(':')[0];",
     "  const url = new URL(request.url || '/', 'http://fixture.invalid');",
     "  let body; let expectedKey;",
     "  if (request.method === 'GET' && url.pathname === '/__count') { response.writeHead(200); response.end(String(requestCount)); return; }",
+    "  if (request.method === 'GET' && url.pathname === '/__grabs') { response.writeHead(200); response.end(String(grabCount)); return; }",
     "  if (request.method === 'GET' && url.pathname === '/__outage') { outage = true; response.writeHead(200); response.end('enabled'); return; }",
+    "  if (request.method === 'POST' && host === 'sonarr-fixture' && url.pathname === '/api/v3/release') {",
+    "    if (request.headers['x-api-key'] !== keys.sonarr) { response.writeHead(401, { 'content-type': 'application/json' }); response.end('{}'); return; }",
+    "    const chunks = []; for await (const chunk of request) chunks.push(chunk);",
+    "    let submitted; try { submitted = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { submitted = undefined; }",
+    "    if (JSON.stringify(submitted) !== JSON.stringify({ guid: 'synthetic-release-guid', indexerId: 11 })) { response.writeHead(400, { 'content-type': 'application/json' }); response.end('{}'); return; }",
+    "    requestCount += 1; grabCount += 1; response.writeHead(200, { 'content-type': 'application/json' }); response.end('{}'); return;",
+    "  }",
     "  if (request.method !== 'GET') { response.writeHead(405); response.end('{}'); return; }",
     "  if (host === 'sonarr-fixture' && url.pathname === '/api/v3/wanted/missing' && url.searchParams.get('pageSize') === '2' && url.searchParams.get('monitored') === 'true') { body = sonarr; expectedKey = keys.sonarr; }",
     "  else if (host === 'radarr-fixture' && url.pathname === '/api/v3/wanted/missing' && url.searchParams.get('pageSize') === '2' && url.searchParams.get('monitored') === 'true') { body = radarr; expectedKey = keys.radarr; }",
@@ -937,6 +949,7 @@ async function packagedMissingInventorySmokeTest() {
       "--mount", `type=bind,source=${paths.bazarr},target=/run/secrets/bazarr_api_key,readonly`,
       "--mount", `type=bind,source=${paths.subdl},target=/run/secrets/subdl_api_key,readonly`,
       "--mount", `type=bind,source=${paths.access},target=/run/secrets/pegarr_access_token,readonly`,
+      "--mount", `type=bind,source=${paths.admin},target=/run/secrets/pegarr_admin_token,readonly`,
       "--env", "DATA_DIR=/tmp",
       "--env", "PEGARR_SONARR_URL=http://sonarr-fixture:8082",
       "--env", "PEGARR_SONARR_ALLOWED_HOSTS=sonarr-fixture",
@@ -956,6 +969,9 @@ async function packagedMissingInventorySmokeTest() {
       "--env", "PEGARR_SUBDL_ALLOW_INSECURE_HTTP=true",
       "--env", "PEGARR_SUBDL_LANGUAGE_MAPPINGS=pt-BR:PT-BR",
       "--env", "PEGARR_ACCESS_TOKEN_FILE=/run/secrets/pegarr_access_token",
+      "--env", "PEGARR_GRAB_ENABLED=true",
+      "--env", "PEGARR_ADMIN_TOKEN_FILE=/run/secrets/pegarr_admin_token",
+      "--env", "PEGARR_GRAB_AUDIT_FILE=/tmp/grab-audit.sqlite",
       "--env", "PEGARR_MISSING_PAGE_SIZE=2",
       "pegarr:harness",
     ]);
@@ -973,6 +989,7 @@ async function packagedMissingInventorySmokeTest() {
     }
     const accessProbe = [
       `const token = ${JSON.stringify(keys.access)};`,
+      `const adminToken = ${JSON.stringify(keys.admin)};`,
       "const endpoint = 'http://127.0.0.1:8080/api/v1/library/missing';",
       "const app = 'http://127.0.0.1:8080';",
       "const countUrl = 'http://sonarr-fixture:8082/__count';",
@@ -1025,19 +1042,33 @@ async function packagedMissingInventorySmokeTest() {
       "  const comparison = dashboardModel.releaseComparison([...itemView.releases, comparisonRelease], [itemView.releases[0].id, comparisonRelease.id]);",
       "  const finalCount = Number(await (await fetch(countUrl)).text());",
       "  if (rows.length !== 4 || movies.length !== 2 || after !== 4) throw new Error('packaged local dashboard controls mismatch');",
-      "  if (itemResponse.status !== 200 || cachedItem.status !== 200 || itemBody.status !== 'ready' || itemBody.analysis?.source !== 'computed' || cachedItemBody.analysis?.source !== 'memory_cache' || itemView.state !== 'ready' || itemView.policySource !== 'bazarr' || itemView.languages[0]?.code !== 'pt-BR' || itemView.languages[0]?.required !== true || itemView.languages[0]?.forced !== false || itemView.languages[0]?.hearingImpaired !== 'either' || itemView.languages[0]?.applicability !== 'always' || itemView.languages[0]?.cutoff !== true || itemView.releases.length !== 1 || itemView.releases[0].confidence !== 'confirmed' || itemView.releases[0].requiredFit !== 'strong' || itemView.releases[0].sizeBytes !== 2400000000 || itemView.releases[0].ageHours !== 3 || itemView.releases[0].seeders !== 42 || itemView.releases[0].leechers !== 6 || itemView.releases[0].releaseGroup !== 'GROUP' || itemView.releases[0].customFormats?.[0] !== 'Subtitle preference' || acceptedReleases.length !== 1 || rejectedReleases.length !== 0 || richReleaseRows.length !== 1 || subtitleDecisionRows.length !== 1 || leading?.id !== itemView.releases[0].id || shortlistRows.length !== 1 || comparison.candidates.length !== 2 || comparison.languages[0]?.assessments.length !== 2 || comparison.candidates[0]?.strengths.subtitleConfidence !== true || comparison.candidates[1]?.strengths.subtitleConfidence !== false || itemSummary.state !== 'ready' || itemSummary.bestConfidence !== 'confirmed' || itemSummary.acceptedCount !== 1 || itemSummary.requiredCoverage !== 'strong' || itemSummary.requiredLanguages?.[0]?.confidence !== 'confirmed' || itemSummary.providerEvidence !== 'available' || itemSummary.providerResultCount !== 1 || itemSummary.availableProviderResultCount !== 1 || analyzedItems.length !== 1 || notAnalyzedItems.length !== 3 || matchingPolicy.length !== 1 || matchingEvidence.length !== 1 || sonarrItems.length !== 2 || matchingProfile.length !== 1 || matchingLanguage.length !== 1 || recentAnalysis.length !== 1 || triageFilterCount !== 5 || itemView.analysis.providerRequests !== 1 || finalCount !== 8) throw new Error('packaged item feasibility or local dashboard controls mismatch');",
+      "  if (itemResponse.status !== 200 || cachedItem.status !== 200 || itemBody.status !== 'ready' || itemBody.capabilities?.controlledGrab !== true || itemBody.analysis?.source !== 'computed' || cachedItemBody.analysis?.source !== 'memory_cache' || itemView.state !== 'ready' || itemView.controlledGrab !== true || itemView.policySource !== 'bazarr' || itemView.languages[0]?.code !== 'pt-BR' || itemView.languages[0]?.required !== true || itemView.languages[0]?.forced !== false || itemView.languages[0]?.hearingImpaired !== 'either' || itemView.languages[0]?.applicability !== 'always' || itemView.languages[0]?.cutoff !== true || itemView.releases.length !== 1 || itemView.releases[0].confidence !== 'confirmed' || itemView.releases[0].requiredFit !== 'strong' || itemView.releases[0].sizeBytes !== 2400000000 || itemView.releases[0].ageHours !== 3 || itemView.releases[0].seeders !== 42 || itemView.releases[0].leechers !== 6 || itemView.releases[0].releaseGroup !== 'GROUP' || itemView.releases[0].customFormats?.[0] !== 'Subtitle preference' || acceptedReleases.length !== 1 || rejectedReleases.length !== 0 || richReleaseRows.length !== 1 || subtitleDecisionRows.length !== 1 || leading?.id !== itemView.releases[0].id || shortlistRows.length !== 1 || comparison.candidates.length !== 2 || comparison.languages[0]?.assessments.length !== 2 || comparison.candidates[0]?.strengths.subtitleConfidence !== true || comparison.candidates[1]?.strengths.subtitleConfidence !== false || itemSummary.state !== 'ready' || itemSummary.bestConfidence !== 'confirmed' || itemSummary.acceptedCount !== 1 || itemSummary.requiredCoverage !== 'strong' || itemSummary.requiredLanguages?.[0]?.confidence !== 'confirmed' || itemSummary.providerEvidence !== 'available' || itemSummary.providerResultCount !== 1 || itemSummary.availableProviderResultCount !== 1 || analyzedItems.length !== 1 || notAnalyzedItems.length !== 3 || matchingPolicy.length !== 1 || matchingEvidence.length !== 1 || sonarrItems.length !== 2 || matchingProfile.length !== 1 || matchingLanguage.length !== 1 || recentAnalysis.length !== 1 || triageFilterCount !== 5 || itemView.analysis.providerRequests !== 1 || finalCount !== 8) throw new Error('packaged item feasibility or local dashboard controls mismatch');",
+      "  const grabBase = app + '/api/v1/library/items/sonarr/episode/305/grab';",
+      "  const libraryCannotGrab = await fetch(grabBase + '/prepare', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ releaseId: itemView.releases[0].id }) });",
+      "  const prepared = await fetch(grabBase + '/prepare', { method: 'POST', headers: { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' }, body: JSON.stringify({ releaseId: itemView.releases[0].id }) });",
+      "  const preparedBody = await prepared.json();",
+      "  if (libraryCannotGrab.status !== 401 || prepared.status !== 200 || preparedBody.status !== 'confirmation_required' || !preparedBody.confirmation.includes(itemView.releases[0].title) || JSON.stringify(preparedBody).includes('synthetic-release-guid')) throw new Error('packaged controlled Grab preparation mismatch');",
+      "  const executeBody = { challengeId: preparedBody.challengeId, confirmation: preparedBody.confirmation, idempotencyKey: 'docker_idempotency_00000001' };",
+      "  const executed = await fetch(grabBase + '/execute', { method: 'POST', headers: { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' }, body: JSON.stringify(executeBody) });",
+      "  const executedBody = await executed.json();",
+      "  const replay = await fetch(grabBase + '/execute', { method: 'POST', headers: { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' }, body: JSON.stringify(executeBody) });",
+      "  const replayBody = await replay.json();",
+      "  const history = await fetch(app + '/api/v1/grabs/history?limit=10', { headers: { authorization: 'Bearer ' + adminToken } });",
+      "  const historyBody = await history.json();",
+      "  const grabCount = Number(await (await fetch('http://sonarr-fixture:8082/__grabs')).text());",
+      "  const postGrabCount = Number(await (await fetch(countUrl)).text());",
+      "  if (executed.status !== 200 || executedBody.status !== 'grabbed' || replay.status !== 200 || replayBody.status !== 'grabbed' || replayBody.replayed !== true || history.status !== 200 || historyBody.events?.length !== 1 || grabCount !== 1 || postGrabCount !== 11 || /idempotency|guid|indexerId|api.?key|authorization/i.test(JSON.stringify(historyBody))) throw new Error('packaged controlled Grab execution, audit, or idempotency mismatch');",
       "  const refreshedItem = await fetch(itemEndpoint + '?refresh=1', { headers: { authorization: 'Bearer ' + token } });",
       "  const refreshedItemBody = await refreshedItem.json();",
       "  const refreshedView = dashboardModel.feasibilityView(refreshedItemBody);",
       "  const refreshedCount = Number(await (await fetch(countUrl)).text());",
-      "  if (refreshedItem.status !== 200 || refreshedItemBody.analysis?.source !== 'computed' || refreshedItemBody.metrics?.providerRequests !== 0 || refreshedItemBody.report?.providerStatus?.[0]?.cache?.status !== 'hit' || refreshedView.state !== 'ready' || refreshedView.providers[0]?.cacheStatus !== 'hit' || refreshedCount !== 11) throw new Error('packaged refresh repeated the stable provider window');",
+      "  if (refreshedItem.status !== 200 || refreshedItemBody.analysis?.source !== 'computed' || refreshedItemBody.metrics?.providerRequests !== 0 || refreshedItemBody.report?.providerStatus?.[0]?.cache?.status !== 'hit' || refreshedView.state !== 'ready' || refreshedView.providers[0]?.cacheStatus !== 'hit' || refreshedCount !== 14) throw new Error('packaged refresh repeated the stable provider window');",
       "  await fetch('http://sonarr-fixture:8082/__outage');",
       "  const staleItem = await fetch(itemEndpoint + '?refresh=1', { headers: { authorization: 'Bearer ' + token } });",
       "  const staleItemBody = await staleItem.json();",
       "  const staleView = dashboardModel.feasibilityView(staleItemBody);",
       "  const staleCount = Number(await (await fetch(countUrl)).text());",
-      "  if (staleItem.status !== 200 || staleItemBody.status !== 'ready' || staleItemBody.analysis?.source !== 'stale_cache' || staleItemBody.analysis?.refreshFailure !== 'integration_failure' || !staleItemBody.analysis?.unavailableIntegrations?.includes('sonarr') || staleView.state !== 'ready' || staleView.analysis.source !== 'stale_cache' || staleView.releases.length !== 1 || staleCount !== 14) throw new Error('packaged outage did not retain labeled stale evidence');",
-      "  if (clientText.includes('/grab') || pageText.includes('Grab selected release')) throw new Error('Grab crossed the Phase 1 boundary');",
+      "  if (staleItem.status !== 200 || staleItemBody.status !== 'ready' || staleItemBody.analysis?.source !== 'stale_cache' || staleItemBody.analysis?.refreshFailure !== 'integration_failure' || !staleItemBody.analysis?.unavailableIntegrations?.includes('sonarr') || staleView.state !== 'ready' || staleView.analysis.source !== 'stale_cache' || staleView.releases.length !== 1 || staleCount !== 17) throw new Error('packaged outage did not retain labeled stale evidence');",
       "  if (response.headers.get('cache-control') !== 'no-store' || response.headers.get('x-content-type-options') !== 'nosniff') throw new Error('security headers missing');",
       "  if (JSON.stringify(body).includes(token)) throw new Error('access token escaped');",
       "  console.log('protected inventory=ready, unauthorized upstream requests=0, item cache and provider window verified');",
@@ -1064,6 +1095,7 @@ async function packagedMissingInventorySmokeTest() {
     process.stdout.write(`${subtitleDecisionScenario} packaged subtitle decision=local (full policy, required fit, language filters, Arr-accepted lead, zero extra upstream requests)\n`);
     process.stdout.write(`${triageScenario} packaged item triage=local (application, profile, language, age, clear-state, zero extra upstream requests)\n`);
     process.stdout.write(`${comparisonScenario} packaged release comparison=local (Arr decisions, language evidence, strengths, navigation assets, zero extra upstream requests)\n`);
+    process.stdout.write(`${controlledGrabScenario} packaged controlled Grab=accepted (independent admin, two revalidations, exact confirmation, one POST, audit, idempotent replay)\n`);
   } finally {
     docker(["rm", "--force", appName]);
     docker(["rm", "--force", fixtureName]);

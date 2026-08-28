@@ -7,23 +7,24 @@ import { syntheticRadarrSystemStatusResponse } from "../fixtures/radarr-system-s
 import {
   JsonTransportError,
   type JsonResponse,
+  type JsonRequest,
   type JsonTransport,
-  type ReadonlyJsonRequest,
 } from "./http.js";
 import {
   mapRadarrReleaseResponse,
   mapRadarrMissingResponse,
   mapRadarrSystemStatus,
   RadarrAdapterError,
+  RadarrGrabError,
   RadarrClient,
 } from "./radarr.js";
 
 class FakeTransport implements JsonTransport {
-  readonly requests: ReadonlyJsonRequest[] = [];
+  readonly requests: JsonRequest[] = [];
   response: JsonResponse = { status: 200, headers: {}, body: [] };
   failure: Error | undefined;
 
-  async requestJson(request: ReadonlyJsonRequest): Promise<JsonResponse> {
+  async requestJson(request: JsonRequest): Promise<JsonResponse> {
     this.requests.push(request);
     if (this.failure !== undefined) {
       throw this.failure;
@@ -235,5 +236,31 @@ test("PEG-RADARR-008 missing-item mapping rejects malformed envelopes and drops 
   await assert.rejects(
     client(transport).listMissingMovies(),
     (error: unknown) => error instanceof RadarrAdapterError && error.code === "invalid_response",
+  );
+});
+
+test("PEG-RADARR-009 controlled Grab revalidates and classifies unknown timeout outcomes", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: syntheticRadarrMovieReleaseResponse };
+  const releaseId = mapRadarrReleaseResponse(syntheticRadarrMovieReleaseResponse, "synthetic-radarr")[0]!.id;
+  const revalidated = await client(transport).revalidateMovieRelease(84, releaseId);
+  assert.equal(revalidated?.candidate.id, releaseId);
+  assert.deepEqual(revalidated?.handle, { guid: "synthetic-radarr-guid-1", indexerId: 21 });
+
+  transport.response = { status: 200, headers: {}, body: {} };
+  await client(transport).grabRelease(revalidated!.handle);
+  assert.deepEqual(transport.requests.at(-1), {
+    method: "POST",
+    path: "/api/v3/release",
+    query: {},
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    body: { guid: "synthetic-radarr-guid-1", indexerId: 21 },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  });
+  transport.failure = new JsonTransportError("timeout", "private timeout detail");
+  await assert.rejects(
+    client(transport).grabRelease(revalidated!.handle),
+    (error: unknown) => error instanceof RadarrGrabError && error.code === "timeout" && !/private/u.test(error.message),
   );
 });

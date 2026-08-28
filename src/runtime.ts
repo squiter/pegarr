@@ -25,6 +25,13 @@ import {
   type ItemFeasibilitySelection,
 } from "./item-feasibility.js";
 import { RadarrMovieFeasibilityService } from "./movie-feasibility.js";
+import {
+  ControlledGrabService,
+  type ExecuteGrabResult,
+  type PrepareGrabResult,
+  type PublicGrabAuditEntry,
+} from "./controlled-grab.js";
+import { GrabAuditStore } from "./grab-audit.js";
 
 export type ArrIntegrationState =
   | "disabled"
@@ -64,6 +71,11 @@ export interface RuntimeServices {
     selection: ItemFeasibilitySelection,
     options?: ItemFeasibilityReadOptions,
   ): Promise<ItemFeasibilityResult>;
+  readonly controlledGrab?: {
+    prepare(selection: ItemFeasibilitySelection, releaseId: string): Promise<PrepareGrabResult>;
+    execute(selection: ItemFeasibilitySelection, challengeId: string, confirmation: string, idempotencyKey: string): Promise<ExecuteGrabResult>;
+    history(limit?: number): readonly PublicGrabAuditEntry[];
+  };
   close(): void;
 }
 
@@ -114,7 +126,11 @@ export function createRuntimeServices(
   configuration: RuntimeConfiguration,
   options: RuntimeServicesOptions = {},
 ): RuntimeServices {
-  const { accessToken: _accessToken, ...inventoryConfiguration } = configuration;
+  const {
+    accessToken: _accessToken,
+    controlledGrab: _controlledGrab,
+    ...inventoryConfiguration
+  } = configuration;
   const now = options.now ?? Date.now;
   const readSonarrStatus = createStatusReader<"sonarr", "Sonarr", SonarrSystemStatus>({
     integration: "sonarr",
@@ -270,12 +286,58 @@ export function createRuntimeServices(
     maxEntries: options.itemFeasibilityMaxEntries ?? 100,
   });
 
+  const controlledGrab = configuration.controlledGrab === undefined
+    ? undefined
+    : new ControlledGrabService({
+        readInventory: readMissingInventory,
+        ...(sonarrClient === undefined
+          ? {}
+          : {
+              sonarr: {
+                revalidate: (selection: ItemFeasibilitySelection, releaseId: string) => {
+                  if (selection.application !== "sonarr" || selection.kind !== "episode") {
+                    throw new TypeError("Sonarr Grab selection is inconsistent");
+                  }
+                  return sonarrClient.revalidateEpisodeRelease(selection.itemId, releaseId);
+                },
+                grab: (handle) => sonarrClient.grabRelease(handle),
+              },
+            }),
+        ...(radarrClient === undefined
+          ? {}
+          : {
+              radarr: {
+                revalidate: (selection: ItemFeasibilitySelection, releaseId: string) => {
+                  if (selection.application !== "radarr" || selection.kind !== "movie") {
+                    throw new TypeError("Radarr Grab selection is inconsistent");
+                  }
+                  return radarrClient.revalidateMovieRelease(selection.itemId, releaseId);
+                },
+                grab: (handle) => radarrClient.grabRelease(handle),
+              },
+            }),
+        audit: new GrabAuditStore(configuration.controlledGrab.auditFile, now),
+        now,
+      });
+
   return {
     readSonarrStatus,
     readRadarrStatus,
     readMissingInventory,
     readItemFeasibility: (selection, readOptions) => itemFeasibility.read(selection, readOptions),
-    close: () => managedSubdl?.close(),
+    ...(controlledGrab === undefined
+      ? {}
+      : {
+          controlledGrab: {
+            prepare: (selection, releaseId) => controlledGrab.prepare(selection, releaseId),
+            execute: (selection, challengeId, confirmation, idempotencyKey) => controlledGrab.execute(selection, challengeId, confirmation, idempotencyKey),
+            history: (limit) => controlledGrab.history(limit),
+          },
+        }),
+    close: () => {
+      controlledGrab?.close();
+      managedSubdl?.close();
+    },
   };
 }
 

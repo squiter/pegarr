@@ -1,0 +1,12 @@
+services:
+  pegarr:
+    environment:
+      PEGARR_GRAB_ENABLED: "true"
+      PEGARR_ADMIN_TOKEN_FILE: /run/secrets/pegarr_admin_token
+      PEGARR_GRAB_AUDIT_FILE: /data/grab-audit.sqlite
+    secrets:
+      - pegarr_admin_token
+
+secrets:
+  pegarr_admin_token:
+    file: ${PEGARR_ADMIN_TOKEN_HOST_FILE:?set an absolute PEGARR_ADMIN_TOKEN_HOST_FILE}

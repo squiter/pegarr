@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "phase": "phase-2-controlled-grab",
+  "status": "in_progress",
+  "startedOn": "2026-08-28",
+  "completionRule": "All implementation criteria must be complete and live mutation compatibility must remain an explicit, manually reconciled gap.",
+  "criteria": [
+    {
+      "id": "P2-ADMIN-BOUNDARY",
+      "title": "Opt-in independent administrator boundary",
+      "status": "complete",
+      "scenarioIds": ["PEG-CONFIG-008", "PEG-GRABAPI-001"]
+    },
+    {
+      "id": "P2-REVALIDATION",
+      "title": "Release revalidation before preparation and execution",
+      "status": "complete",
+      "scenarioIds": ["PEG-SONARR-010", "PEG-RADARR-009", "PEG-GRAB-001", "PEG-GRAB-002"]
+    },
+    {
+      "id": "P2-CONFIRMATION",
+      "title": "Exact release-and-target confirmation",
+      "status": "complete",
+      "scenarioIds": ["PEG-GRAB-001", "PEG-GRAB-002", "PEG-DASH-037"]
+    },
+    {
+      "id": "P2-ARR-GRAB",
+      "title": "Minimal server-side Sonarr and Radarr Grab",
+      "status": "complete",
+      "scenarioIds": ["PEG-HTTP-006", "PEG-SONARR-010", "PEG-RADARR-009", "PEG-GRAB-002", "PEG-GRABAPI-002", "PEG-DOCKER-024"]
+    },
+    {
+      "id": "P2-AUDIT-IDEMPOTENCY",
+      "title": "Durable audit and idempotent duplicate protection",
+      "status": "complete",
+      "scenarioIds": ["PEG-GRAB-003", "PEG-GRAB-005", "PEG-GRABAPI-002", "PEG-DOCKER-024"]
+    },
+    {
+      "id": "P2-CONTROLLED-UX",
+      "title": "Capability-gated controlled Grab dashboard",
+      "status": "complete",
+      "scenarioIds": ["PEG-DASH-037", "PEG-DASH-038", "PEG-DOCKER-024"]
+    },
+    {
+      "id": "P2-TIMEOUT-RECONCILIATION",
+      "title": "Operator reconciliation after unknown mutation outcomes",
+      "status": "in_progress",
+      "scenarioIds": ["PEG-GRAB-004", "PEG-GRAB-006"]
+    }
+  ],
+  "manualGapIds": ["PEG-MANUAL-001", "PEG-MANUAL-002", "PEG-MANUAL-003", "PEG-MANUAL-004", "PEG-MANUAL-005"]
+}

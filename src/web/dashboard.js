@@ -20,6 +20,19 @@ const elements = {
   feasibilityRefresh: document.querySelector("#feasibility-refresh"),
   feasibilitySummary: document.querySelector("#feasibility-summary"),
   feasibilityTitle: document.querySelector("#feasibility-title"),
+  grabAdminToken: document.querySelector("#grab-admin-token"),
+  grabAuthStep: document.querySelector("#grab-auth-step"),
+  grabClose: document.querySelector("#grab-close"),
+  grabConfirmation: document.querySelector("#grab-confirmation"),
+  grabConfirmationPhrase: document.querySelector("#grab-confirmation-phrase"),
+  grabConfirmStep: document.querySelector("#grab-confirm-step"),
+  grabDialog: document.querySelector("#grab-dialog"),
+  grabExecute: document.querySelector("#grab-execute"),
+  grabForm: document.querySelector("#grab-form"),
+  grabPrepare: document.querySelector("#grab-prepare"),
+  grabRelease: document.querySelector("#grab-release"),
+  grabStatus: document.querySelector("#grab-status"),
+  grabTarget: document.querySelector("#grab-target"),
   inventoryList: document.querySelector("#inventory-list"),
   kindFilter: document.querySelector("#kind-filter"),
   providerEvidenceFilter: document.querySelector("#provider-evidence-filter"),
@@ -59,6 +72,8 @@ let inventoryRows = [];
 let selectedRow;
 let activeFeasibility;
 let pageBusy = false;
+let grabContext;
+let administratorToken;
 const feasibilityCache = new Map();
 const analysisByItem = new Map();
 const shortlistedReleaseIds = new Set();
@@ -78,6 +93,18 @@ elements.accessForm?.addEventListener("submit", async (event) => {
 elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
 elements.feasibilityClose?.addEventListener("click", closeFeasibility);
+elements.grabClose?.addEventListener("click", closeGrabDialog);
+elements.grabDialog?.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeGrabDialog();
+});
+elements.grabDialog?.addEventListener("close", clearGrabDialog);
+elements.grabForm?.addEventListener("submit", (event) => event.preventDefault());
+elements.grabPrepare?.addEventListener("click", prepareControlledGrab);
+elements.grabExecute?.addEventListener("click", executeControlledGrab);
+elements.grabConfirmation?.addEventListener("input", () => {
+  elements.grabExecute.disabled = elements.grabConfirmation.value !== grabContext?.confirmation;
+});
 elements.releaseShortlistClear?.addEventListener("click", clearShortlist);
 elements.clearInventoryFilters?.addEventListener("click", clearInventoryFilters);
 for (const control of [elements.searchInput, elements.applicationFilter, elements.kindFilter, elements.analysisFilter, elements.bestConfidenceFilter, elements.requiredCoverageFilter, elements.providerEvidenceFilter, elements.profileFilter, elements.policyLanguageFilter, elements.analysisAgeFilter, elements.sortOrder]) {
@@ -622,8 +649,188 @@ function renderRelease(row) {
   updateShortlistButton(shortlist, row);
   shortlist.addEventListener("click", () => toggleShortlist(row, tableRow, shortlist));
   shortlistCell.append(shortlist);
-  tableRow.append(release, video, subtitle, evidenceCell, shortlistCell);
+  const grabCell = document.createElement("td");
+  grabCell.dataset.label = "Controlled Grab";
+  const grab = document.createElement("button");
+  grab.className = "grab-button";
+  grab.type = "button";
+  const grabAvailable = activeFeasibility?.controlledGrab === true;
+  const currentEvidence = activeFeasibility?.analysis.source !== "stale_cache";
+  grab.dataset.eligible = String(grabAvailable && row.downloadAllowed && currentEvidence);
+  grab.disabled = grab.dataset.eligible !== "true" || pageBusy;
+  grab.textContent = grabAvailable ? "Prepare Grab" : "Not enabled";
+  grab.setAttribute("aria-label", grabAvailable
+    ? `Prepare controlled Grab for ${row.title}`
+    : "Controlled Grab is not enabled on this server");
+  if (grabAvailable && !row.downloadAllowed) grab.title = "Sonarr or Radarr rejected this release";
+  else if (grabAvailable && !currentEvidence) grab.title = "Refresh stale evidence before preparing a Grab";
+  else if (grabAvailable) grab.addEventListener("click", () => openGrabDialog(row));
+  grabCell.append(grab);
+  tableRow.append(release, video, subtitle, evidenceCell, shortlistCell, grabCell);
   return tableRow;
+}
+
+function openGrabDialog(release) {
+  if (selectedRow === undefined || activeFeasibility?.controlledGrab !== true || !release.downloadAllowed || activeFeasibility.analysis.source === "stale_cache") return;
+  clearGrabDialog();
+  grabContext = { row: selectedRow, release };
+  elements.grabTarget.textContent = `${selectedRow.title} · ${selectedRow.context}`;
+  elements.grabRelease.textContent = release.title;
+  elements.grabDialog.showModal();
+  elements.grabAdminToken.focus();
+}
+
+async function prepareControlledGrab() {
+  if (grabContext === undefined) return;
+  const candidate = elements.grabAdminToken.value;
+  if (candidate.length < 32) {
+    setGrabStatus("Enter the independent administrator token configured for controlled Grab.", "error");
+    return;
+  }
+  administratorToken = candidate;
+  elements.grabAdminToken.value = "";
+  setGrabBusy(true);
+  setGrabStatus("Revalidating the release with Sonarr or Radarr…", "loading");
+  try {
+    const { row, release } = grabContext;
+    const result = await grabRequest(
+      `/api/v1/library/items/${row.application}/${row.kind}/${row.itemId}/grab/prepare`,
+      { releaseId: release.id },
+    );
+    if (result.response.status === 401) {
+      administratorToken = undefined;
+      elements.grabAuthStep.hidden = false;
+      setGrabStatus("That administrator token was not accepted.", "error");
+      elements.grabAdminToken.focus();
+      return;
+    }
+    if (result.body?.status !== "confirmation_required") {
+      setGrabStatus(prepareGrabMessage(result.body?.status), "error");
+      return;
+    }
+    grabContext = { ...grabContext, challengeId: result.body.challengeId, confirmation: result.body.confirmation };
+    elements.grabConfirmationPhrase.textContent = result.body.confirmation;
+    elements.grabAuthStep.hidden = true;
+    elements.grabConfirmStep.hidden = false;
+    setGrabStatus("The release is still available and accepted by Arr. Exact confirmation is now required.", "warning");
+    elements.grabConfirmation.focus();
+  } catch {
+    setGrabStatus("Pegarr could not revalidate the release. No Grab request was sent.", "error");
+  } finally {
+    setGrabBusy(false);
+  }
+}
+
+async function executeControlledGrab() {
+  if (grabContext?.challengeId === undefined || grabContext.confirmation === undefined || administratorToken === undefined) return;
+  if (elements.grabConfirmation.value !== grabContext.confirmation) {
+    setGrabStatus("The confirmation must match the displayed phrase exactly.", "error");
+    return;
+  }
+  setGrabBusy(true);
+  setGrabStatus("Revalidating once more, then asking Arr to Grab this release…", "loading");
+  try {
+    const { row, challengeId, confirmation } = grabContext;
+    const result = await grabRequest(
+      `/api/v1/library/items/${row.application}/${row.kind}/${row.itemId}/grab/execute`,
+      { challengeId, confirmation, idempotencyKey: crypto.randomUUID() },
+    );
+    if (result.response.status === 401) {
+      setGrabStatus("Administrator authorization expired. Close this dialog and start again.", "error");
+      return;
+    }
+    if (result.body?.status === "grabbed") {
+      closeGrabDialog();
+      setFeasibilityNotice("Sonarr or Radarr accepted the controlled Grab. The request was recorded in Pegarr's audit history.", "success");
+      return;
+    }
+    if (result.body?.status === "timeout_unknown") {
+      setGrabStatus("The Arr request timed out, so the result is Unknown. Check Arr activity before retrying; Pegarr has blocked a duplicate for the reconciliation window.", "warning");
+      return;
+    }
+    setGrabStatus(executeGrabMessage(result.body?.status), result.response.status >= 500 ? "error" : "warning");
+  } catch {
+    setGrabStatus("Pegarr could not determine the Grab result. Check Arr activity before trying again.", "error");
+  } finally {
+    setGrabBusy(false);
+  }
+}
+
+async function grabRequest(endpoint, body) {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${administratorToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+    credentials: "omit",
+    redirect: "error",
+    referrerPolicy: "no-referrer",
+  });
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    result = undefined;
+  }
+  return { response, body: result };
+}
+
+function prepareGrabMessage(status) {
+  const messages = {
+    item_unavailable: "This item is no longer present in Pegarr's bounded missing inventory.",
+    release_changed: "Arr no longer returns this exact release. Refresh the analysis before choosing another candidate.",
+    release_rejected: "Arr now rejects this release, so Pegarr will not Grab it.",
+    integration_failure: "Arr could not revalidate the release. No Grab request was sent.",
+  };
+  return messages[status] ?? "Pegarr could not prepare this controlled Grab.";
+}
+
+function executeGrabMessage(status) {
+  const messages = {
+    challenge_expired: "This confirmation expired. Close the dialog and prepare the release again.",
+    confirmation_mismatch: "The confirmation did not match exactly. No Grab request was sent.",
+    duplicate_blocked: "A recent or uncertain Grab already exists for this target and release. Reconcile it in Arr before retrying.",
+    duplicate_in_progress: "This Grab is already in progress.",
+    revalidation_failed: "The release changed or became rejected before execution. No Grab request was sent.",
+    upstream_failure: "Arr rejected or could not complete the Grab request. Review Arr before trying again.",
+  };
+  return messages[status] ?? "Pegarr did not complete the controlled Grab.";
+}
+
+function setGrabBusy(value) {
+  elements.grabPrepare.disabled = value;
+  elements.grabExecute.disabled = value || elements.grabConfirmation.value !== grabContext?.confirmation;
+  elements.grabAdminToken.disabled = value;
+  elements.grabConfirmation.disabled = value;
+  elements.grabClose.disabled = value;
+  elements.grabDialog.setAttribute("aria-busy", String(value));
+}
+
+function setGrabStatus(message, state) {
+  elements.grabStatus.textContent = message;
+  elements.grabStatus.dataset.state = state;
+}
+
+function closeGrabDialog() {
+  if (elements.grabDialog.open) elements.grabDialog.close();
+  else clearGrabDialog();
+}
+
+function clearGrabDialog() {
+  administratorToken = undefined;
+  grabContext = undefined;
+  elements.grabAdminToken.value = "";
+  elements.grabConfirmation.value = "";
+  elements.grabConfirmationPhrase.textContent = "";
+  elements.grabTarget.textContent = "";
+  elements.grabRelease.textContent = "";
+  elements.grabAuthStep.hidden = false;
+  elements.grabConfirmStep.hidden = true;
+  elements.grabExecute.disabled = true;
+  setGrabStatus("", "");
 }
 
 function policyLanguageChip(language) {
@@ -918,6 +1125,7 @@ function clearPageEvidence() {
 }
 
 function closeFeasibility() {
+  closeGrabDialog();
   selectedRow = undefined;
   activeFeasibility = undefined;
   elements.feasibilityPanel.hidden = true;
@@ -969,6 +1177,7 @@ function setBusy(value) {
   elements.feasibilityPanel?.setAttribute("aria-busy", String(value));
   for (const button of document.querySelectorAll(".inventory-select")) button.disabled = value;
   for (const button of document.querySelectorAll(".shortlist-toggle")) button.disabled = value;
+  for (const button of document.querySelectorAll(".grab-button")) button.disabled = value || button.dataset.eligible !== "true";
   elements.releaseShortlistClear.disabled = value;
   elements.feasibilityRefresh.disabled = value;
 }

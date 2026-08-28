@@ -8,23 +8,24 @@ import { syntheticSonarrSystemStatusResponse } from "../fixtures/sonarr-system-s
 import {
   JsonTransportError,
   type JsonResponse,
+  type JsonRequest,
   type JsonTransport,
-  type ReadonlyJsonRequest,
 } from "./http.js";
 import {
   mapSonarrReleaseResponse,
   mapSonarrMissingResponse,
   mapSonarrSystemStatus,
   SonarrAdapterError,
+  SonarrGrabError,
   SonarrClient,
 } from "./sonarr.js";
 
 class FakeTransport implements JsonTransport {
-  readonly requests: ReadonlyJsonRequest[] = [];
+  readonly requests: JsonRequest[] = [];
   response: JsonResponse = { status: 200, headers: {}, body: [] };
   failure: Error | undefined;
 
-  async requestJson(request: ReadonlyJsonRequest): Promise<JsonResponse> {
+  async requestJson(request: JsonRequest): Promise<JsonResponse> {
     this.requests.push(request);
     if (this.failure !== undefined) {
       throw this.failure;
@@ -263,4 +264,35 @@ test("PEG-SONARR-009 season search preserves full-season and episode coverage ev
   await assert.rejects(client(transport).searchSeasonReleases(0, 3), /seriesId/u);
   await assert.rejects(client(transport).searchSeasonReleases(42, -1), /seasonNumber/u);
   assert.equal(transport.requests.length, 1);
+});
+
+test("PEG-SONARR-010 controlled Grab revalidates and POSTs only the server-side Arr handle", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: syntheticSonarrEpisodeReleaseResponse };
+  const releaseId = mapSonarrReleaseResponse(syntheticSonarrEpisodeReleaseResponse, "synthetic-sonarr")[0]!.id;
+  const revalidated = await client(transport).revalidateEpisodeRelease(305, releaseId);
+  assert.equal(revalidated?.candidate.id, releaseId);
+  assert.deepEqual(revalidated?.handle, { guid: "synthetic-guid-1", indexerId: 11 });
+  assert.doesNotMatch(JSON.stringify(revalidated?.candidate), /synthetic-guid/iu);
+
+  transport.response = { status: 200, headers: {}, body: {} };
+  assert.deepEqual(await client(transport).grabRelease(revalidated!.handle), {
+    status: "accepted",
+    responseStatus: 200,
+  });
+  assert.deepEqual(transport.requests.at(-1), {
+    method: "POST",
+    path: "/api/v3/release",
+    query: {},
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    body: { guid: "synthetic-guid-1", indexerId: 11 },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  });
+
+  transport.failure = new JsonTransportError("timeout", "private timeout detail");
+  await assert.rejects(
+    client(transport).grabRelease(revalidated!.handle),
+    (error: unknown) => error instanceof SonarrGrabError && error.code === "timeout" && !/private/u.test(error.message),
+  );
 });

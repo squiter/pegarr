@@ -13,6 +13,7 @@ const requiredDocs = [
   "docs/harness.md",
   "docs/harness-scenarios.md",
   "docs/phase-1-completion.md",
+  "docs/controlled-grab.md",
   "docs/configuration.md",
   "docs/access-control.md",
   "docs/missing-item-dashboard.md",

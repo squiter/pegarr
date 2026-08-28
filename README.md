@@ -6,10 +6,10 @@
 [![Container](https://github.com/squiter/pegarr/actions/workflows/container.yml/badge.svg)](https://github.com/squiter/pegarr/actions/workflows/container.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It is designed to compare interactive-search releases with subtitle-provider evidence, explain the confidence of each match, and eventually let an authorized user grab the best-informed release.
+Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It compares interactive-search releases with subtitle-provider evidence, explains the confidence of each match, and can optionally let an administrator Grab one explicitly confirmed release.
 
 > [!IMPORTANT]
-> Pegarr's Phase 1 read-only MVP implementation is complete. The container includes an authenticated missing-item dashboard with interactive, subtitle-aware release evidence, bounded caches, redacted structured request logs, opt-in integration probes, and explicit one-shot reports. Live library access requires a secret-file bearer token. Pegarr does not expose Grab operations.
+> Pegarr's Phase 1 read-only MVP is complete and remains the default. Phase 2 controlled Grab is now in progress behind a separate opt-in setting and administrator secret. It revalidates, requires an exact release-and-target confirmation, audits every attempt, and never runs automatically. Live Grab compatibility remains a manual test boundary.
 
 ## Why Pegarr?
 
@@ -26,7 +26,7 @@ Provider failures are never treated as proof that subtitles do not exist.
 
 ## Project status
 
-The API-feasibility milestone and Phase 1 implementation are complete. The authenticated missing-item dashboard and interactive release table are backed by bounded read-only routes, deterministic confidence, durable provider caching, and a machine-checked completion ledger. End-to-end Sonarr episode and season paths are fixture-proven and locally compatible with real Sonarr/Bazarr reads; authenticated live SubDL, live Radarr, and NAS compatibility remain explicit manual gaps rather than false automated coverage. See the [Phase 1 completion record](docs/phase-1-completion.md) and [research proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md).
+The API-feasibility milestone and Phase 1 implementation are complete. Phase 2 has begun with the first full controlled-Grab vertical slice: independent administration, two-step revalidation, exact confirmation, minimal Arr mutation payloads, durable audit history, idempotency, and timeout-aware duplicate protection. The implementation is synthetic-test proven; live Sonarr/Radarr mutation behavior and NAS compatibility remain explicit manual gaps. See the [controlled Grab guide](docs/controlled-grab.md), [Phase 1 completion record](docs/phase-1-completion.md), and [research proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md).
 
 The current repository foundation includes:
 
@@ -49,6 +49,8 @@ The current repository foundation includes:
 - page-memory release search, protocol filtering, metadata sorting, and a three-candidate side-by-side comparison of Arr decisions, policy-language evidence, and release metadata;
 - full resolved-language policy semantics plus per-release required-language fit and policy-derived language/confidence filters;
 - a deterministic leading Arr-accepted candidate labeled as read-only decision support, never an automatic Grab;
+- an opt-in administrator-only controlled Grab dialog with exact typed confirmation and a second release revalidation immediately before mutation;
+- durable SQLite Grab audit history, idempotent replay, in-flight suppression, and timeout outcomes kept Unknown until reconciliation;
 - page-memory item summaries with best Arr-accepted confidence, policy/freshness badges, and local attention filters;
 - page-memory triage by application, exact Bazarr profile, policy language, and analysis age, with one-click filter clearing;
 - per-required-language coverage computed only from Arr-accepted releases, with Unknown kept distinct from No match found;
@@ -85,9 +87,9 @@ The demo maps a sanitized synthetic Sonarr v3 response into four release candida
 
 ## Development harness
 
-Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise. Every harness mode also validates [the Phase 1 criteria ledger](harness/phase-1.json).
+Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise. Every harness mode preserves the completed [Phase 1 criteria ledger](harness/phase-1.json) and validates the active [Phase 2 criteria ledger](harness/phase-2.json).
 
-See [the Phase 1 completion record](docs/phase-1-completion.md), [harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [access-control guide](docs/access-control.md), [missing-item dashboard guide](docs/missing-item-dashboard.md), [item feasibility API](docs/item-feasibility-api.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See [the controlled Grab guide](docs/controlled-grab.md), [Phase 1 completion record](docs/phase-1-completion.md), [harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [access-control guide](docs/access-control.md), [missing-item dashboard guide](docs/missing-item-dashboard.md), [item feasibility API](docs/item-feasibility-api.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), and the versioned integration contracts. Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 
@@ -106,7 +108,7 @@ docker compose -f deploy/compose.nas.yaml up -d
 docker compose -f deploy/compose.nas.yaml ps
 ```
 
-For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [access](deploy/compose.access.yaml), [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), and [SubDL](deploy/compose.subdl.yaml) Compose overlays mount credentials as Docker secrets; follow the [configuration guide](docs/configuration.md), and never put a token or key in `.env`.
+For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [access](deploy/compose.access.yaml), [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), [SubDL](deploy/compose.subdl.yaml), and [controlled Grab](deploy/compose.grab.yaml) Compose overlays mount credentials as Docker secrets; follow the [configuration guide](docs/configuration.md), and never put a token or key in `.env`.
 
 ## Container publishing
 

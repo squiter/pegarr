@@ -1,6 +1,6 @@
 # Contributing to Pegarr
 
-Pegarr's Phase 1 read-only MVP implementation is complete; external compatibility gaps remain documented separately. Small, evidence-backed changes are easier to review than implicit phase expansion.
+Pegarr's Phase 1 read-only MVP is complete and Phase 2 controlled Grab is in progress; external compatibility gaps remain documented separately. Small, evidence-backed changes are easier to review than implicit phase expansion.
 
 ## Before opening a change
 
@@ -18,6 +18,6 @@ npm run check:affected
 
 The affected gate is the normal completion command. It runs the deterministic repository sensors and adds the compiled checks and Docker build when the changed paths require them. Use `npm run check:fast` for quick feedback and `npm run check` to force every local sensor.
 
-Each behavior change must update [the scenario ledger](harness/manifest.json), name its deterministic test with the scenario ID, and keep [the human-readable catalog](docs/harness-scenarios.md) current. Phase-level claims must also preserve [the Phase 1 criteria ledger](harness/phase-1.json). If behavior can only be checked against a live service or NAS, record it as a manual gap rather than weakening the automated suite or using private data.
+Each behavior change must update [the scenario ledger](harness/manifest.json), name its deterministic test with the scenario ID, and keep [the human-readable catalog](docs/harness-scenarios.md) current. Phase-level claims must preserve [the Phase 1 criteria ledger](harness/phase-1.json) and update [the Phase 2 ledger](harness/phase-2.json). If behavior can only be checked against a live service or NAS, record it as a manual gap rather than weakening the automated suite or using private data.
 
 Commits should be focused and use clear imperative subjects. Pull requests should describe the contract or behavior being proven, the harness evidence collected, and any remaining uncertainty.

@@ -234,7 +234,7 @@ test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe"
   assert.equal(page.headers?.["content-type"], "text/html; charset=utf-8");
   assert.match(page.headers?.["content-security-policy"] ?? "", /default-src 'self'/u);
   assert.match(String(page.body), /<main id="main"|role="status"|aria-live="polite"/u);
-  assert.match(String(page.body), /release-table|feasibility-panel|visible-label|No Grab actions/u);
+  assert.match(String(page.body), /release-table|feasibility-panel|visible-label|controlled Grab/u);
   assert.match(String(page.body), /release-decision-filter|release-confidence-filter|release-sort-order/u);
   assert.match(String(page.body), /type="password"|autocomplete="off"/u);
   assert.match(String(styles.body), /@media \(max-width: 760px\)|prefers-reduced-motion/u);
@@ -268,7 +268,6 @@ test("PEG-DASH-010 analyzed-item cards and controls remain page-memory-only asse
   assert.match(String(model.body), /itemAnalysisSummary|rowsWithAnalysis|needs_attention/u);
   assert.match(String(styles.body), /item-analysis-badge|item-analysis-detail/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
-  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
 
 test("PEG-DASH-013 required-language and provider-health controls remain local dashboard assets", async () => {
@@ -283,7 +282,6 @@ test("PEG-DASH-013 required-language and provider-health controls remain local d
   assert.match(String(model.body), /summarizeRequiredCoverage|summarizeProviderEvidence|matchesProviderEvidence/u);
   assert.match(String(styles.body), /coverage-strong|provider-partial|provider-unavailable/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
-  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
 
 test("PEG-DASH-019 richer release controls and shortlist remain page-memory-only assets", async () => {
@@ -299,7 +297,6 @@ test("PEG-DASH-019 richer release controls and shortlist remain page-memory-only
   assert.match(String(model.body), /releaseSearchText|compareOptionalReleaseNumber|shortlistedReleases/u);
   assert.match(String(styles.body), /release-row--shortlisted|shortlist-toggle|release-shortlist-items/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
-  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
 
 test("PEG-DASH-025 policy semantics, language fit, and leading candidate remain page-memory-only assets", async () => {
@@ -310,12 +307,11 @@ test("PEG-DASH-025 policy semantics, language fit, and leading candidate remain 
   const assets = [page.body, client.body, model.body, styles.body].join("\n");
 
   assert.match(String(page.body), /release-required-fit-filter|release-language-filter|release-language-confidence-filter/u);
-  assert.match(String(page.body), /Decision support only|Leading Arr-accepted candidate|does not Grab/u);
+  assert.match(String(page.body), /Decision support only|Leading Arr-accepted candidate|never Grabs automatically/u);
   assert.match(String(client.body), /policyLanguageChip|populatePolicyLanguageFilter|renderLeadingRelease|requiredFitLabel/u);
   assert.match(String(model.body), /policySource|requiredLanguageFit|matchesLanguageAssessment|leadingRelease/u);
   assert.match(String(styles.body), /policy-language-chip|required-fit-badge|release-leading/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
-  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
 
 test("PEG-DASH-031 missing-item triage filters and clear control remain page-memory-only assets", async () => {
@@ -331,7 +327,6 @@ test("PEG-DASH-031 missing-item triage filters and clear control remain page-mem
   assert.match(String(model.body), /matchesProfile|matchesPolicyLanguage|matchesAnalysisAge|analysisRecencyWindowMs/u);
   assert.match(String(styles.body), /inventory-filter-state/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
-  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
 
 test("PEG-DASH-036 release comparison and navigation remain page-memory-only assets", async () => {
@@ -346,7 +341,130 @@ test("PEG-DASH-036 release comparison and navigation remain page-memory-only ass
   assert.match(String(model.body), /releaseComparison|bestLanguageRanks|strongConfidenceRank/u);
   assert.match(String(styles.body), /release-comparison|comparison-cell--stronger|comparison-strength/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
-  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
+});
+
+test("PEG-GRABAPI-001 controlled Grab routes require the independent administrator token", async () => {
+  const libraryToken = "synthetic-access-token-value-0000000001";
+  const adminToken = "synthetic-admin-token-value-00000000002";
+  let preparations = 0;
+  const base = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  const services: RuntimeServices = {
+    ...base,
+    controlledGrab: {
+      prepare: async (selection, releaseId) => {
+        preparations += 1;
+        assert.deepEqual(selection, { application: "sonarr", kind: "episode", itemId: 305 });
+        assert.equal(releaseId, "sonarr-0123456789abcdef01234567");
+        return {
+          status: "confirmation_required",
+          mode: "controlled_grab",
+          challengeId: "challenge_00000001",
+          application: "sonarr",
+          kind: "episode",
+          itemId: 305,
+          targetLabel: "Synthetic Show S03E05",
+          releaseId,
+          releaseTitle: "Synthetic.Show.S03E05.1080p.WEB-DL-GROUP",
+          confirmation: "GRAB Synthetic.Show.S03E05.1080p.WEB-DL-GROUP FOR Synthetic Show S03E05",
+          expiresAt: "2030-01-01T00:00:00.000Z",
+        };
+      },
+      execute: async () => { throw new Error("not expected"); },
+      history: () => [],
+    },
+  };
+  const path = "/api/v1/library/items/sonarr/episode/305/grab/prepare";
+  const accessControl = new AccessControl(new SecretValue(libraryToken));
+  const adminControl = new AccessControl(new SecretValue(adminToken));
+  const body = { releaseId: "sonarr-0123456789abcdef01234567" };
+
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, {
+    control: accessControl,
+    adminControl,
+    authorization: `Bearer ${libraryToken}`,
+  }, body)).statusCode, 401);
+  assert.equal(preparations, 0);
+  const authorized = await resolveRoute("POST", path, tmpdir(), services, {
+    control: accessControl,
+    adminControl,
+    authorization: `Bearer ${adminToken}`,
+  }, body);
+  assert.equal(authorized.statusCode, 200);
+  assert.equal((authorized.body as { status: string }).status, "confirmation_required");
+  assert.equal(preparations, 1);
+  assert.doesNotMatch(JSON.stringify(authorized), /guid|indexerId|api.?key|synthetic-admin-token/iu);
+});
+
+test("PEG-GRABAPI-002 execution and audit history expose bounded public outcomes", async () => {
+  const token = "synthetic-admin-token-value-00000000002";
+  let executions = 0;
+  const event = {
+    eventId: "event_00000001",
+    application: "sonarr",
+    kind: "episode",
+    itemId: 305,
+    targetLabel: "Synthetic Show S03E05",
+    releaseId: "sonarr-0123456789abcdef01234567",
+    releaseTitle: "Synthetic.Show.S03E05.1080p.WEB-DL-GROUP",
+    status: "grabbed",
+    detailCode: "arr_accepted_grab",
+    requestedAt: "2030-01-01T00:00:00.000Z",
+    completedAt: "2030-01-01T00:00:01.000Z",
+  } as const;
+  const base = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  const services: RuntimeServices = {
+    ...base,
+    controlledGrab: {
+      prepare: async () => { throw new Error("not expected"); },
+      execute: async (selection, challengeId, confirmation, idempotencyKey) => {
+        executions += 1;
+        assert.deepEqual(selection, { application: "sonarr", kind: "episode", itemId: 305 });
+        assert.equal(challengeId, "challenge_00000001");
+        assert.equal(confirmation, "GRAB exact confirmation");
+        assert.equal(idempotencyKey, "idempotency_00000001");
+        return { status: "grabbed", mode: "controlled_grab", event, replayed: false, requiresReconciliation: false };
+      },
+      history: (limit) => {
+        assert.equal(limit, 10);
+        return [event];
+      },
+    },
+  };
+  const access = {
+    control: new AccessControl(new SecretValue("synthetic-access-token-value-0000000001")),
+    adminControl: new AccessControl(new SecretValue(token)),
+    authorization: `Bearer ${token}`,
+  };
+  const executePath = "/api/v1/library/items/sonarr/episode/305/grab/execute";
+  const invalid = await resolveRoute("POST", executePath, tmpdir(), services, access, { challengeId: "challenge_00000001" });
+  assert.equal(invalid.statusCode, 400);
+  assert.equal(executions, 0);
+  const executed = await resolveRoute("POST", executePath, tmpdir(), services, access, {
+    challengeId: "challenge_00000001",
+    confirmation: "GRAB exact confirmation",
+    idempotencyKey: "idempotency_00000001",
+  });
+  assert.equal(executed.statusCode, 200);
+  assert.equal(executions, 1);
+  const history = await resolveRoute("GET", "/api/v1/grabs/history?limit=10", tmpdir(), services, access);
+  assert.equal(history.statusCode, 200);
+  assert.doesNotMatch(JSON.stringify(history), /idempotency|guid|indexerId|authorization|synthetic-admin/iu);
+  assert.equal((await resolveRoute("GET", executePath, tmpdir(), services, access)).statusCode, 405);
+});
+
+test("PEG-DASH-037 controlled Grab UI is opt-in, exact-confirmation, and page-memory-only", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, model.body, styles.body].join("\n");
+
+  assert.match(String(page.body), /Administrator action|Revalidate release|Exact confirmation|Confirm Grab/u);
+  assert.match(String(client.body), /prepareControlledGrab|executeControlledGrab|crypto\.randomUUID|credentials: "omit"/u);
+  assert.match(String(client.body), /timeout_unknown|Check Arr activity|administratorToken = undefined/u);
+  assert.match(String(model.body), /controlledGrab: capabilities\.controlledGrab === true/u);
+  assert.match(String(styles.body), /grab-dialog|grab-confirmation-phrase|danger-button/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
 function fakeServices(

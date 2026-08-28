@@ -8,7 +8,7 @@ import {
   FetchJsonTransport,
   type FetchImplementation,
 } from "./fetch-json-transport.js";
-import { JsonTransportError, type ReadonlyJsonRequest } from "./http.js";
+import { JsonTransportError, type MutatingJsonRequest, type ReadonlyJsonRequest } from "./http.js";
 import { SonarrClient } from "./sonarr.js";
 
 const directRequest: ReadonlyJsonRequest = {
@@ -223,4 +223,36 @@ test("PEG-HTTP-005 Bazarr array query keys are encoded without widening the URL 
       (error: unknown) => error instanceof JsonTransportError && error.code === "invalid_request",
     );
   }
+});
+
+test("PEG-HTTP-006 POST sends one bounded JSON object without widening transport policy", async () => {
+  let capturedInit: RequestInit | undefined;
+  const transport = new FetchJsonTransport({
+    baseUrl: "https://sonarr.example.invalid",
+    allowedHosts: ["sonarr.example.invalid"],
+    fetchImplementation: async (_input, init) => {
+      capturedInit = init;
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    },
+  });
+  const request: MutatingJsonRequest = {
+    method: "POST",
+    path: "/api/v3/release",
+    query: {},
+    headers: { accept: "application/json" },
+    body: { guid: "synthetic-guid", indexerId: 11 },
+    timeoutMs: 100,
+    maxResponseBytes: 1_024,
+  };
+
+  await transport.requestJson(request);
+  assert.equal(capturedInit?.method, "POST");
+  assert.equal(new Headers(capturedInit?.headers).get("content-type"), "application/json");
+  assert.deepEqual(JSON.parse(String(capturedInit?.body)), request.body);
+  assert.equal(capturedInit?.redirect, "error");
+  assert.equal(capturedInit?.credentials, "omit");
+  await assert.rejects(
+    transport.requestJson({ ...request, body: { value: "x".repeat(65 * 1_024) } }),
+    (error: unknown) => error instanceof JsonTransportError && error.code === "invalid_request",
+  );
 });

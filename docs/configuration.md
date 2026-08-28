@@ -78,6 +78,18 @@ Safe route categories include health, readiness, dashboard, dashboard asset, int
 
 The live library route is absent unless the access token is configured. Pegarr rejects a direct `PEGARR_ACCESS_TOKEN` value. Use [the access-control overlay and guide](access-control.md) to mount the token without placing it in `.env`, browser storage, URLs, or logs.
 
+## Controlled Grab
+
+Controlled Grab is disabled by default. Enabling it requires the normal read-only access token plus a separate administrator secret and durable audit path.
+
+| Variable | Required when enabled | Meaning |
+| --- | --- | --- |
+| `PEGARR_GRAB_ENABLED` | Yes | Must be exactly `true`; absent or `false` keeps every mutation route unavailable |
+| `PEGARR_ADMIN_TOKEN_FILE` | Yes | Absolute path to an independent random bearer token of 32 through 4096 characters |
+| `PEGARR_GRAB_AUDIT_FILE` | Yes | Absolute SQLite path used for durable Grab request and outcome history |
+
+Pegarr rejects a direct `PEGARR_ADMIN_TOKEN` and refuses to start if the administrator and read-only access token values are equal. The administrator token stays server-side except while a user types it into the page-memory confirmation dialog. See the [controlled Grab guide](controlled-grab.md).
+
 ## Docker secret deployment
 
 Create the secret outside the repository and restrict it to the account managing the container:
@@ -88,6 +100,7 @@ install -m 600 /dev/null /absolute/private/path/radarr_api_key
 install -m 600 /dev/null /absolute/private/path/bazarr_api_key
 install -m 600 /dev/null /absolute/private/path/subdl_api_key
 install -m 600 /dev/null /absolute/private/path/pegarr_access_token
+install -m 600 /dev/null /absolute/private/path/pegarr_admin_token
 ```
 
 Place the API key in that file using an editor that does not store it in shell history. Then set the non-secret variables in `.env`, including the host path used only by Docker Compose:
@@ -118,6 +131,7 @@ PEGARR_SUBDL_PROBE_EPISODE=1
 PEGARR_PROVIDER_CACHE_TTL_SECONDS=900
 PEGARR_PROVIDER_CACHE_MAX_ENTRIES=5000
 PEGARR_ACCESS_TOKEN_HOST_FILE=/absolute/private/path/pegarr_access_token
+PEGARR_ADMIN_TOKEN_HOST_FILE=/absolute/private/path/pegarr_admin_token
 PEGARR_MISSING_PAGE_SIZE=50
 ```
 

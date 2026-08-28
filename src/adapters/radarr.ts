@@ -3,16 +3,19 @@ import { createHash } from "node:crypto";
 import type {
   ArrReleaseCandidate,
   ArrReleaseEvidence,
+  ArrGrabReceipt,
+  ArrReleaseHandle,
   MissingItemPage,
   MissingItemQuery,
   MissingMediaItem,
   ReleaseTraits,
+  RevalidatedArrRelease,
 } from "../domain.js";
 import {
   JsonTransportError,
   type JsonResponse,
   type JsonTransport,
-  type ReadonlyJsonRequest,
+  type JsonRequest,
 } from "./http.js";
 
 export type RadarrErrorCode =
@@ -37,6 +40,24 @@ export class RadarrAdapterError extends Error {
     this.code = code;
     this.status = options.status;
     this.retryAfterSeconds = options.retryAfterSeconds;
+  }
+}
+
+export type RadarrGrabErrorCode =
+  | "timeout"
+  | "unauthorized"
+  | "rate_limited"
+  | "release_unavailable"
+  | "upstream_failure"
+  | "invalid_response";
+
+export class RadarrGrabError extends Error {
+  readonly code: RadarrGrabErrorCode;
+
+  constructor(code: RadarrGrabErrorCode, message: string) {
+    super(message);
+    this.name = "RadarrGrabError";
+    this.code = code;
   }
 }
 
@@ -108,6 +129,57 @@ export class RadarrClient {
     }
   }
 
+  async revalidateMovieRelease(
+    movieId: number,
+    releaseId: string,
+  ): Promise<RevalidatedArrRelease | undefined> {
+    const normalizedMovieId = boundedInteger(movieId, 1, Number.MAX_SAFE_INTEGER, "movieId");
+    const normalizedReleaseId = safeReleaseId(releaseId, "radarr");
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/release",
+      query: { movieId: String(normalizedMovieId) },
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: this.#maxResponseBytes,
+    });
+    assertSuccessfulStatus(response, "release revalidation");
+    try {
+      return mapRadarrRevalidatedReleaseResponse(response.body, this.#instanceId)
+        .find(({ candidate }) => candidate.id === normalizedReleaseId);
+    } catch {
+      throw new RadarrAdapterError("invalid_response", "Radarr returned an invalid release response", {
+        status: response.status,
+      });
+    }
+  }
+
+  async grabRelease(handle: ArrReleaseHandle): Promise<ArrGrabReceipt> {
+    const normalized = validateGrabHandle(handle);
+    let response: JsonResponse;
+    try {
+      response = await this.#transport.requestJson({
+        method: "POST",
+        path: "/api/v3/release",
+        query: {},
+        headers: { accept: "application/json", "x-api-key": this.#apiKey },
+        body: normalized,
+        timeoutMs: this.#timeoutMs,
+        maxResponseBytes: Math.min(this.#maxResponseBytes, 256 * 1024),
+      });
+    } catch (error) {
+      if (error instanceof JsonTransportError && error.code === "timeout") {
+        throw new RadarrGrabError("timeout", "Radarr Grab outcome is unknown after a timeout");
+      }
+      if (error instanceof JsonTransportError && (error.code === "invalid_json" || error.code === "response_too_large")) {
+        throw new RadarrGrabError("invalid_response", "Radarr returned an invalid Grab response");
+      }
+      throw new RadarrGrabError("upstream_failure", "Radarr Grab request failed");
+    }
+    assertGrabStatus(response, "Radarr");
+    return { status: "accepted", responseStatus: 200 };
+  }
+
   async listMissingMovies(query: MissingItemQuery = {}): Promise<MissingItemPage> {
     const page = boundedInteger(query.page ?? 1, 1, Number.MAX_SAFE_INTEGER, "page");
     const pageSize = boundedInteger(query.pageSize ?? 50, 1, 100, "pageSize");
@@ -172,7 +244,7 @@ export class RadarrClient {
     }
   }
 
-  async #requestJson(request: ReadonlyJsonRequest): Promise<JsonResponse> {
+  async #requestJson(request: JsonRequest): Promise<JsonResponse> {
     try {
       return await this.#transport.requestJson(request);
     } catch (error) {
@@ -215,6 +287,23 @@ export function mapRadarrReleaseResponse(
   }
 
   return body.map((value, index) => mapRelease(value, index, instanceId));
+}
+
+export function mapRadarrRevalidatedReleaseResponse(
+  body: unknown,
+  instanceId = "radarr",
+): readonly RevalidatedArrRelease[] {
+  if (!Array.isArray(body)) throw new TypeError("Radarr release response must be an array");
+  return body.map((value, index) => {
+    const row = record(value, `release[${index}]`);
+    return {
+      candidate: mapRelease(value, index, instanceId),
+      handle: {
+        guid: requiredString(row.guid, `release[${index}].guid`),
+        indexerId: boundedInteger(requiredNumber(row.indexerId, `release[${index}].indexerId`), 1, Number.MAX_SAFE_INTEGER, `release[${index}].indexerId`),
+      },
+    };
+  });
 }
 
 export function mapRadarrMissingResponse(
@@ -338,6 +427,25 @@ function assertSuccessfulStatus(response: JsonResponse, operation: string): void
   throw new RadarrAdapterError("unexpected_status", `Radarr rejected the ${operation} request`, {
     status: response.status,
   });
+}
+
+function assertGrabStatus(response: JsonResponse, application: "Radarr"): void {
+  if (response.status === 200) return;
+  if (response.status === 401 || response.status === 403) throw new RadarrGrabError("unauthorized", `${application} rejected the configured credentials`);
+  if (response.status === 404 || response.status === 409) throw new RadarrGrabError("release_unavailable", `${application} could not Grab the revalidated release`);
+  if (response.status === 429) throw new RadarrGrabError("rate_limited", `${application} rate limited the Grab`);
+  throw new RadarrGrabError("upstream_failure", `${application} rejected the Grab request`);
+}
+
+function validateGrabHandle(handle: ArrReleaseHandle): Readonly<Record<string, unknown>> {
+  const guid = requiredString(handle.guid, "grab.guid");
+  if (guid.length > 4_096 || /[\r\n]/u.test(guid)) throw new TypeError("grab.guid must be bounded");
+  return { guid, indexerId: boundedInteger(handle.indexerId, 1, Number.MAX_SAFE_INTEGER, "grab.indexerId") };
+}
+
+function safeReleaseId(value: string, application: "radarr"): string {
+  if (!new RegExp(`^${application}-[a-f0-9]{24}$`, "u").test(value)) throw new TypeError("releaseId is invalid");
+  return value;
 }
 
 function parseRetryAfter(headers: Readonly<Record<string, string>>): number | undefined {

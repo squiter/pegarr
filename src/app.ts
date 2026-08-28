@@ -29,6 +29,7 @@ const jsonHeaders = {
 
 export interface RouteAccess {
   readonly control: AccessControl;
+  readonly adminControl?: AccessControl;
   readonly authorization?: string;
 }
 
@@ -36,7 +37,7 @@ export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "missing_inventory" | "item_feasibility" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -44,6 +45,7 @@ export interface RequestLogEntry {
 export interface RequestHandlerOptions {
   readonly now?: () => number;
   readonly log?: (entry: RequestLogEntry) => void;
+  readonly adminAccessControl?: AccessControl;
 }
 
 const dashboardAssetRoutes = new Map<string, DashboardAssetName>([
@@ -81,12 +83,19 @@ export async function resolveRoute(
   dataDirectory: string,
   services?: RuntimeServices,
   access?: RouteAccess,
+  requestBody?: unknown,
 ): Promise<RouteResult> {
   const parsedUrl = new URL(requestUrl ?? "/", "http://pegarr.invalid");
   const pathname = parsedUrl.pathname;
   const itemSelection = parseItemFeasibilityPath(pathname);
+  const grabSelection = parseGrabPath(pathname);
+  const grabHistory = pathname === "/api/v1/grabs/history";
   const protectedLibraryRoute = pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
+    return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+  }
+  const controlledGrabAvailable = services?.controlledGrab !== undefined && access?.adminControl?.configured === true;
+  if ((grabSelection !== undefined || grabHistory) && !controlledGrabAvailable) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   const knownReadOnlyRoutes = new Set([
@@ -106,6 +115,12 @@ export async function resolveRoute(
       headers: { allow: "GET" },
       body: { service: "pegarr", status: "method_not_allowed" },
     };
+  }
+  if (grabHistory && method !== "GET") {
+    return { statusCode: 405, headers: { allow: "GET" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (grabSelection !== undefined && method !== "POST") {
+    return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
   }
 
   if (pathname === "/health") {
@@ -207,12 +222,59 @@ export async function resolveRoute(
         : await services.readItemFeasibility(itemSelection, {
             refresh: parsedUrl.searchParams.get("refresh") === "1",
           });
-      return { statusCode: body.status === "not_found" ? 404 : 200, body };
+      return {
+        statusCode: body.status === "not_found" ? 404 : 200,
+        body: {
+          ...body,
+          capabilities: { controlledGrab: controlledGrabAvailable },
+        },
+      };
     } catch {
       return {
         statusCode: 503,
         body: { service: "pegarr", mode: "read_only", status: "unavailable" },
       };
+    }
+  }
+
+  if (grabSelection !== undefined) {
+    const rejection = authorizeAdministratorRoute(access);
+    if (rejection !== undefined) return rejection;
+    if (services?.controlledGrab === undefined) {
+      return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+    }
+    try {
+      if (grabSelection.action === "prepare") {
+        const body = parsePrepareGrabBody(requestBody);
+        const result = await services.controlledGrab.prepare(grabSelection.selection, body.releaseId);
+        return { statusCode: result.status === "confirmation_required" ? 200 : 409, body: result };
+      }
+      const body = parseExecuteGrabBody(requestBody);
+      const result = await services.controlledGrab.execute(grabSelection.selection, body.challengeId, body.confirmation, body.idempotencyKey);
+      return { statusCode: executeGrabStatusCode(result.status), body: result };
+    } catch (error) {
+      if (error instanceof InvalidRequestBodyError) {
+        return { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } };
+      }
+      return { statusCode: 503, body: { service: "pegarr", status: "controlled_grab_unavailable" } };
+    }
+  }
+
+  if (grabHistory) {
+    const rejection = authorizeAdministratorRoute(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      const limit = boundedHistoryLimit(parsedUrl.searchParams.get("limit"));
+      return {
+        statusCode: 200,
+        body: {
+          kind: "grab-audit-history",
+          mode: "controlled_grab",
+          events: services?.controlledGrab?.history(limit) ?? [],
+        },
+      };
+    } catch {
+      return { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } };
     }
   }
 
@@ -234,6 +296,18 @@ function authorizeLibraryRoute(access: RouteAccess | undefined): RouteResult | u
   };
 }
 
+function authorizeAdministratorRoute(access: RouteAccess | undefined): RouteResult | undefined {
+  if (access?.adminControl?.configured !== true) {
+    return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+  }
+  if (access.adminControl.authorize(access.authorization)) return undefined;
+  return {
+    statusCode: 401,
+    headers: { "www-authenticate": 'Bearer realm="pegarr-admin", charset="UTF-8"' },
+    body: { service: "pegarr", status: "unauthorized" },
+  };
+}
+
 function parseItemFeasibilityPath(pathname: string): ItemFeasibilitySelection | undefined {
   const match = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/(episode|movie)\/(\d+)\/feasibility$/u.exec(pathname);
   if (match === null) return undefined;
@@ -244,6 +318,75 @@ function parseItemFeasibilityPath(pathname: string): ItemFeasibilitySelection | 
   if (application === "sonarr" && kind === "episode") return { application, kind, itemId };
   if (application === "radarr" && kind === "movie") return { application, kind, itemId };
   return undefined;
+}
+
+interface GrabPath {
+  readonly selection: ItemFeasibilitySelection;
+  readonly action: "prepare" | "execute";
+}
+
+function parseGrabPath(pathname: string): GrabPath | undefined {
+  const match = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/(episode|movie)\/(\d+)\/grab\/(prepare|execute)$/u.exec(pathname);
+  if (match === null) return undefined;
+  const application = match[1];
+  const kind = match[2];
+  const itemId = Number(match[3]);
+  const action = match[4];
+  if (!Number.isSafeInteger(itemId) || itemId < 1 || (action !== "prepare" && action !== "execute")) return undefined;
+  if (application === "sonarr" && kind === "episode") return { selection: { application, kind, itemId }, action };
+  if (application === "radarr" && kind === "movie") return { selection: { application, kind, itemId }, action };
+  return undefined;
+}
+
+class InvalidRequestBodyError extends Error {}
+
+function parsePrepareGrabBody(value: unknown): { readonly releaseId: string } {
+  const body = requestRecord(value, ["releaseId"]);
+  return { releaseId: requestString(body.releaseId, "releaseId", 64) };
+}
+
+function parseExecuteGrabBody(value: unknown): {
+  readonly challengeId: string;
+  readonly confirmation: string;
+  readonly idempotencyKey: string;
+} {
+  const body = requestRecord(value, ["challengeId", "confirmation", "idempotencyKey"]);
+  return {
+    challengeId: requestString(body.challengeId, "challengeId", 128),
+    confirmation: requestString(body.confirmation, "confirmation", 8_192),
+    idempotencyKey: requestString(body.idempotencyKey, "idempotencyKey", 128),
+  };
+}
+
+function requestRecord(value: unknown, expectedKeys: readonly string[]): Readonly<Record<string, unknown>> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new InvalidRequestBodyError();
+  const body = value as Readonly<Record<string, unknown>>;
+  const keys = Object.keys(body).toSorted();
+  if (JSON.stringify(keys) !== JSON.stringify([...expectedKeys].toSorted())) throw new InvalidRequestBodyError();
+  return body;
+}
+
+function requestString(value: unknown, field: string, maximum: number): string {
+  if (typeof value !== "string" || !value.trim() || value.length > maximum || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)) {
+    throw new InvalidRequestBodyError(`${field} is invalid`);
+  }
+  return value;
+}
+
+function boundedHistoryLimit(value: string | null): number {
+  if (value === null) return 50;
+  if (!/^\d{1,3}$/u.test(value)) throw new InvalidRequestBodyError();
+  const limit = Number(value);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new InvalidRequestBodyError();
+  return limit;
+}
+
+function executeGrabStatusCode(status: string): number {
+  if (status === "grabbed") return 200;
+  if (status === "timeout_unknown") return 202;
+  if (status === "challenge_expired") return 410;
+  if (status === "revalidation_failed" || status === "confirmation_mismatch" || status === "duplicate_blocked" || status === "duplicate_in_progress" || status === "idempotency_conflict") return 409;
+  return 503;
 }
 
 async function safeRadarrStatus(services: RuntimeServices | undefined): Promise<RadarrIntegrationStatus> {
@@ -279,6 +422,9 @@ export function createRequestHandler(
     const authorization = request.headers.authorization;
     let result: RouteResult;
     try {
+      const requestBody = request.method === "POST" && safeRequestRoute(request.url).startsWith("grab_")
+        ? await readBoundedJsonBody(request)
+        : undefined;
       result = await resolveRoute(
         request.method,
         request.url,
@@ -288,13 +434,20 @@ export function createRequestHandler(
           ? undefined
           : {
               control: accessControl,
+              ...(options.adminAccessControl === undefined
+                ? {}
+                : { adminControl: options.adminAccessControl }),
               ...(typeof authorization === "string" ? { authorization } : {}),
             },
+        requestBody,
       );
-    } catch {
+    } catch (error) {
       result = {
-        statusCode: 500,
-        body: { service: "pegarr", status: "unexpected_failure" },
+        statusCode: error instanceof HttpRequestBodyError ? error.statusCode : 500,
+        body: {
+          service: "pegarr",
+          status: error instanceof HttpRequestBodyError ? error.status : "unexpected_failure",
+        },
       };
     }
     response.writeHead(result.statusCode, { ...jsonHeaders, ...result.headers });
@@ -307,6 +460,46 @@ export function createRequestHandler(
       // Operational logging must never change the HTTP result.
     }
   };
+}
+
+class HttpRequestBodyError extends Error {
+  readonly statusCode: 400 | 413 | 415;
+  readonly status: "invalid_request" | "request_too_large" | "unsupported_media_type";
+
+  constructor(statusCode: 400 | 413 | 415, status: HttpRequestBodyError["status"]) {
+    super(status);
+    this.statusCode = statusCode;
+    this.status = status;
+  }
+}
+
+async function readBoundedJsonBody(request: IncomingMessage): Promise<unknown> {
+  const contentType = request.headers["content-type"];
+  const normalizedContentType = Array.isArray(contentType) ? contentType[0] : contentType;
+  if (normalizedContentType === undefined || !/^application\/json(?:\s*;|$)/iu.test(normalizedContentType)) {
+    throw new HttpRequestBodyError(415, "unsupported_media_type");
+  }
+  const declared = request.headers["content-length"];
+  if (typeof declared === "string" && /^\d+$/u.test(declared) && Number(declared) > 16 * 1024) {
+    request.resume();
+    throw new HttpRequestBodyError(413, "request_too_large");
+  }
+  const chunks: Buffer[] = [];
+  let bytes = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    bytes += buffer.byteLength;
+    if (bytes > 16 * 1024) {
+      request.resume();
+      throw new HttpRequestBodyError(413, "request_too_large");
+    }
+    chunks.push(buffer);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw new HttpRequestBodyError(400, "invalid_request");
+  }
 }
 
 export function requestLogEntry(
@@ -349,6 +542,10 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (pathname === "/api/v1/integrations/radarr/status") return "radarr_status";
   if (pathname === "/api/v1/library/missing") return "missing_inventory";
   if (parseItemFeasibilityPath(pathname) !== undefined) return "item_feasibility";
+  const grab = parseGrabPath(pathname);
+  if (grab?.action === "prepare") return "grab_prepare";
+  if (grab?.action === "execute") return "grab_execute";
+  if (pathname === "/api/v1/grabs/history") return "grab_history";
   return "not_found";
 }
 
