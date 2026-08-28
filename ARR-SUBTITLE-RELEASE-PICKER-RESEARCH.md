@@ -551,6 +551,7 @@ Exit condition: one end-to-end read-only report can associate subtitle candidate
 - Multiple *Arr instances
 - OpenSubtitles adapter
 - Provider-specific rate limiting and quota display
+- Quota-aware provider ordering with asymmetric positive, empty, and failure cache windows
 - Season-pack matching
 - Forced/hearing-impaired preferences
 - Better release parsing and matching fixtures
