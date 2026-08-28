@@ -32,6 +32,7 @@ function delay(milliseconds) {
 
 async function smokeTest() {
   const scenario = "PEG-DOCKER-001";
+  const logScenario = "PEG-DOCKER-023";
   const containerName = `pegarr-harness-${process.pid}`;
   const started = docker([
     "run",
@@ -72,14 +73,30 @@ async function smokeTest() {
       "  if (path.endsWith('/sonarr/status') && (body.mode !== 'read_only' || body.state !== 'disabled')) throw new Error('Sonarr status is not safely disabled');",
       "  if (path.endsWith('/radarr/status') && (body.mode !== 'read_only' || body.state !== 'disabled')) throw new Error('Radarr status is not safely disabled');",
       "  return path + '=200';",
-      "})).then((results) => console.log(results.join(', ')));",
+      "})).then(async (results) => {",
+      "  const unknown = await fetch('http://127.0.0.1:8080/does-not-exist?token=synthetic-log-secret-00000001');",
+      "  if (unknown.status !== 404) throw new Error('unknown log probe did not stay generic');",
+      "  console.log(results.join(', '));",
+      "});",
     ].join("\n");
 
     let result;
     for (let attempt = 0; attempt < 20; attempt += 1) {
       result = docker(["exec", containerName, "node", "-e", probe]);
       if (result.status === 0) {
+        const requestLogs = docker(["logs", containerName]);
+        const logOutput = outputOf(requestLogs);
+        if (
+          requestLogs.status !== 0 ||
+          !logOutput.includes('"event":"http_request"') ||
+          !logOutput.includes('"route":"not_found"') ||
+          !logOutput.includes('"statusCode":404') ||
+          /synthetic-log-secret|does-not-exist|[?&]token=|authorization/iu.test(logOutput)
+        ) {
+          throw new Error(`${logScenario} request log contract mismatch:\n${logOutput}`);
+        }
         process.stdout.write(`${scenario} ${result.stdout.trim()} (node, read-only, network=none)\n`);
+        process.stdout.write(`${logScenario} packaged request logs=redacted (safe route category, no URL, query, headers, or credentials)\n`);
         return;
       }
       await delay(250);

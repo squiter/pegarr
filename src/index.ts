@@ -14,7 +14,9 @@ async function start(): Promise<void> {
   const configuration = await loadRuntimeConfiguration(process.env);
   const services = createRuntimeServices(configuration, { environment: process.env });
   const accessControl = new AccessControl(configuration.accessToken);
-  const server = createServer(createRequestHandler(dataDirectory, services, accessControl));
+  const server = createServer(createRequestHandler(dataDirectory, services, accessControl, {
+    log: (entry) => process.stdout.write(`${JSON.stringify(entry)}\n`),
+  }));
 
   server.listen(port, host, () => {
     process.stdout.write(`${JSON.stringify({ event: "server_started", service: "pegarr", port })}\n`);

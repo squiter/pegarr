@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { shouldRetryWithClassicBuilder } from "./docker-build.mjs";
-import { classifyAffectedFiles, selectCheckIds, summarizeFailure } from "./run-checks.mjs";
+import { classifyAffectedFiles, harnessPhaseSummary, selectCheckIds, summarizeFailure } from "./run-checks.mjs";
 
 test("PEG-HARNESS-001 affected paths select the narrow deterministic sensor set", () => {
   assert.deepEqual(classifyAffectedFiles(["docs/harness.md"]), {
@@ -15,11 +15,32 @@ test("PEG-HARNESS-001 affected paths select the narrow deterministic sensor set"
   });
   assert.deepEqual(selectCheckIds("affected", ["docs/harness.md"]), [
     "PEG-SCENARIOS",
+    "PEG-PHASE",
     "PEG-DOCS",
     "PEG-ARCH",
     "PEG-SECRETS",
   ]);
   assert.ok(selectCheckIds("affected", ["src/matching.ts"]).includes("PEG-DOCKER"));
+});
+
+test("PEG-HARNESS-005 harness reports retain machine-readable phase completion evidence", () => {
+  assert.deepEqual(harnessPhaseSummary({
+    phase: "phase-1-read-only-mvp-complete",
+    completion: { status: "complete" },
+    automatedScenarios: [{ id: "one" }, { id: "two" }],
+    manualGaps: [{ id: "gap" }],
+  }), {
+    id: "phase-1-read-only-mvp-complete",
+    status: "complete",
+    automatedScenarioCount: 2,
+    manualGapCount: 1,
+  });
+  assert.deepEqual(harnessPhaseSummary({}), {
+    id: "unknown",
+    status: "unknown",
+    automatedScenarioCount: 0,
+    manualGapCount: 0,
+  });
 });
 
 test("PEG-HARNESS-002 raw tool failures become compact actionable signals", () => {

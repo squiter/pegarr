@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "phase": "phase-1-read-only-mvp",
+  "status": "complete",
+  "completedOn": "2026-08-28",
+  "completionRule": "Every criterion is complete and references automated scenarios; environment-only compatibility remains an explicit manual gap.",
+  "criteria": [
+    {
+      "id": "P1-ARR-INSTANCES",
+      "title": "Single Sonarr and Radarr instance support",
+      "status": "complete",
+      "scenarioIds": ["PEG-CONFIG-002", "PEG-CONFIG-003", "PEG-SONARR-001", "PEG-RADARR-001", "PEG-RUNTIME-001", "PEG-RUNTIME-005", "PEG-INVENTORY-001"]
+    },
+    {
+      "id": "P1-BAZARR-POLICY",
+      "title": "Bazarr profile discovery and assignment resolution",
+      "status": "complete",
+      "scenarioIds": ["PEG-CONFIG-004", "PEG-BAZARR-001", "PEG-BAZARR-002", "PEG-BAZARR-003", "PEG-BAZARR-004", "PEG-BAZARR-005"]
+    },
+    {
+      "id": "P1-SUBDL-ADAPTER",
+      "title": "Bounded SubDL provider adapter",
+      "status": "complete",
+      "scenarioIds": ["PEG-CONFIG-005", "PEG-CONFIG-007", "PEG-SUBDL-001", "PEG-SUBDL-002", "PEG-SUBDL-003", "PEG-SUBDL-004", "PEG-SUBDL-005", "PEG-SUBDL-006"]
+    },
+    {
+      "id": "P1-MISSING-DASHBOARD",
+      "title": "Authenticated missing-item dashboard",
+      "status": "complete",
+      "scenarioIds": ["PEG-ACCESS-001", "PEG-ACCESS-002", "PEG-ACCESS-003", "PEG-INVENTORY-001", "PEG-INVENTORY-002", "PEG-DASH-001", "PEG-DASH-002", "PEG-DASH-003", "PEG-DOCKER-012"]
+    },
+    {
+      "id": "P1-RELEASE-TABLE",
+      "title": "Interactive read-only release exploration",
+      "status": "complete",
+      "scenarioIds": ["PEG-ACCESS-004", "PEG-ITEM-001", "PEG-ITEM-003", "PEG-DASH-004", "PEG-DASH-007", "PEG-DASH-018", "PEG-DASH-024", "PEG-DASH-032", "PEG-DASH-036", "PEG-DOCKER-022"]
+    },
+    {
+      "id": "P1-CONFIDENCE",
+      "title": "Deterministic confidence and explanations",
+      "status": "complete",
+      "scenarioIds": ["PEG-MATCH-001", "PEG-MATCH-002", "PEG-MATCH-003", "PEG-MATCH-004", "PEG-MATCH-005", "PEG-MATCH-006", "PEG-MATCH-007", "PEG-MATCH-008", "PEG-MATCH-009", "PEG-MATCH-010"]
+    },
+    {
+      "id": "P1-OPERATIONS",
+      "title": "Bounded cache, health status, and redacted structured logs",
+      "status": "complete",
+      "scenarioIds": ["PEG-OPS-001", "PEG-OPS-002", "PEG-OPS-003", "PEG-HTTP-002", "PEG-HTTP-003", "PEG-CACHE-001", "PEG-CACHE-002", "PEG-CACHE-003", "PEG-CACHE-004", "PEG-CACHE-007", "PEG-CACHE-008", "PEG-DOCKER-001", "PEG-DOCKER-023"]
+    },
+    {
+      "id": "P1-NO-GRAB",
+      "title": "No Grab or other mutation surface",
+      "status": "complete",
+      "scenarioIds": ["PEG-API-001", "PEG-ACCESS-004", "PEG-DASH-036", "PEG-DOCKER-013", "PEG-DOCKER-023"]
+    }
+  ],
+  "manualGapIds": ["PEG-MANUAL-001", "PEG-MANUAL-002", "PEG-MANUAL-003", "PEG-MANUAL-004", "PEG-MANUAL-005"]
+}

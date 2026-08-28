@@ -32,6 +32,20 @@ export interface RouteAccess {
   readonly authorization?: string;
 }
 
+export interface RequestLogEntry {
+  readonly event: "http_request";
+  readonly service: "pegarr";
+  readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "missing_inventory" | "item_feasibility" | "not_found";
+  readonly statusCode: number;
+  readonly durationMs: number;
+}
+
+export interface RequestHandlerOptions {
+  readonly now?: () => number;
+  readonly log?: (entry: RequestLogEntry) => void;
+}
+
 const dashboardAssetRoutes = new Map<string, DashboardAssetName>([
   ["/assets/dashboard.css", "dashboard.css"],
   ["/assets/dashboard.js", "dashboard.js"],
@@ -257,26 +271,90 @@ export function createRequestHandler(
   dataDirectory: string,
   services?: RuntimeServices,
   accessControl?: AccessControl,
+  options: RequestHandlerOptions = {},
 ) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
+    const now = options.now ?? Date.now;
+    const startedAt = now();
     const authorization = request.headers.authorization;
-    const result = await resolveRoute(
-      request.method,
-      request.url,
-      dataDirectory,
-      services,
-      accessControl === undefined
-        ? undefined
-        : {
-            control: accessControl,
-            ...(typeof authorization === "string" ? { authorization } : {}),
-          },
-    );
+    let result: RouteResult;
+    try {
+      result = await resolveRoute(
+        request.method,
+        request.url,
+        dataDirectory,
+        services,
+        accessControl === undefined
+          ? undefined
+          : {
+              control: accessControl,
+              ...(typeof authorization === "string" ? { authorization } : {}),
+            },
+      );
+    } catch {
+      result = {
+        statusCode: 500,
+        body: { service: "pegarr", status: "unexpected_failure" },
+      };
+    }
     response.writeHead(result.statusCode, { ...jsonHeaders, ...result.headers });
     response.end(
       typeof result.body === "string" ? result.body : `${JSON.stringify(result.body)}\n`,
     );
+    try {
+      options.log?.(requestLogEntry(request.method, request.url, result.statusCode, startedAt, now()));
+    } catch {
+      // Operational logging must never change the HTTP result.
+    }
   };
+}
+
+export function requestLogEntry(
+  method: string | undefined,
+  requestUrl: string | undefined,
+  statusCode: number,
+  startedAt: number,
+  completedAt: number,
+): RequestLogEntry {
+  return {
+    event: "http_request",
+    service: "pegarr",
+    method: safeRequestMethod(method),
+    route: safeRequestRoute(requestUrl),
+    statusCode: Number.isSafeInteger(statusCode) && statusCode >= 100 && statusCode <= 599 ? statusCode : 500,
+    durationMs: safeRequestDuration(startedAt, completedAt),
+  };
+}
+
+function safeRequestMethod(method: string | undefined): RequestLogEntry["method"] {
+  const normalized = method?.toUpperCase();
+  return normalized === "GET" || normalized === "HEAD" || normalized === "POST" || normalized === "PUT" || normalized === "PATCH" || normalized === "DELETE" || normalized === "OPTIONS"
+    ? normalized
+    : "OTHER";
+}
+
+function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["route"] {
+  let pathname: string;
+  try {
+    pathname = new URL(requestUrl ?? "/", "http://pegarr.invalid").pathname;
+  } catch {
+    return "not_found";
+  }
+  if (pathname === "/") return "dashboard";
+  if (dashboardAssetRoutes.has(pathname)) return "dashboard_asset";
+  if (pathname === "/health") return "health";
+  if (pathname === "/health/ready") return "readiness";
+  if (pathname === "/api/v1/feasibility/demo") return "demo_feasibility";
+  if (pathname === "/api/v1/integrations/sonarr/status") return "sonarr_status";
+  if (pathname === "/api/v1/integrations/radarr/status") return "radarr_status";
+  if (pathname === "/api/v1/library/missing") return "missing_inventory";
+  if (parseItemFeasibilityPath(pathname) !== undefined) return "item_feasibility";
+  return "not_found";
+}
+
+function safeRequestDuration(startedAt: number, completedAt: number): number {
+  if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt)) return 0;
+  return Math.max(0, Math.min(60_000, Math.round(completedAt - startedAt)));
 }
 
 async function safeSonarrStatus(services: RuntimeServices | undefined): Promise<SonarrIntegrationStatus> {

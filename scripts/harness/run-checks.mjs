@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -12,6 +12,12 @@ const checks = [
     process.execPath,
     ["scripts/harness/scenario-contract.mjs"],
     "Update the manifest, test ID, and catalog together.",
+  ),
+  check(
+    "PEG-PHASE",
+    process.execPath,
+    ["scripts/harness/phase-contract.mjs"],
+    "Restore the Phase 1 criteria-to-evidence ledger before claiming completion.",
   ),
   check(
     "PEG-DOCS",
@@ -57,7 +63,7 @@ const checks = [
   ),
 ];
 
-const contractIds = new Set(["PEG-SCENARIOS", "PEG-DOCS", "PEG-ARCH", "PEG-SECRETS"]);
+const contractIds = new Set(["PEG-SCENARIOS", "PEG-PHASE", "PEG-DOCS", "PEG-ARCH", "PEG-SECRETS"]);
 const compiledIds = new Set(["PEG-TYPES", "PEG-BUILD", "PEG-TEST"]);
 
 function check(id, command, args, nextAction) {
@@ -112,6 +118,15 @@ export function summarizeFailure(output) {
   return (lines.at(-1) ?? "Command failed without output").slice(0, 500);
 }
 
+export function harnessPhaseSummary(manifest) {
+  return {
+    id: typeof manifest.phase === "string" ? manifest.phase : "unknown",
+    status: typeof manifest.completion?.status === "string" ? manifest.completion.status : "unknown",
+    automatedScenarioCount: Array.isArray(manifest.automatedScenarios) ? manifest.automatedScenarios.length : 0,
+    manualGapCount: Array.isArray(manifest.manualGaps) ? manifest.manualGaps.length : 0,
+  };
+}
+
 export function changedFiles() {
   const tracked = runGit(["diff", "--name-only", "HEAD"]);
   const untracked = runGit(["ls-files", "--others", "--exclude-standard"]);
@@ -162,8 +177,10 @@ export function main(argv = process.argv.slice(2)) {
   mkdirSync(artifactDirectory, { recursive: true });
   const startedAt = new Date().toISOString();
   const results = [];
+  const phase = harnessPhaseSummary(JSON.parse(readFileSync(resolve(root, "harness/manifest.json"), "utf8")));
 
   process.stdout.write(`Pegarr harness: ${mode} (${selected.length} sensors)\n`);
+  process.stdout.write(`Phase: ${phase.id} (${phase.status}; ${phase.automatedScenarioCount} automated, ${phase.manualGapCount} manual gaps)\n`);
   if (mode === "affected") {
     process.stdout.write(`Changed paths: ${changes.length === 0 ? "none" : changes.join(", ")}\n`);
   }
@@ -192,6 +209,7 @@ export function main(argv = process.argv.slice(2)) {
       dirty: runGit(["status", "--porcelain"]).length > 0,
       changedFiles: changes,
     },
+    phase,
     checks: results,
   };
   const reportPath = resolve(artifactDirectory, "report.json");

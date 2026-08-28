@@ -5,7 +5,7 @@ import test from "node:test";
 import type { FeasibilityReport } from "./domain.js";
 import { AccessControl } from "./access-control.js";
 import { SecretValue } from "./config.js";
-import { healthResponse, readinessResponse, resolveRoute } from "./app.js";
+import { healthResponse, readinessResponse, requestLogEntry, resolveRoute } from "./app.js";
 import type { RuntimeServices } from "./runtime.js";
 
 test("PEG-OPS-001 liveness is healthy", () => {
@@ -21,6 +21,34 @@ test("PEG-OPS-002 readiness requires an accessible data directory", async () => 
     (await readinessResponse(`${tmpdir()}/pegarr-directory-that-does-not-exist`)).statusCode,
     503,
   );
+});
+
+test("PEG-OPS-003 structured request logs are bounded and redact URLs, IDs, and credentials", () => {
+  const entry = requestLogEntry(
+    "get",
+    "/api/v1/library/items/sonarr/episode/305/feasibility?refresh=1&token=synthetic-private-token",
+    200,
+    1_000,
+    1_017.6,
+  );
+
+  assert.deepEqual(entry, {
+    event: "http_request",
+    service: "pegarr",
+    method: "GET",
+    route: "item_feasibility",
+    statusCode: 200,
+    durationMs: 18,
+  });
+  assert.doesNotMatch(JSON.stringify(entry), /305|refresh|token|synthetic-private|authorization|sonarr\/episode/iu);
+  assert.deepEqual(requestLogEntry("TRACE", "http://[", 999, Number.NaN, Infinity), {
+    event: "http_request",
+    service: "pegarr",
+    method: "OTHER",
+    route: "not_found",
+    statusCode: 500,
+    durationMs: 0,
+  });
 });
 
 test("PEG-API-001 health routes reject mutations", async () => {

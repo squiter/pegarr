@@ -8,7 +8,7 @@ Read `ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md` before making architectural or pr
 
 ## Current phase
 
-The repository is in the Phase 1 read-only MVP foundation. Keep live library routes authenticated, cache bounded, and behavior deterministic. Build the missing-item and release-selection experience in small vertical slices; Grab remains outside this phase.
+The Phase 1 read-only MVP implementation is complete and ratcheted by `harness/phase-1.json`. Keep live library routes authenticated, caches bounded, logs redacted, and behavior deterministic. Phase 2 Grab work must not begin without an explicit product decision and a new mutation-specific harness boundary.
 
 ## Non-negotiable behavior
 

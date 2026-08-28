@@ -9,7 +9,7 @@
 Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It is designed to compare interactive-search releases with subtitle-provider evidence, explain the confidence of each match, and eventually let an authorized user grab the best-informed release.
 
 > [!IMPORTANT]
-> Pegarr is in its read-only MVP phase. The container includes an authenticated missing-item dashboard with interactive, subtitle-aware release evidence, a synthetic feasibility report, opt-in integration probes, and explicit one-shot reports. Live library access requires a secret-file bearer token. Pegarr does not expose Grab operations.
+> Pegarr's Phase 1 read-only MVP implementation is complete. The container includes an authenticated missing-item dashboard with interactive, subtitle-aware release evidence, bounded caches, redacted structured request logs, opt-in integration probes, and explicit one-shot reports. Live library access requires a secret-file bearer token. Pegarr does not expose Grab operations.
 
 ## Why Pegarr?
 
@@ -26,7 +26,7 @@ Provider failures are never treated as proof that subtitles do not exist.
 
 ## Project status
 
-The API-feasibility milestone is complete. Phase 1 now has an authenticated missing-item dashboard and interactive release table backed by bounded read-only routes. End-to-end Sonarr episode and season paths are fixture-proven and locally compatible with real Sonarr/Bazarr reads; authenticated live SubDL and Radarr compatibility remain explicit manual gaps. See [the research and implementation proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md) for the product decisions, phases, non-goals, and open questions.
+The API-feasibility milestone and Phase 1 implementation are complete. The authenticated missing-item dashboard and interactive release table are backed by bounded read-only routes, deterministic confidence, durable provider caching, and a machine-checked completion ledger. End-to-end Sonarr episode and season paths are fixture-proven and locally compatible with real Sonarr/Bazarr reads; authenticated live SubDL, live Radarr, and NAS compatibility remain explicit manual gaps rather than false automated coverage. See the [Phase 1 completion record](docs/phase-1-completion.md) and [research proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md).
 
 The current repository foundation includes:
 
@@ -54,6 +54,7 @@ The current repository foundation includes:
 - per-required-language coverage computed only from Arr-accepted releases, with Unknown kept distinct from No match found;
 - provider-evidence health that exposes available, partial, unavailable, and unknown search windows without changing match confidence;
 - transparent analysis timing, provider counts, quota evidence, and separate item/provider cache freshness;
+- bounded structured request logs that record only safe route categories, methods, status codes, and duration;
 - bounded, visibly labeled stale item evidence when Arr or Bazarr cannot refresh;
 - a host-allowlisted, redirect-free, size- and time-bounded read-only HTTP transport;
 - secret-file-only Sonarr configuration and a browser-safe version/status route;
@@ -84,9 +85,9 @@ The demo maps a sanitized synthetic Sonarr v3 response into four release candida
 
 ## Development harness
 
-Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise.
+Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise. Every harness mode also validates [the Phase 1 criteria ledger](harness/phase-1.json).
 
-See [the harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [access-control guide](docs/access-control.md), [missing-item dashboard guide](docs/missing-item-dashboard.md), [item feasibility API](docs/item-feasibility-api.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See [the Phase 1 completion record](docs/phase-1-completion.md), [harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [access-control guide](docs/access-control.md), [missing-item dashboard guide](docs/missing-item-dashboard.md), [item feasibility API](docs/item-feasibility-api.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), [HTTP transport contract](docs/contracts/http-transport.md), [Sonarr release-search contract](docs/contracts/sonarr-v3-release-search.md), [Sonarr status contract](docs/contracts/sonarr-v3-system-status.md), [Radarr release-search contract](docs/contracts/radarr-v3-release-search.md), [Radarr status contract](docs/contracts/radarr-v3-system-status.md), [Bazarr language-policy contract](docs/contracts/bazarr-v1-language-policy.md), and [SubDL search contract](docs/contracts/subdl-v2-subtitle-search.md). Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 

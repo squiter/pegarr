@@ -1,7 +1,9 @@
 {
   "schemaVersion": 1,
-  "phase": "phase-1-read-only-mvp",
+  "phase": "phase-1-read-only-mvp-complete",
   "completion": {
+    "status": "complete",
+    "criteria": "harness/phase-1.json",
     "affected": "npm run check:affected",
     "full": "npm run check"
   },
@@ -17,6 +19,12 @@
       "title": "Readiness reflects data-directory accessibility",
       "evidence": "src/app.test.ts",
       "boundary": "Temporary local directories only"
+    },
+    {
+      "id": "PEG-OPS-003",
+      "title": "Structured request logs are bounded and redact request identity",
+      "evidence": "src/app.test.ts",
+      "boundary": "Pure safe-route classification without recording URLs, item IDs, query strings, headers, or credentials"
     },
     {
       "id": "PEG-API-001",
@@ -101,6 +109,18 @@
       "title": "Docker frontend timeouts use one bounded classic-builder fallback",
       "evidence": "scripts/harness/run-checks.test.mjs",
       "boundary": "Fallback classification only; the affected gate executes the real build"
+    },
+    {
+      "id": "PEG-HARNESS-004",
+      "title": "Phase 1 completion maps every criterion to automated evidence",
+      "evidence": "scripts/harness/phase-contract.mjs",
+      "boundary": "Repository-owned completion ledger, scenario manifest, and documentation only"
+    },
+    {
+      "id": "PEG-HARNESS-005",
+      "title": "Harness reports retain machine-readable phase completion evidence",
+      "evidence": "scripts/harness/run-checks.test.mjs",
+      "boundary": "Pure summary mapping over synthetic manifest metadata"
     },
     {
       "id": "PEG-DOCKER-001",
@@ -1025,18 +1045,24 @@
       "title": "Packaged release comparison causes no upstream requests",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Packaged shortlist comparison on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-DOCKER-023",
+      "title": "Packaged request logs are structured, redacted, and read-only",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Ephemeral hardened container with no network and a synthetic secret-shaped query that must not enter logs"
     }
   ],
   "manualGaps": [
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "Local Colima verified the authenticated Sonarr 4.0.16.2944 packaged status probe, a 100-row episode release search, and the monitored missing-episode envelope on 2026-08-26 without retaining private records; Radarr remains fixture-proven only, and NAS production validation is intentionally separate"
+      "reason": "Local Colima refreshed the authenticated Sonarr 4.0.16.2944 status and monitored missing-page envelopes on 2026-08-28, after a 100-row episode release search was measured on 2026-08-26, without retaining private records; no local Radarr service is available, and NAS production validation is intentionally separate"
     },
     {
       "id": "PEG-MANUAL-002",
       "title": "Live Bazarr profile resolution and provider policy",
-      "reason": "Local Colima verified the authenticated profile list and targeted series assignment shapes on 2026-08-26 without retaining policy contents; installed NAS compatibility remains intentionally untested"
+      "reason": "Local Colima refreshed the authenticated profile-list and targeted series-assignment shapes on 2026-08-28 without retaining policy contents; installed NAS compatibility remains intentionally untested"
     },
     {
       "id": "PEG-MANUAL-003",

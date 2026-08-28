@@ -20,6 +20,7 @@ The guides are `AGENTS.md`, this document, the research record, the scenario led
 The computational sensors currently enforce:
 
 - scenario-to-test traceability and explicit manual gaps;
+- Phase 1 criterion-to-scenario traceability and an explicit completion state;
 - read-only phase, authentication, and confidence-state architecture ratchets;
 - core matching isolation from Node, adapters, and fixtures;
 - local Markdown links and required contributor documentation;
@@ -27,7 +28,7 @@ The computational sensors currently enforce:
 - TypeScript strictness, production compilation, deterministic single-worker tests;
 - a Docker build plus an ephemeral non-root, read-only, egress-disabled endpoint smoke test for runtime/deployment changes.
 
-The runner transforms noisy command output into a short headline and next action. It retains complete logs and a JSON trajectory under `.artifacts/harness/<timestamp>/` so debugging does not depend on terminal history.
+The runner transforms noisy command output into a short headline and next action. It retains complete logs and a JSON trajectory under `.artifacts/harness/<timestamp>/` so debugging does not depend on terminal history. Every report includes the current phase ID, completion state, automated-scenario count, and manual-gap count.
 
 ## Adding an integration
 

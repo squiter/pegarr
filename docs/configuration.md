@@ -63,6 +63,12 @@ The packaged feasibility reports can reuse successful SubDL results from a priva
 
 The database contains private normalized matching evidence such as media identifiers and release names, but never API keys, authorization headers, provider download handles, or upstream URLs. Keep the data volume private. See the [provider search cache guide](provider-search-cache.md) for result and deletion semantics.
 
+## Operational logs
+
+The server writes one JSON record for startup, shutdown, and each completed HTTP request. Request records contain only `event`, `service`, a bounded method, a safe route category, status code, and bounded duration. They never contain the raw URL, query string, item ID, title, authorization header, API key, access token, configured hostname, or upstream error detail. Logging failures cannot change the HTTP response.
+
+Safe route categories include health, readiness, dashboard, dashboard asset, integration status, missing inventory, item feasibility, synthetic demo, and not found. This keeps container logs useful for operations without turning them into library history.
+
 ## Read-only API access
 
 | Variable | Required when enabled | Meaning |

@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | PEG-OPS-001 | Liveness is healthy | `src/app.test.ts` |
 | PEG-OPS-002 | Readiness reflects data-directory access | `src/app.test.ts` |
+| PEG-OPS-003 | Structured request logs are bounded and redact request identity | `src/app.test.ts` |
 | PEG-API-001 | Read-only routes reject mutations | `src/app.test.ts` |
 | PEG-API-002 | The synthetic feasibility report is read-only and explainable | `src/app.test.ts` |
 | PEG-API-003 | Unknown routes do not reflect request secrets | `src/app.test.ts` |
@@ -22,6 +23,8 @@
 | PEG-HARNESS-001 | Changed paths select the intended sensors | `scripts/harness/run-checks.test.mjs` |
 | PEG-HARNESS-002 | Noisy failures become compact signals | `scripts/harness/run-checks.test.mjs` |
 | PEG-HARNESS-003 | Docker frontend timeouts use one bounded fallback | `scripts/harness/run-checks.test.mjs` |
+| PEG-HARNESS-004 | Phase 1 completion maps every criterion to automated evidence | `scripts/harness/phase-contract.mjs` |
+| PEG-HARNESS-005 | Harness reports retain machine-readable phase completion evidence | `scripts/harness/run-checks.test.mjs` |
 | PEG-DOCKER-001 | The built image starts hardened and serves core routes without egress | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-002 | The packaged runtime reads a Sonarr secret file on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-SONARR-001 | Episode search is bounded, read-only, and authenticates by header | `src/adapters/sonarr.test.ts` |
@@ -176,13 +179,14 @@
 | PEG-DASH-035 | Release comparison marks deterministic field strengths and ties | `src/dashboard-model.test.ts` |
 | PEG-DASH-036 | Release comparison and navigation remain page-memory-only assets | `src/app.test.ts` |
 | PEG-DOCKER-022 | Packaged release comparison causes no upstream requests | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-023 | Packaged request logs are structured, redacted, and read-only | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima verified the authenticated Sonarr 4.0.16.2944 packaged status probe and a 100-row episode release search on 2026-08-26; Radarr remains fixture-proven only, and NAS production validation is intentionally separate |
-| PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima verified authenticated profile-list and targeted series-assignment shapes on 2026-08-26 without retaining policy contents; installed NAS compatibility remains intentionally untested |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima refreshed Sonarr 4.0.16.2944 status and monitored missing-page shapes on 2026-08-28 after a measured release search on 2026-08-26; no local Radarr is available, and NAS production validation remains separate |
+| PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima refreshed authenticated profile-list and targeted series-assignment shapes on 2026-08-28 without retaining policy contents; installed NAS compatibility remains intentionally untested |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Future Grab confirmation | Mutations are outside the read-only MVP and require explicit confirmation |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |
