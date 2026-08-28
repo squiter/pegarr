@@ -1,12 +1,16 @@
-import { feasibilityView, itemAnalysisSummary, leadingRelease, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "/assets/dashboard-model.js";
+import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
   accessForm: document.querySelector("#access-form"),
   accessToken: document.querySelector("#access-token"),
+  activeFilterCount: document.querySelector("#active-filter-count"),
   analysisFilter: document.querySelector("#analysis-filter"),
+  analysisAgeFilter: document.querySelector("#analysis-age-filter"),
+  applicationFilter: document.querySelector("#application-filter"),
   bestConfidenceFilter: document.querySelector("#best-confidence-filter"),
   connectButton: document.querySelector("#connect-button"),
+  clearInventoryFilters: document.querySelector("#clear-inventory-filters"),
   dashboard: document.querySelector("#dashboard"),
   emptyState: document.querySelector("#empty-state"),
   feasibilityClose: document.querySelector("#feasibility-close"),
@@ -19,6 +23,8 @@ const elements = {
   inventoryList: document.querySelector("#inventory-list"),
   kindFilter: document.querySelector("#kind-filter"),
   providerEvidenceFilter: document.querySelector("#provider-evidence-filter"),
+  profileFilter: document.querySelector("#profile-filter"),
+  policyLanguageFilter: document.querySelector("#policy-language-filter"),
   refreshButton: document.querySelector("#refresh-button"),
   releaseConfidenceFilter: document.querySelector("#release-confidence-filter"),
   releaseControls: document.querySelector("#release-controls"),
@@ -73,7 +79,8 @@ elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
 elements.feasibilityClose?.addEventListener("click", closeFeasibility);
 elements.releaseShortlistClear?.addEventListener("click", clearShortlist);
-for (const control of [elements.searchInput, elements.kindFilter, elements.analysisFilter, elements.bestConfidenceFilter, elements.requiredCoverageFilter, elements.providerEvidenceFilter, elements.sortOrder]) {
+elements.clearInventoryFilters?.addEventListener("click", clearInventoryFilters);
+for (const control of [elements.searchInput, elements.applicationFilter, elements.kindFilter, elements.analysisFilter, elements.bestConfidenceFilter, elements.requiredCoverageFilter, elements.providerEvidenceFilter, elements.profileFilter, elements.policyLanguageFilter, elements.analysisAgeFilter, elements.sortOrder]) {
   control?.addEventListener("input", renderInventory);
   control?.addEventListener("change", renderInventory);
 }
@@ -143,19 +150,76 @@ function showAccess(message) {
 }
 
 function renderInventory() {
-  const rows = selectRows(rowsWithAnalysis(inventoryRows, analysisByItem), {
+  const analyzedRows = rowsWithAnalysis(inventoryRows, analysisByItem);
+  populateInventoryAnalysisFilters(analyzedRows);
+  const options = inventorySelectionOptions();
+  const rows = selectRows(analyzedRows, {
+    ...options,
+    nowEpochMs: Date.now(),
+  });
+  const activeFilters = activeInventoryFilterCount(options);
+  elements.activeFilterCount.textContent = `${activeFilters} ${activeFilters === 1 ? "filter" : "filters"} active`;
+  elements.clearInventoryFilters.disabled = activeFilters === 0;
+  elements.inventoryList.replaceChildren(...rows.map(renderItem));
+  elements.visibleCount.textContent = String(rows.length);
+  elements.visibleLabel.textContent = rows.length === 1 ? "item" : "items";
+  elements.emptyState.hidden = rows.length !== 0;
+}
+
+function inventorySelectionOptions() {
+  return {
     query: elements.searchInput?.value,
+    application: elements.applicationFilter?.value,
     kind: elements.kindFilter?.value,
     analysis: elements.analysisFilter?.value,
     confidence: elements.bestConfidenceFilter?.value,
     requiredCoverage: elements.requiredCoverageFilter?.value,
     providerEvidence: elements.providerEvidenceFilter?.value,
+    profile: elements.profileFilter?.value,
+    language: elements.policyLanguageFilter?.value,
+    analysisAge: elements.analysisAgeFilter?.value,
     sort: elements.sortOrder?.value,
-  });
-  elements.inventoryList.replaceChildren(...rows.map(renderItem));
-  elements.visibleCount.textContent = String(rows.length);
-  elements.visibleLabel.textContent = rows.length === 1 ? "item" : "items";
-  elements.emptyState.hidden = rows.length !== 0;
+  };
+}
+
+function populateInventoryAnalysisFilters(rows) {
+  const profileOptions = [...new Map(rows.flatMap((row) => row.analysis?.policyName ? [[row.analysis.policyName.toLocaleLowerCase(), row.analysis.policyName]] : [])).values()]
+    .toSorted((left, right) => left.localeCompare(right));
+  const languagesByCode = new Map();
+  for (const language of rows.flatMap((row) => row.analysis?.languages ?? [])) {
+    const key = language.code.toLocaleLowerCase();
+    const existing = languagesByCode.get(key) ?? { code: language.code, requirements: new Set() };
+    existing.requirements.add(language.required);
+    languagesByCode.set(key, existing);
+  }
+  const languageOptions = [...languagesByCode.values()]
+    .toSorted((left, right) => left.code.localeCompare(right.code));
+  replaceScopedOptions(elements.profileFilter, "All analyzed profiles", "profile", profileOptions.map((label) => ({ label, value: label })));
+  replaceScopedOptions(elements.policyLanguageFilter, "All analyzed languages", "language", languageOptions.map(({ code, requirements }) => ({
+    label: `${code} · ${requirements.size > 1 ? "mixed requirements" : requirements.has(true) ? "required" : "optional"}`,
+    value: code,
+  })));
+}
+
+function replaceScopedOptions(select, allLabel, scope, options) {
+  const previous = select.value;
+  const next = [new Option(allLabel, "all"), ...options.map(({ label, value }) => new Option(label, `${scope}:${value}`))];
+  select.replaceChildren(...next);
+  select.value = next.some(({ value }) => value === previous) ? previous : "all";
+}
+
+function clearInventoryFilters() {
+  elements.searchInput.value = "";
+  elements.applicationFilter.value = "all";
+  elements.kindFilter.value = "all";
+  elements.analysisFilter.value = "all";
+  elements.bestConfidenceFilter.value = "all";
+  elements.requiredCoverageFilter.value = "all";
+  elements.providerEvidenceFilter.value = "all";
+  elements.profileFilter.value = "all";
+  elements.policyLanguageFilter.value = "all";
+  elements.analysisAgeFilter.value = "all";
+  renderInventory();
 }
 
 function renderItem(row) {

@@ -50,6 +50,7 @@ The current repository foundation includes:
 - full resolved-language policy semantics plus per-release required-language fit and policy-derived language/confidence filters;
 - a deterministic leading Arr-accepted candidate labeled as read-only decision support, never an automatic Grab;
 - page-memory item summaries with best Arr-accepted confidence, policy/freshness badges, and local attention filters;
+- page-memory triage by application, exact Bazarr profile, policy language, and analysis age, with one-click filter clearing;
 - per-required-language coverage computed only from Arr-accepted releases, with Unknown kept distinct from No match found;
 - provider-evidence health that exposes available, partial, unavailable, and unknown search windows without changing match confidence;
 - transparent analysis timing, provider counts, quota evidence, and separate item/provider cache freshness;

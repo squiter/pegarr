@@ -163,6 +163,13 @@
 | PEG-DASH-024 | Leading candidate is deterministic and never overrides Arr rejection | `src/dashboard-model.test.ts` |
 | PEG-DASH-025 | Policy semantics, language fit, and leading candidate remain page-memory-only assets | `src/app.test.ts` |
 | PEG-DOCKER-020 | Packaged subtitle decision controls cause no upstream requests | `scripts/harness/docker-build.mjs` |
+| PEG-DASH-026 | Application filtering keeps Sonarr and Radarr identities separate | `src/dashboard-model.test.ts` |
+| PEG-DASH-027 | Profile filtering uses exact analyzed Bazarr policy names | `src/dashboard-model.test.ts` |
+| PEG-DASH-028 | Policy-language filtering is derived from analyzed summaries | `src/dashboard-model.test.ts` |
+| PEG-DASH-029 | Analysis-age filtering has a deterministic one-hour boundary | `src/dashboard-model.test.ts` |
+| PEG-DASH-030 | Active inventory filter count ignores sorting and unsafe values | `src/dashboard-model.test.ts` |
+| PEG-DASH-031 | Missing-item triage filters and clear control remain page-memory-only assets | `src/app.test.ts` |
+| PEG-DOCKER-021 | Packaged missing-item triage causes no upstream requests | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

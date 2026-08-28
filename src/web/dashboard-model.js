@@ -12,21 +12,18 @@ export function rowsFromInventory(value) {
 }
 
 export function selectRows(rows, options = {}) {
-  const query = String(options.query ?? "").trim().toLocaleLowerCase();
-  const kind = options.kind === "episode" || options.kind === "movie" ? options.kind : "all";
-  const analysis = ["not_analyzed", "analyzed", "needs_attention", "stale"].includes(options.analysis)
-    ? options.analysis
-    : "all";
-  const confidence = [...confidenceValues, "none"].includes(options.confidence) ? options.confidence : "all";
-  const requiredCoverage = requiredCoverageValues.includes(options.requiredCoverage) ? options.requiredCoverage : "all";
-  const providerEvidence = providerEvidenceValues.includes(options.providerEvidence) ? options.providerEvidence : "all";
+  const filters = inventorySelectionOptions(options);
   const selected = rows.filter((row) =>
-    (kind === "all" || row.kind === kind) &&
-    matchesAnalysis(row.analysis, analysis) &&
-    matchesSummaryConfidence(row.analysis, confidence) &&
-    matchesRequiredCoverage(row.analysis, requiredCoverage) &&
-    matchesProviderEvidence(row.analysis, providerEvidence) &&
-    (!query || rowSearchText(row).includes(query)),
+    (filters.application === "all" || row.application === filters.application) &&
+    (filters.kind === "all" || row.kind === filters.kind) &&
+    matchesAnalysis(row.analysis, filters.analysis) &&
+    matchesSummaryConfidence(row.analysis, filters.confidence) &&
+    matchesRequiredCoverage(row.analysis, filters.requiredCoverage) &&
+    matchesProviderEvidence(row.analysis, filters.providerEvidence) &&
+    matchesProfile(row.analysis, filters.profile) &&
+    matchesPolicyLanguage(row.analysis, filters.language) &&
+    matchesAnalysisAge(row.analysis, filters.analysisAge, filters.nowEpochMs) &&
+    (!filters.query || rowSearchText(row).includes(filters.query)),
   );
   const sort = options.sort ?? "available-desc";
   return selected.toSorted((left, right) => {
@@ -41,6 +38,22 @@ export function selectRows(rows, options = {}) {
     const direction = sort === "available-asc" ? 1 : -1;
     return direction * String(left.availableAt ?? "").localeCompare(String(right.availableAt ?? "")) || left.title.localeCompare(right.title);
   });
+}
+
+export function activeInventoryFilterCount(options = {}) {
+  const filters = inventorySelectionOptions(options);
+  return [
+    filters.query,
+    filters.application,
+    filters.kind,
+    filters.analysis,
+    filters.confidence,
+    filters.requiredCoverage,
+    filters.providerEvidence,
+    filters.profile,
+    filters.language,
+    filters.analysisAge,
+  ].filter((value) => value !== "" && value !== "all").length;
 }
 
 export function rowsWithAnalysis(rows, analyses) {
@@ -527,6 +540,50 @@ function matchesProviderEvidence(summary, providerEvidence) {
   return (summary?.state === "ready" || summary?.state === "stale") && summary.providerEvidence === providerEvidence;
 }
 
+function matchesProfile(summary, profile) {
+  if (profile === "all") return true;
+  return (summary?.state === "ready" || summary?.state === "stale") &&
+    summary.policyName?.toLocaleLowerCase() === profile;
+}
+
+function matchesPolicyLanguage(summary, language) {
+  if (language === "all") return true;
+  return (summary?.state === "ready" || summary?.state === "stale") &&
+    Array.isArray(summary.languages) &&
+    summary.languages.some(({ code }) => code.toLocaleLowerCase() === language);
+}
+
+function matchesAnalysisAge(summary, analysisAge, nowEpochMs) {
+  if (analysisAge === "all") return true;
+  const generatedAt = typeof summary?.generatedAt === "string" ? Date.parse(summary.generatedAt) : Number.NaN;
+  if (!Number.isFinite(generatedAt)) return analysisAge === "unknown";
+  if (analysisAge === "unknown") return false;
+  const ageMs = Math.max(0, nowEpochMs - generatedAt);
+  return analysisAge === "recent" ? ageMs <= analysisRecencyWindowMs : ageMs > analysisRecencyWindowMs;
+}
+
+function inventorySelectionOptions(options) {
+  return {
+    query: String(options.query ?? "").trim().toLocaleLowerCase(),
+    application: options.application === "sonarr" || options.application === "radarr" ? options.application : "all",
+    kind: options.kind === "episode" || options.kind === "movie" ? options.kind : "all",
+    analysis: ["not_analyzed", "analyzed", "needs_attention", "stale"].includes(options.analysis) ? options.analysis : "all",
+    confidence: [...confidenceValues, "none"].includes(options.confidence) ? options.confidence : "all",
+    requiredCoverage: requiredCoverageValues.includes(options.requiredCoverage) ? options.requiredCoverage : "all",
+    providerEvidence: providerEvidenceValues.includes(options.providerEvidence) ? options.providerEvidence : "all",
+    profile: scopedFilterValue(options.profile, "profile", 256),
+    language: scopedFilterValue(options.language, "language", 64),
+    analysisAge: analysisAgeValues.includes(options.analysisAge) ? options.analysisAge : "all",
+    nowEpochMs: Number.isFinite(options.nowEpochMs) ? options.nowEpochMs : Date.now(),
+  };
+}
+
+function scopedFilterValue(value, scope, maximumLength) {
+  if (typeof value !== "string" || !value.startsWith(`${scope}:`)) return "all";
+  const selected = value.slice(scope.length + 1).trim();
+  return selected.length > 0 && selected.length <= maximumLength ? selected.toLocaleLowerCase() : "all";
+}
+
 function rowSearchText(row) {
   const policy = row.analysis?.policyName ?? "";
   const languages = Array.isArray(row.analysis?.languages)
@@ -574,3 +631,5 @@ const requiredFitValues = ["strong", "possible", "no_match_found", "unknown", "n
 const maximumShortlistSize = 3;
 const confidenceRank = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };
 const analysisConfidenceRank = { ...confidenceRank, none: 5, not_analyzed: 6 };
+const analysisAgeValues = ["recent", "older", "unknown"];
+const analysisRecencyWindowMs = 60 * 60 * 1_000;

@@ -32,8 +32,11 @@ export interface DashboardAnalysisSummary {
 export function rowsFromInventory(value: unknown): readonly DashboardRow[];
 export function selectRows(
   rows: readonly DashboardRow[],
-  options: { readonly query?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly requiredCoverage?: string; readonly providerEvidence?: string; readonly sort?: string },
+  options: { readonly query?: string; readonly application?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly requiredCoverage?: string; readonly providerEvidence?: string; readonly profile?: string; readonly language?: string; readonly analysisAge?: string; readonly nowEpochMs?: number; readonly sort?: string },
 ): readonly DashboardRow[];
+export function activeInventoryFilterCount(
+  options: { readonly query?: string; readonly application?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly requiredCoverage?: string; readonly providerEvidence?: string; readonly profile?: string; readonly language?: string; readonly analysisAge?: string; readonly sort?: string },
+): number;
 export function rowsWithAnalysis(
   rows: readonly DashboardRow[],
   analyses: ReadonlyMap<string, DashboardAnalysisSummary>,

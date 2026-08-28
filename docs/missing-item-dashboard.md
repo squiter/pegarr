@@ -10,7 +10,10 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Missing episodes and movies are shown with application, title, episode or year context, and availability date.
 - Search matches title, series context, and application.
 - After an item is analyzed, search also matches its Bazarr profile name and language codes.
-- Type filtering switches between all items, episodes, and movies. Analysis filters distinguish not analyzed, analyzed or attempted, needs-attention, and stale items; best-confidence filtering uses only completed reports and Arr-accepted releases.
+- Application and type filtering switch between Sonarr/Radarr and episodes/movies. Analysis filters distinguish not analyzed, analyzed or attempted, needs-attention, and stale items; best-confidence filtering uses only completed reports and Arr-accepted releases.
+- After reports are analyzed, exact Bazarr-profile and policy-language options are derived from the safe page-memory summaries. No profile or language is hardcoded or fetched again for these controls.
+- Analysis-age filtering distinguishes reports generated within the last hour, older reports, and items without a generation timestamp. The boundary uses the report's safe generation time and the current page clock.
+- The dashboard counts active filters and clears all filters in one action without changing the selected sort order.
 - Required-language coverage is summarized independently for every language Bazarr marks required, using only Arr-accepted releases. A rejected release cannot satisfy coverage, missing or failed evidence remains Unknown, and a successful empty search remains No match found.
 - Provider-evidence health distinguishes fully available, partial, unavailable, and unknown searches. It stays separate from match confidence, so a timeout or quota failure cannot be presented as subtitle absence.
 - Sorting supports availability, title, type, best Arr-accepted subtitle confidence, and most recent analysis.
@@ -44,4 +47,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-025`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-020` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-031`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-021` are the deterministic evidence for this page.

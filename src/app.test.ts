@@ -290,6 +290,22 @@ test("PEG-DASH-025 policy semantics, language fit, and leading candidate remain 
   assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
 
+test("PEG-DASH-031 missing-item triage filters and clear control remain page-memory-only assets", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, model.body, styles.body].join("\n");
+
+  assert.match(String(page.body), /application-filter|profile-filter|policy-language-filter|analysis-age-filter/u);
+  assert.match(String(page.body), /active-filter-count|clear-inventory-filters|Clear filters/u);
+  assert.match(String(client.body), /populateInventoryAnalysisFilters|replaceScopedOptions|clearInventoryFilters|activeInventoryFilterCount/u);
+  assert.match(String(model.body), /matchesProfile|matchesPolicyLanguage|matchesAnalysisAge|analysisRecencyWindowMs/u);
+  assert.match(String(styles.body), /inventory-filter-state/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
+  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
+});
+
 function fakeServices(
   readMissingInventory: RuntimeServices["readMissingInventory"],
 ): RuntimeServices {

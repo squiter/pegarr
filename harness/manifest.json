@@ -947,6 +947,48 @@
       "title": "Packaged subtitle decision controls cause no upstream requests",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Packaged policy, fit, language, and leading-candidate logic on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-DASH-026",
+      "title": "Application filtering keeps Sonarr and Radarr identities separate",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure selection over safe in-memory application identities"
+    },
+    {
+      "id": "PEG-DASH-027",
+      "title": "Profile filtering uses exact analyzed Bazarr policy names",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure selection over page-memory analysis summaries"
+    },
+    {
+      "id": "PEG-DASH-028",
+      "title": "Policy-language filtering is derived from analyzed summaries",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure selection over Bazarr-derived language codes already in page memory"
+    },
+    {
+      "id": "PEG-DASH-029",
+      "title": "Analysis-age filtering has a deterministic one-hour boundary",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure time comparison with an injected clock and safe generation timestamps"
+    },
+    {
+      "id": "PEG-DASH-030",
+      "title": "Active inventory filter count ignores sorting and unsafe values",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure normalized filter-state counting"
+    },
+    {
+      "id": "PEG-DASH-031",
+      "title": "Missing-item triage filters and clear control remain page-memory-only assets",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process HTML, CSS, JavaScript, and storage-boundary inspection"
+    },
+    {
+      "id": "PEG-DOCKER-021",
+      "title": "Packaged missing-item triage causes no upstream requests",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Packaged application, profile, language, age, and filter-state selection on an internal-only Docker network"
     }
   ],
   "manualGaps": [

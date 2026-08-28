@@ -56,6 +56,14 @@ export const dashboardPage = `<!doctype html>
           <span>Search</span>
           <input id="search-input" type="search" placeholder="Title, series, or application" autocomplete="off">
         </label>
+        <label for="application-filter">
+          <span>Application</span>
+          <select id="application-filter">
+            <option value="all">Sonarr and Radarr</option>
+            <option value="sonarr">Sonarr</option>
+            <option value="radarr">Radarr</option>
+          </select>
+        </label>
         <label for="kind-filter">
           <span>Type</span>
           <select id="kind-filter">
@@ -108,6 +116,27 @@ export const dashboardPage = `<!doctype html>
             <option value="unknown">Unknown</option>
           </select>
         </label>
+        <label for="profile-filter">
+          <span>Bazarr profile</span>
+          <select id="profile-filter">
+            <option value="all">All analyzed profiles</option>
+          </select>
+        </label>
+        <label for="policy-language-filter">
+          <span>Policy language</span>
+          <select id="policy-language-filter">
+            <option value="all">All analyzed languages</option>
+          </select>
+        </label>
+        <label for="analysis-age-filter">
+          <span>Analysis age</span>
+          <select id="analysis-age-filter">
+            <option value="all">Any analysis age</option>
+            <option value="recent">Analyzed in the last hour</option>
+            <option value="older">Older than one hour</option>
+            <option value="unknown">No analysis timestamp</option>
+          </select>
+        </label>
         <label for="sort-order">
           <span>Sort</span>
           <select id="sort-order">
@@ -119,6 +148,10 @@ export const dashboardPage = `<!doctype html>
             <option value="analyzed-desc">Recently analyzed</option>
           </select>
         </label>
+        <div class="inventory-filter-state">
+          <span id="active-filter-count" role="status" aria-live="polite">0 filters active</span>
+          <button id="clear-inventory-filters" class="quiet-button" type="button" disabled>Clear filters</button>
+        </div>
       </div>
 
       <div id="empty-state" class="empty-state" hidden>

@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { feasibilityView, itemAnalysisSummary, leadingRelease, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "./web/dashboard-model.js";
+import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -409,6 +409,88 @@ test("PEG-DASH-024 leading candidate is deterministic and never overrides Arr re
   assert.equal(leadingRelease(rejected), undefined);
   assert.ok(leadingRelease(view.releases)?.downloadAllowed);
 });
+
+test("PEG-DASH-026 application filtering keeps Sonarr and Radarr identities separate", () => {
+  const rows = rowsFromInventory(inventory);
+
+  assert.deepEqual(selectRows(rows, { application: "sonarr" }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(rows, { application: "radarr" }).map(({ key }) => key), ["radarr:movie:84", "radarr:movie:85"]);
+  assert.deepEqual(selectRows(rows, { application: "unsafe" }), selectRows(rows, {}));
+});
+
+test("PEG-DASH-027 profile filtering uses exact analyzed Bazarr policy names", () => {
+  const rows = triageRows();
+
+  assert.deepEqual(selectRows(rows, { profile: "profile:Brazilian Portuguese" }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(rows, { profile: "profile:english fallback" }).map(({ key }) => key), ["radarr:movie:84"]);
+  assert.deepEqual(selectRows(rows, { profile: "Brazilian Portuguese" }), selectRows(rows, {}));
+});
+
+test("PEG-DASH-028 policy-language filtering is derived from analyzed summaries", () => {
+  const rows = triageRows();
+
+  assert.deepEqual(selectRows(rows, { language: "language:pt-BR" }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(rows, { language: "language:en" }).map(({ key }) => key), ["radarr:movie:84", "sonarr:episode:305"]);
+  assert.deepEqual(selectRows(rows, { language: "language:missing" }), []);
+});
+
+test("PEG-DASH-029 analysis-age filtering has a deterministic one-hour boundary", () => {
+  const rows = triageRows();
+  const nowEpochMs = Date.parse("2026-08-28T12:00:00.000Z");
+
+  assert.deepEqual(selectRows(rows, { analysisAge: "recent", nowEpochMs }).map(({ key }) => key), ["sonarr:episode:305"]);
+  assert.deepEqual(selectRows(rows, { analysisAge: "older", nowEpochMs }).map(({ key }) => key), ["radarr:movie:84"]);
+  assert.deepEqual(selectRows(rows, { analysisAge: "unknown", nowEpochMs }).map(({ key }) => key), ["radarr:movie:85"]);
+  assert.deepEqual(selectRows(rows, { analysisAge: "unsafe", nowEpochMs }), selectRows(rows, { nowEpochMs }));
+});
+
+test("PEG-DASH-030 active inventory filter count ignores sorting and unsafe values", () => {
+  assert.equal(activeInventoryFilterCount({}), 0);
+  assert.equal(activeInventoryFilterCount({ query: "   ", sort: "title-asc" }), 0);
+  assert.equal(activeInventoryFilterCount({
+    query: "show",
+    application: "sonarr",
+    profile: "profile:Brazilian Portuguese",
+    language: "language:pt-BR",
+    analysisAge: "recent",
+  }), 5);
+  assert.equal(activeInventoryFilterCount({ application: "unsafe", profile: "unsafe", language: "language:" }), 0);
+});
+
+function triageRows() {
+  return rowsWithAnalysis(rowsFromInventory(inventory), new Map([
+    ["sonarr:episode:305", {
+      state: "ready" as const,
+      bestConfidence: "confirmed" as const,
+      releaseCount: 4,
+      acceptedCount: 3,
+      policyName: "Brazilian Portuguese",
+      languages: [{ code: "pt-BR", required: true }, { code: "en", required: false }],
+      requiredCoverage: "strong" as const,
+      requiredLanguages: [{ code: "pt-BR", confidence: "confirmed" as const }],
+      providerEvidence: "available" as const,
+      providerResultCount: 1,
+      availableProviderResultCount: 1,
+      providerFailures: [],
+      generatedAt: "2026-08-28T11:30:00.000Z",
+    }],
+    ["radarr:movie:84", {
+      state: "stale" as const,
+      bestConfidence: "likely" as const,
+      releaseCount: 2,
+      acceptedCount: 1,
+      policyName: "English fallback",
+      languages: [{ code: "en", required: true }],
+      requiredCoverage: "strong" as const,
+      requiredLanguages: [{ code: "en", confidence: "likely" as const }],
+      providerEvidence: "partial" as const,
+      providerResultCount: 2,
+      availableProviderResultCount: 1,
+      providerFailures: ["timeout"],
+      generatedAt: "2026-08-28T10:00:00.000Z",
+    }],
+  ]));
+}
 
 test("PEG-DASH-008 item summaries use the best Arr-accepted confidence and retain freshness", () => {
   const mapped = feasibilityView({
