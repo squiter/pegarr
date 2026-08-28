@@ -30,7 +30,10 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Release controls sort by the combined decision order, subtitle confidence, custom-format score, seeders, size, age, or title. Missing numeric evidence is always placed last.
 - Required-language fit, policy-language, and language-confidence filters are derived from the current policy and operate only on loaded assessments. A confidence filter without a selected language matches any policy language with that confidence.
 - A clearly labeled leading Arr-accepted candidate shows the first row in the deterministic recommended ordering. It is decision support only, never promotes an Arr-rejected release, and cannot trigger a Grab.
-- A page-memory shortlist holds up to three release candidates in selection order so their Arr decision, subtitle confidence, quality, group, size, age, and peer evidence can be compared. It clears when the item or page changes and never persists to browser storage.
+- A page-memory shortlist holds up to three release candidates in selection order. Its side-by-side table preserves Arr decisions and rejection reasons, aligns each Bazarr-derived policy language across candidates, and compares quality, protocol, group, custom-format score, size, age, and seeder evidence.
+- Relative markers identify the strongest available subtitle confidence, required-language fit, custom-format score, seeder count, release age, and per-language confidence in the current shortlist. Ties remain marked together, unavailable or negative subtitle evidence is never labeled strongest, and the table does not collapse these independent fields into an automatic winner.
+- Each comparison column can be removed independently. “Show release” clears only the local release filters, preserves the selected sort, and focuses the corresponding source row without requesting a new Arr, Bazarr, or provider report.
+- The shortlist clears when the item or page changes and never persists to browser storage.
 - Release filtering and sorting operate only on the analysis already in page memory. They never repeat Arr, Bazarr, or provider requests, and rejected releases remain available through the Arr-decision filter.
 - Analysis timing and safe Arr, Bazarr, and provider request counts stay visible beside provider quota and cache timestamps.
 - Successful item views are reused in page memory. An explicit refresh re-reads Arr and Bazarr while retaining the stable provider-language cache window.
@@ -47,4 +50,4 @@ The HTML uses a same-origin Content Security Policy: scripts, styles, and API co
 
 See [read-only API access control](access-control.md) for token setup and [missing-item inventory](missing-item-inventory.md) for upstream request bounds.
 
-`PEG-DASH-001` through `PEG-DASH-031`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-021` are the deterministic evidence for this page.
+`PEG-DASH-001` through `PEG-DASH-036`, `PEG-ITEM-001` through `PEG-ITEM-006`, and `PEG-DOCKER-012` through `PEG-DOCKER-022` are the deterministic evidence for this page.

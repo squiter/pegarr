@@ -269,7 +269,7 @@ test("PEG-DASH-019 richer release controls and shortlist remain page-memory-only
   assert.match(String(page.body), /release-shortlist|release-shortlist-count|Clear shortlist/u);
   assert.match(String(client.body), /shortlistedReleaseIds|toggleShortlist|releaseFacts|formatBytes|formatAge/u);
   assert.match(String(model.body), /releaseSearchText|compareOptionalReleaseNumber|shortlistedReleases/u);
-  assert.match(String(styles.body), /release-row--shortlisted|shortlist-toggle|release-shortlist-card/u);
+  assert.match(String(styles.body), /release-row--shortlisted|shortlist-toggle|release-shortlist-items/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
   assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });
@@ -302,6 +302,21 @@ test("PEG-DASH-031 missing-item triage filters and clear control remain page-mem
   assert.match(String(client.body), /populateInventoryAnalysisFilters|replaceScopedOptions|clearInventoryFilters|activeInventoryFilterCount/u);
   assert.match(String(model.body), /matchesProfile|matchesPolicyLanguage|matchesAnalysisAge|analysisRecencyWindowMs/u);
   assert.match(String(styles.body), /inventory-filter-state/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
+  assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
+});
+
+test("PEG-DASH-036 release comparison and navigation remain page-memory-only assets", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, model.body, styles.body].join("\n");
+
+  assert.match(String(page.body), /Compare shortlisted releases|release-shortlist-items|Clear shortlist/u);
+  assert.match(String(client.body), /comparisonTable|comparisonHeading|languageComparison|removeFromShortlist|showReleaseInTable/u);
+  assert.match(String(model.body), /releaseComparison|bestLanguageRanks|strongConfidenceRank/u);
+  assert.match(String(styles.body), /release-comparison|comparison-cell--stronger|comparison-strength/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie/iu);
   assert.doesNotMatch(assets, /\/grab|Grab selected release/iu);
 });

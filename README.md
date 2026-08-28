@@ -46,7 +46,7 @@ The current repository foundation includes:
 - an interactive release table that preserves Arr decisions while explaining per-language subtitle confidence and provider state;
 - local release filtering and sorting that reuse the in-memory analysis without new upstream requests;
 - release rows with safe Arr size, age, peer, language, custom-format, group, and edition evidence;
-- page-memory release search, protocol filtering, metadata sorting, and a three-candidate shortlist for comparison;
+- page-memory release search, protocol filtering, metadata sorting, and a three-candidate side-by-side comparison of Arr decisions, policy-language evidence, and release metadata;
 - full resolved-language policy semantics plus per-release required-language fit and policy-derived language/confidence filters;
 - a deterministic leading Arr-accepted candidate labeled as read-only decision support, never an automatic Grab;
 - page-memory item summaries with best Arr-accepted confidence, policy/freshness badges, and local attention filters;

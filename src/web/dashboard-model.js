@@ -247,6 +247,70 @@ export function shortlistedReleases(rows, releaseIds) {
   return selected;
 }
 
+export function releaseComparison(rows, releaseIds) {
+  const releases = shortlistedReleases(rows, releaseIds);
+  const comparable = releases.length > 1;
+  const bestConfidenceRank = minimumDefined(releases.map(({ confidence }) => strongConfidenceRank[confidence]));
+  const bestRequiredFitRank = minimumDefined(releases.map(({ requiredFit }) => strongRequiredFitRank[requiredFit]));
+  const highestCustomFormatScore = maximumDefined(releases.map(({ customFormatScore }) => customFormatScore));
+  const highestSeeders = maximumDefined(releases.map(({ seeders }) => seeders));
+  const newestAgeHours = minimumDefined(releases.map(({ ageHours }) => ageHours));
+  const languageDefinitions = [];
+  const seenLanguages = new Set();
+  for (const release of releases) {
+    for (const language of release.languages) {
+      const key = language.language.toLocaleLowerCase();
+      if (seenLanguages.has(key)) continue;
+      languageDefinitions.push({ code: language.language, key, required: language.required === true });
+      seenLanguages.add(key);
+    }
+  }
+  const bestLanguageRanks = new Map(languageDefinitions.map(({ key }) => [
+    key,
+    minimumDefined(releases.map((release) => {
+      const language = release.languages.find(({ language: code }) => code.toLocaleLowerCase() === key);
+      return strongConfidenceRank[language?.confidence ?? "unknown"];
+    })),
+  ]));
+
+  return {
+    candidates: releases.map((release) => ({
+      ...release,
+      strengths: comparable
+        ? {
+            subtitleConfidence: bestConfidenceRank !== undefined && strongConfidenceRank[release.confidence] === bestConfidenceRank,
+            requiredFit: bestRequiredFitRank !== undefined && strongRequiredFitRank[release.requiredFit] === bestRequiredFitRank,
+            customFormatScore: release.customFormatScore === highestCustomFormatScore,
+            seeders: release.seeders !== undefined && release.seeders === highestSeeders,
+            age: release.ageHours !== undefined && release.ageHours === newestAgeHours,
+          }
+        : {
+            subtitleConfidence: false,
+            requiredFit: false,
+            customFormatScore: false,
+            seeders: false,
+            age: false,
+          },
+    })),
+    languages: languageDefinitions.map(({ code, key, required }) => ({
+      code,
+      required,
+      assessments: releases.map((release) => {
+        const assessment = release.languages.find(({ language }) => language.toLocaleLowerCase() === key);
+        const confidence = assessment?.confidence ?? "unknown";
+        return {
+          releaseId: release.id,
+          confidence,
+          providerCount: assessment?.providerCount ?? 0,
+          warnings: assessment?.warnings ?? [],
+          ...(assessment?.evidence === undefined ? {} : { evidence: assessment.evidence }),
+          strongest: comparable && bestLanguageRanks.get(key) !== undefined && strongConfidenceRank[confidence] === bestLanguageRanks.get(key),
+        };
+      }),
+    })),
+  };
+}
+
 export function feasibilityView(value) {
   if (!isRecord(value) || value.kind !== "item-feasibility" || typeof value.status !== "string") {
     return { state: "invalid", message: "Pegarr returned an unreadable feasibility report." };
@@ -631,5 +695,17 @@ const requiredFitValues = ["strong", "possible", "no_match_found", "unknown", "n
 const maximumShortlistSize = 3;
 const confidenceRank = { confirmed: 0, likely: 1, possible: 2, no_match_found: 3, unknown: 4 };
 const analysisConfidenceRank = { ...confidenceRank, none: 5, not_analyzed: 6 };
+const strongConfidenceRank = { confirmed: 0, likely: 1, possible: 2 };
+const strongRequiredFitRank = { strong: 0, possible: 1 };
 const analysisAgeValues = ["recent", "older", "unknown"];
 const analysisRecencyWindowMs = 60 * 60 * 1_000;
+
+function minimumDefined(values) {
+  const defined = values.filter(Number.isFinite);
+  return defined.length === 0 ? undefined : Math.min(...defined);
+}
+
+function maximumDefined(values) {
+  const defined = values.filter(Number.isFinite);
+  return defined.length === 0 ? undefined : Math.max(...defined);
+}

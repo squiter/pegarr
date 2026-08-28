@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "./web/dashboard-model.js";
+import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -305,6 +305,61 @@ test("PEG-DASH-018 release shortlist is bounded, deterministic, and page-memory 
   assert.deepEqual(shortlistedReleases(view.releases, [ids[2]!, ids[0]!, ids[2]!, "missing", ids[1]!, ids[3]!]).map(({ id }) => id), [ids[2], ids[0], ids[1]]);
   assert.deepEqual(shortlistedReleases(view.releases, undefined), []);
   assert.doesNotMatch(JSON.stringify(shortlistedReleases(view.releases, ids)), /downloadUrl|magnet|infoHash/iu);
+});
+
+test("PEG-DASH-032 comparison preserves shortlist order and remains bounded to safe release rows", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  const ids = view.releases.map(({ id }) => id);
+  const comparison = releaseComparison(view.releases, [ids[2]!, ids[0]!, ids[2]!, "missing", ids[1]!, ids[3]!]);
+
+  assert.deepEqual(comparison.candidates.map(({ id }) => id), [ids[2], ids[0], ids[1]]);
+  assert.doesNotMatch(JSON.stringify(comparison), /downloadUrl|magnet|infoHash|api.?key/iu);
+});
+
+test("PEG-DASH-033 comparison keeps Arr acceptance and rejection reasons explicit", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  const rejected = view.releases.find(({ downloadAllowed }) => !downloadAllowed)!;
+  const accepted = view.releases.find(({ downloadAllowed }) => downloadAllowed)!;
+  const comparison = releaseComparison(view.releases, [rejected.id, accepted.id]);
+
+  assert.equal(comparison.candidates[0]?.downloadAllowed, false);
+  assert.deepEqual(comparison.candidates[0]?.rejectionReasons, ["Quality profile does not allow HDTV-720p"]);
+  assert.equal(comparison.candidates[1]?.downloadAllowed, true);
+});
+
+test("PEG-DASH-034 comparison aligns policy languages and keeps missing evidence Unknown", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  const first = view.releases[0]!;
+  const withoutEnglish = { ...view.releases[1]!, languages: view.releases[1]!.languages.filter(({ language }) => language !== "en") };
+  const comparison = releaseComparison([first, withoutEnglish], [first.id, withoutEnglish.id]);
+  const english = comparison.languages.find(({ code }) => code === "en")!;
+
+  assert.equal(english.required, false);
+  assert.equal(english.assessments[1]?.confidence, "unknown");
+  assert.equal(english.assessments[1]?.providerCount, 0);
+  assert.equal(english.assessments[1]?.strongest, false);
+});
+
+test("PEG-DASH-035 comparison marks deterministic evidence strengths and preserves ties", () => {
+  const view = feasibilityView({ kind: "item-feasibility", status: "ready", mode: "read_only", report: buildFeasibilityReport(demoFeasibilityInput) });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  const comparison = releaseComparison(view.releases, view.releases.slice(0, 3).map(({ id }) => id));
+
+  assert.deepEqual(comparison.candidates.map(({ strengths }) => strengths.subtitleConfidence), [true, false, false]);
+  assert.deepEqual(comparison.candidates.map(({ strengths }) => strengths.requiredFit), [true, true, false]);
+  assert.deepEqual(comparison.candidates.map(({ strengths }) => strengths.customFormatScore), [true, false, false]);
+  assert.deepEqual(comparison.candidates.map(({ strengths }) => strengths.seeders), [true, false, false]);
+  assert.deepEqual(comparison.candidates.map(({ strengths }) => strengths.age), [false, false, true]);
+  assert.deepEqual(comparison.languages.find(({ code }) => code === "pt-BR")?.assessments.map(({ strongest }) => strongest), [true, false, false]);
+  assert.deepEqual(comparison.languages.find(({ code }) => code === "en")?.assessments.map(({ strongest }) => strongest), [false, false, false]);
+  assert.ok(releaseComparison(view.releases, [view.releases[0]!.id]).candidates.every(({ strengths }) => Object.values(strengths).every((value) => value === false)));
 });
 
 test("PEG-DASH-020 release analysis preserves full Bazarr policy semantics", () => {

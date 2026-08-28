@@ -989,6 +989,42 @@
       "title": "Packaged missing-item triage causes no upstream requests",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Packaged application, profile, language, age, and filter-state selection on an internal-only Docker network"
+    },
+    {
+      "id": "PEG-DASH-032",
+      "title": "Release comparison preserves safe shortlist order and bounds",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure comparison mapping over at most three page-memory release rows"
+    },
+    {
+      "id": "PEG-DASH-033",
+      "title": "Release comparison keeps Arr acceptance and rejections explicit",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure side-by-side mapping of already loaded Arr decisions"
+    },
+    {
+      "id": "PEG-DASH-034",
+      "title": "Release comparison aligns policy-language evidence honestly",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure matrix over page-memory language assessments with missing evidence kept Unknown"
+    },
+    {
+      "id": "PEG-DASH-035",
+      "title": "Release comparison marks deterministic field strengths and ties",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure relative comparison without producing an automatic combined winner"
+    },
+    {
+      "id": "PEG-DASH-036",
+      "title": "Release comparison and navigation remain page-memory-only assets",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process HTML, CSS, JavaScript, storage, and no-Grab inspection"
+    },
+    {
+      "id": "PEG-DOCKER-022",
+      "title": "Packaged release comparison causes no upstream requests",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Packaged shortlist comparison on an internal-only Docker network"
     }
   ],
   "manualGaps": [

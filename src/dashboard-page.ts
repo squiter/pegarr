@@ -262,11 +262,11 @@ export const dashboardPage = `<!doctype html>
       </section>
       <section id="release-shortlist" class="release-shortlist" aria-labelledby="release-shortlist-title" hidden>
         <div>
-          <strong id="release-shortlist-title">Release shortlist</strong>
+          <strong id="release-shortlist-title">Compare shortlisted releases</strong>
           <span id="release-shortlist-count" aria-live="polite">0 of 3 selected</span>
         </div>
         <button id="release-shortlist-clear" class="quiet-button" type="button" hidden>Clear shortlist</button>
-        <div id="release-shortlist-items" class="release-shortlist-items" role="list"></div>
+        <div id="release-shortlist-items" class="release-shortlist-items"></div>
       </section>
       <div id="feasibility-notice" class="feasibility-notice" role="status" aria-live="polite"></div>
       <div id="release-table-wrap" class="release-table-wrap" hidden>

@@ -307,10 +307,25 @@ button:disabled { cursor: wait; opacity: .55; }
 .release-shortlist > div:first-child { display: grid; gap: .2rem; }
 .release-shortlist > div:first-child span { color: var(--muted); font-size: .75rem; }
 .release-shortlist > button { justify-self: end; }
-.release-shortlist-items { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .65rem; }
-.release-shortlist-card { display: grid; gap: .3rem; padding: .75rem; background: rgb(7 16 15 / 40%); border: 1px solid var(--border); border-radius: .8rem; }
-.release-shortlist-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.release-shortlist-card span { color: var(--muted); font-size: .72rem; }
+.release-shortlist-items { display: grid; grid-column: 1 / -1; gap: .65rem; min-width: 0; }
+.release-comparison-guidance { margin: 0; color: var(--muted); font-size: .75rem; line-height: 1.5; }
+.release-comparison-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: .8rem; }
+.release-comparison { width: 100%; min-width: 760px; border-collapse: collapse; background: rgb(7 16 15 / 40%); }
+.release-comparison caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.release-comparison th, .release-comparison td { min-width: 11rem; padding: .7rem; text-align: left; vertical-align: top; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.release-comparison th:last-child, .release-comparison td:last-child { border-right: 0; }
+.release-comparison tr:last-child th, .release-comparison tr:last-child td { border-bottom: 0; }
+.release-comparison thead th { background: rgb(7 16 15 / 70%); }
+.release-comparison thead th:first-child, .release-comparison tbody th { min-width: 9rem; color: var(--muted); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; }
+.release-comparison thead strong { display: block; max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.release-comparison td > span { display: block; color: var(--muted); font-size: .72rem; line-height: 1.45; }
+.release-comparison-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
+.comparison-action { padding: .3rem .45rem; color: var(--accent); background: transparent; border: 1px solid rgb(52 211 153 / 35%); border-radius: .45rem; font-size: .65rem; font-weight: 800; }
+.comparison-action--remove { color: var(--muted); border-color: var(--border); }
+.release-comparison .comparison-cell--accepted > span:first-child { color: var(--accent); }
+.release-comparison .comparison-cell--rejected > span:first-child, .release-comparison .comparison-rejection, .release-comparison .comparison-warning { color: var(--danger); }
+.release-comparison .comparison-cell--stronger { background: rgb(52 211 153 / 7%); }
+.release-comparison .comparison-strength { display: inline-block; width: fit-content; margin-top: .35rem; padding: .15rem .35rem; color: var(--accent); border: 1px solid rgb(52 211 153 / 30%); border-radius: 999px; font-size: .6rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .release-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 1rem; }
 .release-table { width: 100%; min-width: 980px; border-collapse: collapse; }
 .release-table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -318,6 +333,7 @@ button:disabled { cursor: wait; opacity: .55; }
 .release-table th { color: var(--muted); background: rgb(7 16 15 / 55%); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
 .release-table tr:last-child td { border-bottom: 0; }
 .release-table tr.release-row--shortlisted td { background: rgb(45 212 191 / 5%); }
+.release-table tr:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .release-table td { max-width: 24rem; font-size: .82rem; }
 .release-table td > strong, .release-table td > span { display: block; }
 .release-table td > span { margin-top: .35rem; color: var(--muted); }

@@ -80,6 +80,31 @@ export function shortlistedReleases(
   rows: readonly FeasibilityReleaseRow[],
   releaseIds: readonly string[] | unknown,
 ): readonly FeasibilityReleaseRow[];
+export interface ReleaseComparisonCandidate extends FeasibilityReleaseRow {
+  readonly strengths: {
+    readonly subtitleConfidence: boolean;
+    readonly requiredFit: boolean;
+    readonly customFormatScore: boolean;
+    readonly seeders: boolean;
+    readonly age: boolean;
+  };
+}
+export interface ReleaseComparisonLanguage {
+  readonly code: string;
+  readonly required: boolean;
+  readonly assessments: readonly {
+    readonly releaseId: string;
+    readonly confidence: FeasibilityReleaseRow["confidence"];
+    readonly providerCount: number;
+    readonly warnings: readonly string[];
+    readonly evidence?: { readonly provider: string; readonly releaseName: string; readonly reasons: readonly string[] };
+    readonly strongest: boolean;
+  }[];
+}
+export function releaseComparison(
+  rows: readonly FeasibilityReleaseRow[],
+  releaseIds: readonly string[] | unknown,
+): { readonly candidates: readonly ReleaseComparisonCandidate[]; readonly languages: readonly ReleaseComparisonLanguage[] };
 
 export type FeasibilityView =
   | { readonly state: "ready"; readonly title: string; readonly context: string; readonly policyName: string; readonly policySource: "bazarr" | "explicit_default" | "unknown"; readonly languages: readonly { readonly code: string; readonly required: boolean; readonly forced: boolean; readonly hearingImpaired: "required" | "prefer" | "avoid" | "either"; readonly applicability?: "always" | "audio_matches" | "audio_does_not_match"; readonly cutoff?: boolean }[]; readonly providers: readonly { readonly provider: string; readonly status: string; readonly detail: string; readonly cacheStatus?: "hit" | "miss"; readonly cachedAt?: string; readonly cacheExpiresAt?: string; readonly quota: { readonly remaining?: number; readonly limit?: number; readonly resetAtEpochSeconds?: number } }[]; readonly releases: readonly FeasibilityReleaseRow[]; readonly analysis: { readonly source: "computed" | "memory_cache" | "stale_cache"; readonly generatedAt?: string; readonly expiresAt?: string; readonly staleUntil?: string; readonly refreshFailure?: "inventory_unavailable" | "integration_failure" | "unexpected_failure"; readonly unavailableIntegrations: readonly ("sonarr" | "radarr" | "bazarr" | "subdl")[]; readonly elapsedMs: number; readonly arrRequests: number; readonly bazarrRequests: number; readonly providerRequests: number } }

@@ -170,6 +170,12 @@
 | PEG-DASH-030 | Active inventory filter count ignores sorting and unsafe values | `src/dashboard-model.test.ts` |
 | PEG-DASH-031 | Missing-item triage filters and clear control remain page-memory-only assets | `src/app.test.ts` |
 | PEG-DOCKER-021 | Packaged missing-item triage causes no upstream requests | `scripts/harness/docker-build.mjs` |
+| PEG-DASH-032 | Release comparison preserves safe shortlist order and bounds | `src/dashboard-model.test.ts` |
+| PEG-DASH-033 | Release comparison keeps Arr acceptance and rejections explicit | `src/dashboard-model.test.ts` |
+| PEG-DASH-034 | Release comparison aligns policy-language evidence honestly | `src/dashboard-model.test.ts` |
+| PEG-DASH-035 | Release comparison marks deterministic field strengths and ties | `src/dashboard-model.test.ts` |
+| PEG-DASH-036 | Release comparison and navigation remain page-memory-only assets | `src/app.test.ts` |
+| PEG-DOCKER-022 | Packaged release comparison causes no upstream requests | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

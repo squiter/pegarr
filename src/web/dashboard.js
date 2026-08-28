@@ -1,4 +1,4 @@
-import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "/assets/dashboard-model.js";
+import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -530,6 +530,7 @@ function renderReleaseSelection() {
 function renderRelease(row) {
   const tableRow = document.createElement("tr");
   tableRow.dataset.releaseId = row.id;
+  tableRow.tabIndex = -1;
   tableRow.classList.toggle("release-row--shortlisted", shortlistedReleaseIds.has(row.id));
   const release = document.createElement("td");
   release.dataset.label = "Video release";
@@ -685,7 +686,8 @@ function releaseFacts(row) {
 }
 
 function toggleShortlist(row, tableRow, button) {
-  if (shortlistedReleaseIds.has(row.id)) shortlistedReleaseIds.delete(row.id);
+  const removing = shortlistedReleaseIds.has(row.id);
+  if (removing) shortlistedReleaseIds.delete(row.id);
   else if (shortlistedReleaseIds.size >= 3) {
     setFeasibilityNotice("The page-memory shortlist holds up to 3 releases. Remove one before adding another.", "warning");
     return;
@@ -693,6 +695,10 @@ function toggleShortlist(row, tableRow, button) {
   tableRow.classList.toggle("release-row--shortlisted", shortlistedReleaseIds.has(row.id));
   updateShortlistButton(button, row);
   renderShortlist(activeFeasibility?.releases ?? []);
+  setFeasibilityNotice(
+    `Release ${removing ? "removed from" : "added to"} the page-memory comparison. No provider request was made.`,
+    "success",
+  );
 }
 
 function updateShortlistButton(button, row) {
@@ -703,23 +709,169 @@ function updateShortlistButton(button, row) {
 }
 
 function renderShortlist(releases) {
-  const rows = shortlistedReleases(releases, [...shortlistedReleaseIds]);
+  const comparison = releaseComparison(releases, [...shortlistedReleaseIds]);
+  const rows = comparison.candidates;
   elements.releaseShortlist.hidden = releases.length === 0;
   elements.releaseShortlistCount.textContent = `${rows.length} of 3 selected`;
   elements.releaseShortlistClear.hidden = rows.length === 0;
-  elements.releaseShortlistItems.replaceChildren(...rows.map((row) => {
-    const card = document.createElement("article");
-    card.className = "release-shortlist-card";
-    card.setAttribute("role", "listitem");
-    const title = document.createElement("strong");
-    title.textContent = row.title;
-    const decision = document.createElement("span");
-    decision.textContent = `${row.downloadAllowed ? "Arr accepted" : "Arr rejected"} · ${confidenceLabel(row.confidence)}`;
-    const metadata = document.createElement("span");
-    metadata.textContent = [row.quality, row.releaseGroup ? `Group ${row.releaseGroup}` : "", ...releaseFacts(row)].filter(Boolean).join(" · ");
-    card.append(title, decision, metadata);
-    return card;
-  }));
+  if (rows.length === 0) {
+    const guidance = document.createElement("p");
+    guidance.className = "release-comparison-guidance";
+    guidance.textContent = "Shortlist up to three releases to compare Arr decisions, subtitle evidence, and release metadata side by side.";
+    elements.releaseShortlistItems.replaceChildren(guidance);
+    return;
+  }
+  const guidance = document.createElement("p");
+  guidance.className = "release-comparison-guidance";
+  guidance.textContent = rows.length === 1
+    ? "Choose at least one more release to reveal relative evidence markers."
+    : "Stronger markers compare one field at a time. They are not an automatic release recommendation.";
+  elements.releaseShortlistItems.replaceChildren(guidance, comparisonTable(comparison));
+}
+
+function comparisonTable(comparison) {
+  const wrap = document.createElement("div");
+  wrap.className = "release-comparison-wrap";
+  const table = document.createElement("table");
+  table.className = "release-comparison";
+  const caption = document.createElement("caption");
+  caption.textContent = "Side-by-side comparison of shortlisted releases";
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  const attribute = document.createElement("th");
+  attribute.scope = "col";
+  attribute.textContent = "Evidence";
+  headRow.append(attribute, ...comparison.candidates.map(comparisonHeading));
+  head.append(headRow);
+  const body = document.createElement("tbody");
+  body.append(
+    comparisonRow("Arr decision", comparison.candidates, (candidate) => arrDecisionComparison(candidate)),
+    comparisonRow("Subtitle confidence", comparison.candidates, (candidate) => comparisonValue(confidenceLabel(candidate.confidence), candidate.strengths.subtitleConfidence)),
+    comparisonRow("Required-language fit", comparison.candidates, (candidate) => comparisonValue(requiredFitLabel(candidate.requiredFit), candidate.strengths.requiredFit)),
+    ...comparison.languages.map((language) => comparisonRow(
+      `${language.code} · ${language.required ? "required" : "optional"}`,
+      language.assessments,
+      (assessment) => languageComparison(assessment),
+    )),
+    comparisonRow("Video metadata", comparison.candidates, (candidate) => comparisonValue([
+      candidate.quality,
+      candidate.protocol,
+      candidate.releaseGroup ? `Group ${candidate.releaseGroup}` : "",
+      candidate.edition ?? "",
+    ].filter(Boolean).join(" · "))),
+    comparisonRow("Custom format score", comparison.candidates, (candidate) => comparisonValue(candidate.customFormatScore.toLocaleString(), candidate.strengths.customFormatScore)),
+    comparisonRow("Seeders", comparison.candidates, (candidate) => comparisonValue(candidate.seeders?.toLocaleString() ?? "Unknown", candidate.strengths.seeders)),
+    comparisonRow("Release age", comparison.candidates, (candidate) => comparisonValue(candidate.ageHours === undefined ? "Unknown" : formatAge(candidate.ageHours), candidate.strengths.age)),
+    comparisonRow("Size", comparison.candidates, (candidate) => comparisonValue(candidate.sizeBytes === undefined ? "Unknown" : formatBytes(candidate.sizeBytes))),
+  );
+  table.append(caption, head, body);
+  wrap.append(table);
+  return wrap;
+}
+
+function comparisonHeading(candidate) {
+  const heading = document.createElement("th");
+  heading.scope = "col";
+  const title = document.createElement("strong");
+  title.textContent = candidate.title;
+  const actions = document.createElement("div");
+  actions.className = "release-comparison-actions";
+  const show = document.createElement("button");
+  show.className = "comparison-action";
+  show.type = "button";
+  show.textContent = "Show release";
+  show.setAttribute("aria-label", `Show ${candidate.title} in the release table`);
+  show.addEventListener("click", () => showReleaseInTable(candidate.id));
+  const remove = document.createElement("button");
+  remove.className = "comparison-action comparison-action--remove";
+  remove.type = "button";
+  remove.textContent = "Remove";
+  remove.setAttribute("aria-label", `Remove ${candidate.title} from comparison`);
+  remove.addEventListener("click", () => removeFromShortlist(candidate.id));
+  actions.append(show, remove);
+  heading.append(title, actions);
+  return heading;
+}
+
+function comparisonRow(label, values, renderValue) {
+  const row = document.createElement("tr");
+  const heading = document.createElement("th");
+  heading.scope = "row";
+  heading.textContent = label;
+  row.append(heading, ...values.map(renderValue));
+  return row;
+}
+
+function arrDecisionComparison(candidate) {
+  const cell = comparisonValue(candidate.downloadAllowed ? "Accepted by Arr" : "Rejected by Arr");
+  cell.classList.add(candidate.downloadAllowed ? "comparison-cell--accepted" : "comparison-cell--rejected");
+  for (const message of candidate.rejectionReasons) {
+    const reason = document.createElement("span");
+    reason.className = "comparison-rejection";
+    reason.textContent = message;
+    cell.append(reason);
+  }
+  return cell;
+}
+
+function languageComparison(assessment) {
+  const value = comparisonValue(
+    `${confidenceLabel(assessment.confidence)} · ${assessment.providerCount} ${assessment.providerCount === 1 ? "provider" : "providers"}`,
+    assessment.strongest,
+  );
+  if (assessment.evidence !== undefined) {
+    const evidence = document.createElement("span");
+    evidence.textContent = `${assessment.evidence.provider}: ${assessment.evidence.releaseName}`;
+    value.append(evidence);
+  }
+  for (const message of assessment.warnings) {
+    const warning = document.createElement("span");
+    warning.className = "comparison-warning";
+    warning.textContent = message;
+    value.append(warning);
+  }
+  return value;
+}
+
+function comparisonValue(text, strongest = false) {
+  const cell = document.createElement("td");
+  const value = document.createElement("span");
+  value.textContent = text;
+  cell.append(value);
+  if (strongest) {
+    cell.classList.add("comparison-cell--stronger");
+    const marker = document.createElement("span");
+    marker.className = "comparison-strength";
+    marker.textContent = "Stronger evidence";
+    cell.append(marker);
+  }
+  return cell;
+}
+
+function removeFromShortlist(releaseId) {
+  shortlistedReleaseIds.delete(releaseId);
+  syncShortlistButtons();
+  renderShortlist(activeFeasibility?.releases ?? []);
+  setFeasibilityNotice("Release removed from the page-memory comparison.", "success");
+}
+
+function showReleaseInTable(releaseId) {
+  clearReleaseFilters();
+  renderReleaseSelection();
+  const row = [...elements.releaseTableBody.children].find(({ dataset }) => dataset.releaseId === releaseId);
+  row?.focus();
+  row?.scrollIntoView({ block: "center" });
+  setFeasibilityNotice("Release filters cleared and the selected comparison row is focused. No provider request was made.", "success");
+}
+
+function clearReleaseFilters() {
+  elements.releaseSearchInput.value = "";
+  elements.releaseDecisionFilter.value = "all";
+  elements.releaseConfidenceFilter.value = "all";
+  elements.releaseProtocolFilter.value = "all";
+  elements.releaseRequiredFitFilter.value = "all";
+  elements.releaseLanguageFilter.value = "all";
+  elements.releaseLanguageConfidenceFilter.value = "all";
 }
 
 function pruneShortlist(releases) {
@@ -729,12 +881,20 @@ function pruneShortlist(releases) {
 
 function clearShortlist() {
   shortlistedReleaseIds.clear();
+  syncShortlistButtons();
+  renderShortlist(activeFeasibility?.releases ?? []);
+  setFeasibilityNotice("Page-memory comparison cleared. No provider request was made.", "success");
+}
+
+function syncShortlistButtons() {
   for (const row of document.querySelectorAll(".release-row--shortlisted")) row.classList.remove("release-row--shortlisted");
   for (const button of document.querySelectorAll(".shortlist-toggle")) {
     const row = activeFeasibility?.releases.find(({ id }) => id === button.closest("tr")?.dataset.releaseId);
-    if (row !== undefined) updateShortlistButton(button, row);
+    if (row !== undefined) {
+      button.closest("tr")?.classList.toggle("release-row--shortlisted", shortlistedReleaseIds.has(row.id));
+      updateShortlistButton(button, row);
+    }
   }
-  renderShortlist(activeFeasibility?.releases ?? []);
 }
 
 function rememberAnalysis(key, view) {
