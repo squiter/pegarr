@@ -335,3 +335,38 @@ test("PEG-CONFIG-009 multiple Arr instances load from bounded secret-reference f
   ]), { mode: 0o600 });
   await assert.rejects(loadRuntimeConfiguration({ PEGARR_SONARR_INSTANCES_FILE: instancesFile }), /unique safe labels/u);
 });
+
+test("PEG-CONFIG-010 OpenSubtitles credentials use an independent bounded secret-file contract", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-opensubtitles-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const secretPath = join(directory, "opensubtitles-api-key");
+  const secret = "synthetic.opensubtitles-key_value==";
+  await writeFile(secretPath, `${secret}\n`, { mode: 0o600 });
+
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_OPENSUBTITLES_URL: "https://api.opensubtitles.com/api/v1",
+    PEGARR_OPENSUBTITLES_ALLOWED_HOSTS: "api.opensubtitles.com",
+    PEGARR_OPENSUBTITLES_API_KEY_FILE: secretPath,
+  });
+
+  assert.equal(configuration.opensubtitles?.apiKey.reveal(), secret);
+  assert.equal(configuration.opensubtitles?.instanceId, "opensubtitles");
+  assert.equal(configuration.opensubtitles?.allowInsecureHttp, false);
+  assert.deepEqual(configuration.opensubtitles?.allowedHosts, ["api.opensubtitles.com"]);
+  assert.doesNotMatch(JSON.stringify(configuration), new RegExp(secret, "u"));
+
+  await assert.rejects(
+    loadRuntimeConfiguration({
+      PEGARR_OPENSUBTITLES_API_KEY: "synthetic-direct-opensubtitles-secret",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof ConfigurationError);
+      assert.match(error.message, /PEGARR_OPENSUBTITLES_API_KEY_FILE/u);
+      assert.doesNotMatch(error.message, /synthetic-direct-opensubtitles-secret/u);
+      return true;
+    },
+  );
+});

@@ -204,12 +204,20 @@
 | PEG-INSTANCE-001 | Instance-scoped analysis and Grab routes preserve exact Arr identity | `src/app.test.ts` |
 | PEG-INSTANCE-002 | Colliding item IDs require explicit Arr instance selection | `src/item-feasibility.test.ts` |
 | PEG-INSTANCE-003 | Grab duplicate protection is isolated by Arr instance | `src/grab-audit.test.ts` |
+| PEG-INSTANCE-004 | Per-instance Arr status is authenticated, bounded, and read-only | `src/app.test.ts` |
 | PEG-DASH-040 | Dashboard inventory keys remain unique across Arr instances | `src/dashboard-model.test.ts` |
 | PEG-HARNESS-007 | Phase 3 progress preserves completed Phase 1 and Phase 2 evidence | `scripts/harness/phase-contract.mjs` |
 | PEG-CONFIG-009 | Multiple Arr instances load from bounded secret-reference files | `src/config.test.ts` |
 | PEG-INVENTORY-005 | Missing inventory fans out across bounded Arr instances | `src/inventory-missing.test.ts` |
 | PEG-RUNTIME-009 | Scoped analysis selects the exact Arr client | `src/runtime.test.ts` |
 | PEG-RUNTIME-010 | Controlled Grab mutates only the confirmed Arr instance | `src/runtime.test.ts` |
+| PEG-RUNTIME-011 | Per-instance status probes every configured Arr once per cache window | `src/runtime.test.ts` |
+| PEG-CONFIG-010 | OpenSubtitles credentials load only from a bounded secret file | `src/config.test.ts` |
+| PEG-OPENSUBTITLES-001 | OpenSubtitles exact searches are bounded and authenticate only through headers | `src/adapters/opensubtitles.test.ts` |
+| PEG-OPENSUBTITLES-002 | OpenSubtitles retains safe preference evidence and discards download handles | `src/adapters/opensubtitles.test.ts` |
+| PEG-OPENSUBTITLES-003 | OpenSubtitles empty, irrelevant, and malformed responses stay distinct | `src/adapters/opensubtitles.test.ts` |
+| PEG-OPENSUBTITLES-004 | OpenSubtitles failures and measured per-second quotas remain honest | `src/adapters/opensubtitles.test.ts` |
+| PEG-OPENSUBTITLES-005 | OpenSubtitles stable search windows are single-flight and cached | `src/adapters/opensubtitles.test.ts` |
 
 ## Explicit manual gaps
 
@@ -220,5 +228,6 @@
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |
+| PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The official search contract and adapter are pinned; an operator-owned key, sanitized response, measured rate headers, and language mapping remain unverified |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.

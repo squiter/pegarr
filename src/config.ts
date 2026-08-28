@@ -43,6 +43,7 @@ export type SonarrRuntimeConfiguration = ServiceRuntimeConfiguration;
 export type RadarrRuntimeConfiguration = ServiceRuntimeConfiguration;
 export type BazarrRuntimeConfiguration = ServiceRuntimeConfiguration;
 export type SubdlRuntimeConfiguration = ServiceRuntimeConfiguration;
+export type OpenSubtitlesRuntimeConfiguration = ServiceRuntimeConfiguration;
 
 export interface ControlledGrabRuntimeConfiguration {
   readonly enabled: true;
@@ -57,6 +58,7 @@ export interface RuntimeConfiguration {
   readonly radarrInstances?: readonly RadarrRuntimeConfiguration[];
   readonly bazarr?: BazarrRuntimeConfiguration;
   readonly subdl?: SubdlRuntimeConfiguration;
+  readonly opensubtitles?: OpenSubtitlesRuntimeConfiguration;
   readonly accessToken?: SecretValue;
   readonly controlledGrab?: ControlledGrabRuntimeConfiguration;
   readonly missingPageSize?: number;
@@ -68,9 +70,9 @@ const maximumInstancesFileBytes = 65_536;
 const maximumArrInstances = 16;
 
 interface IntegrationConfigurationSpec {
-  readonly displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL";
-  readonly prefix: "PEGARR_SONARR" | "PEGARR_RADARR" | "PEGARR_BAZARR" | "PEGARR_SUBDL";
-  readonly defaultInstanceId: "sonarr" | "radarr" | "bazarr" | "subdl";
+  readonly displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL" | "OpenSubtitles";
+  readonly prefix: "PEGARR_SONARR" | "PEGARR_RADARR" | "PEGARR_BAZARR" | "PEGARR_SUBDL" | "PEGARR_OPENSUBTITLES";
+  readonly defaultInstanceId: "sonarr" | "radarr" | "bazarr" | "subdl" | "opensubtitles";
   readonly secretFormat: "arr" | "bearer";
 }
 
@@ -105,6 +107,12 @@ export async function loadRuntimeConfiguration(
     defaultInstanceId: "subdl",
     secretFormat: "bearer",
   });
+  const opensubtitles = await loadIntegrationConfiguration(environment, {
+    displayName: "OpenSubtitles",
+    prefix: "PEGARR_OPENSUBTITLES",
+    defaultInstanceId: "opensubtitles",
+    secretFormat: "bearer",
+  });
   const accessToken = await loadAccessToken(environment);
   const controlledGrab = await loadControlledGrabConfiguration(environment);
   if (controlledGrab !== undefined && accessToken === undefined) {
@@ -134,6 +142,7 @@ export async function loadRuntimeConfiguration(
     ...(radarrInstances === undefined ? {} : { radarrInstances }),
     ...(bazarr === undefined ? {} : { bazarr }),
     ...(subdl === undefined ? {} : { subdl }),
+    ...(opensubtitles === undefined ? {} : { opensubtitles }),
     ...(accessToken === undefined ? {} : { accessToken }),
     ...(controlledGrab === undefined ? {} : { controlledGrab }),
     ...(missingPageSize === undefined ? {} : { missingPageSize }),
@@ -406,7 +415,7 @@ function parseOptionalBoundedInteger(
 
 async function readSecret(
   path: string,
-  displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL" | "Pegarr",
+  displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL" | "OpenSubtitles" | "Pegarr",
   apiKeyFileName: string,
   secretFormat: "arr" | "bearer" | "access" | "admin",
 ): Promise<SecretValue> {

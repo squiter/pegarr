@@ -1,6 +1,6 @@
 # Runtime configuration
 
-Pegarr starts with every external integration disabled. Sonarr, Radarr, Bazarr, and SubDL become available independently only when all required settings for that integration are present and valid. Partial configuration stops startup with a redacted error instead of silently running with an unexpected boundary.
+Pegarr starts with every external integration disabled. Sonarr, Radarr, Bazarr, SubDL, and OpenSubtitles become available independently only when all required settings for that integration are present and valid. Partial configuration stops startup with a redacted error instead of silently running with an unexpected boundary.
 
 ## Sonarr settings
 
@@ -38,7 +38,7 @@ Use `PEGARR_SONARR_INSTANCES_FILE` or `PEGARR_RADARR_INSTANCES_FILE` instead of 
 ]
 ```
 
-Instance IDs are unique, case-insensitive safe labels. Unknown fields, duplicate IDs, direct key values, oversized files, partial entries, and mixing an instances file with legacy settings stop startup. The first configured instance currently supplies the aggregate integration-status probe; inventory, item analysis, dashboard identity, controlled Grab, and audit isolation use every configured instance.
+Instance IDs are unique, case-insensitive safe labels. Unknown fields, duplicate IDs, direct key values, oversized files, partial entries, and mixing an instances file with legacy settings stop startup. The legacy aggregate integration-status route reports the first configured instance for compatibility. The authenticated `GET /api/v1/library/instances` route reports a safe status for every configured Arr instance; inventory, item analysis, dashboard identity, controlled Grab, and audit isolation also use every configured instance.
 
 The `compose.sonarr-instances.yaml` and `compose.radarr-instances.yaml` overlays mount one metadata file plus a dedicated read-only API-key directory. Copy the matching file from `deploy/examples`, edit only non-secret topology, create each referenced key file in the dedicated host directory, and keep both locations outside the repository. Do not point the directory mount at a general NAS secrets directory.
 
@@ -67,7 +67,21 @@ The one-shot SubDL probe also requires a deliberate, representative search windo
 
 The dashboard item route uses `PEGARR_SUBDL_LANGUAGE_MAPPINGS`. Each mapping is explicit because Bazarr policy codes and SubDL provider codes are separate contracts. Unmapped policy languages remain `Unknown` and cause no provider request; Pegarr never supplies a PT-BR or other language default.
 
-Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, `PEGARR_BAZARR_API_KEY`, or `PEGARR_SUBDL_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
+## OpenSubtitles settings
+
+The Phase 3 OpenSubtitles boundary is search-only. It does not log in as a user and never requests or stores subtitle download handles.
+
+| Variable | Required when enabled | Meaning |
+| --- | --- | --- |
+| `PEGARR_OPENSUBTITLES_URL` | Yes | REST API base URL; normally `https://api.opensubtitles.com/api/v1` |
+| `PEGARR_OPENSUBTITLES_ALLOWED_HOSTS` | Yes | Comma-separated hostnames Pegarr may contact; normally `api.opensubtitles.com` |
+| `PEGARR_OPENSUBTITLES_API_KEY_FILE` | Yes | Absolute in-container path to one OpenSubtitles application API key |
+| `PEGARR_OPENSUBTITLES_INSTANCE_ID` | No | Safe non-secret label; defaults to `opensubtitles` |
+| `PEGARR_OPENSUBTITLES_ALLOW_INSECURE_HTTP` | No | Test fixtures only; production access should remain HTTPS |
+
+Following the [official OpenSubtitles REST search contract](https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles), the adapter uses the fixed application identity `Pegarr v0.1.0`, exact IMDb or TMDB identifiers, lowercase provider language codes, and sorted query fields. OpenSubtitles is not yet added to the runtime provider schedule; that ordering and Bazarr language mapping are the next `P3-PROVIDER-QUOTA` slice.
+
+Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, `PEGARR_BAZARR_API_KEY`, `PEGARR_SUBDL_API_KEY`, or `PEGARR_OPENSUBTITLES_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
 
 The base URL may use a Sonarr URL base, such as `https://media.example.invalid/sonarr`. The allowlist entry for that URL is only `media.example.invalid`.
 
@@ -119,6 +133,7 @@ install -m 600 /dev/null /absolute/private/path/sonarr_api_key
 install -m 600 /dev/null /absolute/private/path/radarr_api_key
 install -m 600 /dev/null /absolute/private/path/bazarr_api_key
 install -m 600 /dev/null /absolute/private/path/subdl_api_key
+install -m 600 /dev/null /absolute/private/path/opensubtitles_api_key
 install -m 600 /dev/null /absolute/private/path/pegarr_access_token
 install -m 600 /dev/null /absolute/private/path/pegarr_admin_token
 ```
@@ -148,6 +163,7 @@ PEGARR_SUBDL_PROBE_POLICY_LANGUAGE=en
 PEGARR_SUBDL_PROBE_PROVIDER_LANGUAGE=EN
 PEGARR_SUBDL_PROBE_SEASON=1
 PEGARR_SUBDL_PROBE_EPISODE=1
+PEGARR_OPENSUBTITLES_API_KEY_HOST_FILE=/absolute/private/path/opensubtitles_api_key
 PEGARR_PROVIDER_CACHE_TTL_SECONDS=900
 PEGARR_PROVIDER_CACHE_MAX_ENTRIES=5000
 PEGARR_ACCESS_TOKEN_HOST_FILE=/absolute/private/path/pegarr_access_token
@@ -158,7 +174,7 @@ PEGARR_MISSING_PAGE_SIZE=50
 Enable the opt-in overlay alongside either Compose base:
 
 ```console
-docker compose -f deploy/compose.nas.yaml -f deploy/compose.access.yaml -f deploy/compose.sonarr.yaml -f deploy/compose.radarr.yaml -f deploy/compose.bazarr.yaml -f deploy/compose.subdl.yaml up -d
+docker compose -f deploy/compose.nas.yaml -f deploy/compose.access.yaml -f deploy/compose.sonarr.yaml -f deploy/compose.radarr.yaml -f deploy/compose.bazarr.yaml -f deploy/compose.subdl.yaml -f deploy/compose.opensubtitles.yaml up -d
 ```
 
 The host secrets are mounted under `/run/secrets`; only those in-container paths are passed to Pegarr. Host paths and API keys must never be committed.

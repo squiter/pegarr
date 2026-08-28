@@ -8,6 +8,9 @@ The protected read-only routes are:
 GET /api/v1/library/missing
 Authorization: Bearer <access token>
 
+GET /api/v1/library/instances
+Authorization: Bearer <access token>
+
 GET /api/v1/library/items/sonarr/<instance-id>/episode/<episode-id>/feasibility
 GET /api/v1/library/items/radarr/<instance-id>/movie/<movie-id>/feasibility
 Authorization: Bearer <access token>
@@ -49,7 +52,7 @@ The read-only token is deliberately unable to authorize a controlled Grab. Phase
 
 ## Request bounds
 
-Authorized inventory reads request at most one configured page from each Arr instance. Concurrent requests share one in-flight operation, and completed results are reused for 30 seconds. `PEGARR_MISSING_PAGE_SIZE` defaults to 50 and accepts values from 1 through 100.
+Authorized inventory reads request at most one configured page from each Arr instance. Concurrent requests share one in-flight operation, and completed results are reused for 30 seconds. `PEGARR_MISSING_PAGE_SIZE` defaults to 50 and accepts values from 1 through 100. The instance-status route probes every configured Arr through the same independently bounded 30-second status readers and returns only safe capability evidence plus each configured instance ID.
 
 Authorized item reads resolve the requested instance and ID from that server-owned inventory before starting release, Bazarr, or provider work. Legacy unscoped URLs remain available only when the item identity is unambiguous. Successful item reports share a 30-second bounded in-memory window. See [item feasibility API](item-feasibility-api.md).
 

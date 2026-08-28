@@ -17,13 +17,18 @@ export interface FetchJsonTransportOptions {
   readonly fetchImplementation?: FetchImplementation;
 }
 
-const allowedRequestHeaders = new Set(["accept", "authorization", "content-type", "user-agent", "x-api-key"]);
+const allowedRequestHeaders = new Set(["accept", "api-key", "authorization", "content-type", "user-agent", "x-api-key"]);
 const safeResponseHeaders = new Set([
   "content-type",
   "retry-after",
   "x-ratelimit-limit",
+  "x-ratelimit-limit-second",
   "x-ratelimit-remaining",
+  "x-ratelimit-remaining-second",
   "x-ratelimit-reset",
+  "ratelimit-limit",
+  "ratelimit-remaining",
+  "ratelimit-reset",
 ]);
 const maximumResponseBytes = 10 * 1024 * 1024;
 const maximumRequestBytes = 64 * 1024;

@@ -8,20 +8,20 @@
     {
       "id": "P3-MULTI-ARR",
       "title": "Multiple Sonarr and Radarr instances",
-      "status": "in_progress",
-      "scenarioIds": ["PEG-CONFIG-009", "PEG-INVENTORY-005", "PEG-INSTANCE-001", "PEG-INSTANCE-002", "PEG-INSTANCE-003", "PEG-DASH-040", "PEG-RUNTIME-009", "PEG-RUNTIME-010"]
+      "status": "complete",
+      "scenarioIds": ["PEG-CONFIG-009", "PEG-INVENTORY-005", "PEG-INSTANCE-001", "PEG-INSTANCE-002", "PEG-INSTANCE-003", "PEG-INSTANCE-004", "PEG-DASH-040", "PEG-RUNTIME-009", "PEG-RUNTIME-010", "PEG-RUNTIME-011"]
     },
     {
       "id": "P3-OPENSUBTITLES",
       "title": "OpenSubtitles provider adapter",
-      "status": "pending",
-      "scenarioIds": []
+      "status": "complete",
+      "scenarioIds": ["PEG-CONFIG-010", "PEG-OPENSUBTITLES-001", "PEG-OPENSUBTITLES-002", "PEG-OPENSUBTITLES-003", "PEG-OPENSUBTITLES-004", "PEG-OPENSUBTITLES-005"]
     },
     {
       "id": "P3-PROVIDER-QUOTA",
       "title": "Provider-specific rate limits, quota display, ordering, and asymmetric caching",
-      "status": "pending",
-      "scenarioIds": []
+      "status": "in_progress",
+      "scenarioIds": ["PEG-OPENSUBTITLES-004", "PEG-OPENSUBTITLES-005"]
     },
     {
       "id": "P3-SEASON-PACKS",
@@ -42,5 +42,5 @@
       "scenarioIds": []
     }
   ],
-  "manualGapIds": ["PEG-MANUAL-001", "PEG-MANUAL-002", "PEG-MANUAL-003", "PEG-MANUAL-004", "PEG-MANUAL-005"]
+  "manualGapIds": ["PEG-MANUAL-001", "PEG-MANUAL-002", "PEG-MANUAL-003", "PEG-MANUAL-004", "PEG-MANUAL-005", "PEG-MANUAL-006"]
 }

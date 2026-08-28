@@ -16,6 +16,7 @@ const adapterImports = {
   "src/adapters/radarr.ts": ["node:crypto", "../domain.js", "./http.js"],
   "src/adapters/bazarr.ts": ["../domain.js", "./http.js"],
   "src/adapters/subdl.ts": ["node:crypto", "../domain.js", "./http.js"],
+  "src/adapters/opensubtitles.ts": ["node:crypto", "../domain.js", "./http.js"],
 };
 
 for (const [file, allowedImports] of Object.entries(coreImports)) {
@@ -89,6 +90,24 @@ if (
   subdlAdapter.includes('/download')
 ) {
   issues.push("The Phase 0 SubDL adapter must remain search-only and read-only");
+}
+
+const opensubtitlesAdapter = readFileSync(resolve(repoRoot, "src/adapters/opensubtitles.ts"), "utf8");
+if (
+  !opensubtitlesAdapter.includes('method: "GET"') ||
+  opensubtitlesAdapter.includes('method: "POST"') ||
+  opensubtitlesAdapter.includes('/download') ||
+  opensubtitlesAdapter.includes('/login')
+) {
+  issues.push("The OpenSubtitles adapter must remain search-only and read-only");
+}
+for (const contract of ['"api-key": this.#apiKey', '"user-agent": this.#userAgent', 'path: "/subtitles"']) {
+  if (!opensubtitlesAdapter.includes(contract)) {
+    issues.push(`The OpenSubtitles adapter must retain ${contract}`);
+  }
+}
+if (/authorization:\s*`Bearer/u.test(opensubtitlesAdapter) || /file_id/u.test(opensubtitlesAdapter)) {
+  issues.push("OpenSubtitles search must not retain user tokens or download handles");
 }
 if (!subdlAdapter.includes("authorization: `Bearer ${this.#apiKey}`") || /api_key/u.test(subdlAdapter)) {
   issues.push("The SubDL API key must remain in the authorization header and out of URLs");
@@ -166,6 +185,7 @@ for (const contract of [
   'prefix: "PEGARR_RADARR"',
   'prefix: "PEGARR_BAZARR"',
   'prefix: "PEGARR_SUBDL"',
+  'prefix: "PEGARR_OPENSUBTITLES"',
   '`${spec.prefix}_API_KEY_FILE`',
   "maximumSecretBytes = 4_096",
   'return "[redacted]"',
@@ -250,6 +270,13 @@ if (/PEGARR_BAZARR_API_KEY\s*:/u.test(bazarrCompose)) {
 const subdlCompose = readFileSync(resolve(repoRoot, "deploy/compose.subdl.yaml"), "utf8");
 if (!subdlCompose.includes("PEGARR_SUBDL_API_KEY_FILE: /run/secrets/subdl_api_key")) {
   issues.push("The SubDL Compose overlay must mount the API key through a secret file");
+}
+const opensubtitlesCompose = readFileSync(resolve(repoRoot, "deploy/compose.opensubtitles.yaml"), "utf8");
+if (!opensubtitlesCompose.includes("PEGARR_OPENSUBTITLES_API_KEY_FILE: /run/secrets/opensubtitles_api_key")) {
+  issues.push("The OpenSubtitles Compose overlay must mount the API key through a secret file");
+}
+if (/PEGARR_OPENSUBTITLES_API_KEY\s*:/u.test(opensubtitlesCompose)) {
+  issues.push("The OpenSubtitles Compose overlay may not pass the API key as an environment value");
 }
 if (/PEGARR_SUBDL_API_KEY\s*:/u.test(subdlCompose)) {
   issues.push("The SubDL Compose overlay may not pass the API key as an environment value");

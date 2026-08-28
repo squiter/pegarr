@@ -143,6 +143,7 @@ export interface ProviderQuotaEvidence {
   readonly limit?: number;
   readonly remaining?: number;
   readonly resetAtEpochSeconds?: number;
+  readonly windowSeconds?: number;
 }
 
 export interface ProviderCacheEvidence {

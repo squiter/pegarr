@@ -108,7 +108,7 @@ docker compose -f deploy/compose.nas.yaml up -d
 docker compose -f deploy/compose.nas.yaml ps
 ```
 
-For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [access](deploy/compose.access.yaml), [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), [SubDL](deploy/compose.subdl.yaml), and [controlled Grab](deploy/compose.grab.yaml) Compose overlays mount credentials as Docker secrets; follow the [configuration guide](docs/configuration.md), and never put a token or key in `.env`.
+For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [access](deploy/compose.access.yaml), [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), [SubDL](deploy/compose.subdl.yaml), [OpenSubtitles](deploy/compose.opensubtitles.yaml), and [controlled Grab](deploy/compose.grab.yaml) Compose overlays mount credentials as Docker secrets; follow the [configuration guide](docs/configuration.md), and never put a token or key in `.env`.
 
 ## Container publishing
 

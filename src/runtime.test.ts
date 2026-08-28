@@ -440,6 +440,41 @@ test("PEG-RUNTIME-009 scoped analysis selects the exact Arr client", async () =>
   assert.doesNotMatch(JSON.stringify(result), /example\.invalid|synthetic-sonarr-(?:main|anime)-key/iu);
 });
 
+test("PEG-RUNTIME-011 per-instance status probes every configured Arr once per cache window", async () => {
+  const configuration = {
+    sonarrInstances: [
+      { instanceId: "sonarr-main", baseUrl: "https://sonarr-main.example.invalid", allowedHosts: ["sonarr-main.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-sonarr-main-key") },
+      { instanceId: "sonarr-anime", baseUrl: "https://sonarr-anime.example.invalid", allowedHosts: ["sonarr-anime.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-sonarr-anime-key") },
+    ],
+    radarrInstances: [
+      { instanceId: "radarr-4k", baseUrl: "https://radarr-4k.example.invalid", allowedHosts: ["radarr-4k.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-radarr-4k-key") },
+    ],
+  };
+  const requests: string[] = [];
+  const services = createRuntimeServices(configuration, {
+    fetchImplementation: async (input) => {
+      const url = new URL(input);
+      requests.push(url.hostname);
+      const body = url.hostname.startsWith("radarr") ? syntheticRadarrSystemStatusResponse : syntheticSonarrSystemStatusResponse;
+      return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+    },
+    now: () => 1_000,
+  });
+
+  const first = await services.readArrInstanceStatuses?.();
+  const cached = await services.readArrInstanceStatuses?.();
+  services.close();
+
+  assert.deepEqual(first?.map(({ integration, instanceId, state }) => ({ integration, instanceId, state })), [
+    { integration: "sonarr", instanceId: "sonarr-main", state: "available" },
+    { integration: "sonarr", instanceId: "sonarr-anime", state: "available" },
+    { integration: "radarr", instanceId: "radarr-4k", state: "available" },
+  ]);
+  assert.deepEqual(cached, first);
+  assert.equal(requests.length, 3);
+  assert.doesNotMatch(JSON.stringify(first), /example\.invalid|synthetic-(?:sonarr|radarr).*-key/iu);
+});
+
 test("PEG-RUNTIME-010 controlled Grab mutates only the confirmed Arr instance", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-multi-grab-runtime-"));
   context.after(async () => rm(directory, { recursive: true }));

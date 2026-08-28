@@ -69,10 +69,14 @@ export interface ArrIntegrationStatus<
 
 export type SonarrIntegrationStatus = ArrIntegrationStatus<"sonarr", "Sonarr">;
 export type RadarrIntegrationStatus = ArrIntegrationStatus<"radarr", "Radarr">;
+export type ArrInstanceIntegrationStatus =
+  | (SonarrIntegrationStatus & { readonly instanceId: string; readonly configured: true })
+  | (RadarrIntegrationStatus & { readonly instanceId: string; readonly configured: true });
 
 export interface RuntimeServices {
   readSonarrStatus(): Promise<SonarrIntegrationStatus>;
   readRadarrStatus(): Promise<RadarrIntegrationStatus>;
+  readonly readArrInstanceStatuses?: () => Promise<readonly ArrInstanceIntegrationStatus[]>;
   readMissingInventory(): Promise<MissingInventoryResult>;
   readItemFeasibility(
     selection: ItemFeasibilitySelection,
@@ -144,14 +148,14 @@ export function createRuntimeServices(
   const radarrConfigurations = configuredRadarrInstances(configuration);
   const primarySonarrConfiguration = sonarrConfigurations[0];
   const primaryRadarrConfiguration = radarrConfigurations[0];
-  const readSonarrStatus = createStatusReader<"sonarr", "Sonarr", SonarrSystemStatus>({
+  const createSonarrStatusReader = (arrConfiguration: ArrRuntimeConfiguration | undefined) => createStatusReader<"sonarr", "Sonarr", SonarrSystemStatus>({
     integration: "sonarr",
-    configuration: primarySonarrConfiguration,
+    configuration: arrConfiguration,
     createClient: (transport) =>
       new SonarrClient(
         {
-          instanceId: primarySonarrConfiguration?.instanceId ?? "sonarr",
-          apiKey: primarySonarrConfiguration?.apiKey.reveal() ?? "unreachable-disabled-key",
+          instanceId: arrConfiguration?.instanceId ?? "sonarr",
+          apiKey: arrConfiguration?.apiKey.reveal() ?? "unreachable-disabled-key",
         },
         transport,
       ),
@@ -163,14 +167,14 @@ export function createRuntimeServices(
       "sonarrStatusTtlMs",
     ),
   });
-  const readRadarrStatus = createStatusReader<"radarr", "Radarr", RadarrSystemStatus>({
+  const createRadarrStatusReader = (arrConfiguration: ArrRuntimeConfiguration | undefined) => createStatusReader<"radarr", "Radarr", RadarrSystemStatus>({
     integration: "radarr",
-    configuration: primaryRadarrConfiguration,
+    configuration: arrConfiguration,
     createClient: (transport) =>
       new RadarrClient(
         {
-          instanceId: primaryRadarrConfiguration?.instanceId ?? "radarr",
-          apiKey: primaryRadarrConfiguration?.apiKey.reveal() ?? "unreachable-disabled-key",
+          instanceId: arrConfiguration?.instanceId ?? "radarr",
+          apiKey: arrConfiguration?.apiKey.reveal() ?? "unreachable-disabled-key",
         },
         transport,
       ),
@@ -182,6 +186,16 @@ export function createRuntimeServices(
       "radarrStatusTtlMs",
     ),
   });
+  const readSonarrStatus = createSonarrStatusReader(primarySonarrConfiguration);
+  const readRadarrStatus = createRadarrStatusReader(primaryRadarrConfiguration);
+  const sonarrInstanceStatusReaders = sonarrConfigurations.map((arrConfiguration, index) => ({
+    instanceId: arrConfiguration.instanceId,
+    read: index === 0 ? readSonarrStatus : createSonarrStatusReader(arrConfiguration),
+  }));
+  const radarrInstanceStatusReaders = radarrConfigurations.map((arrConfiguration, index) => ({
+    instanceId: arrConfiguration.instanceId,
+    read: index === 0 ? readRadarrStatus : createRadarrStatusReader(arrConfiguration),
+  }));
   const readMissingInventory = createMissingInventoryReader(inventoryConfiguration, {
     fetchImplementation: options.fetchImplementation,
     now,
@@ -355,6 +369,10 @@ export function createRuntimeServices(
   return {
     readSonarrStatus,
     readRadarrStatus,
+    readArrInstanceStatuses: async () => Promise.all([
+      ...sonarrInstanceStatusReaders.map(async ({ instanceId, read }) => ({ ...(await read()), instanceId, configured: true as const })),
+      ...radarrInstanceStatusReaders.map(async ({ instanceId, read }) => ({ ...(await read()), instanceId, configured: true as const })),
+    ]),
     readMissingInventory,
     readItemFeasibility: (selection, readOptions) => itemFeasibility.read(selection, readOptions),
     ...(controlledGrab === undefined

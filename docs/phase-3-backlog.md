@@ -14,7 +14,7 @@ This is documentation and deployment composition only. Pegarr must remain indepe
 
 **Status:** proposed
 
-**Priority:** high when the second subtitle-provider adapter is introduced
+**Priority:** active now that the second subtitle-provider adapter is available
 
 ### Why
 

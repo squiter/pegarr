@@ -1,0 +1,14 @@
+services:
+  pegarr:
+    environment:
+      PEGARR_OPENSUBTITLES_URL: ${PEGARR_OPENSUBTITLES_URL:-https://api.opensubtitles.com/api/v1}
+      PEGARR_OPENSUBTITLES_ALLOWED_HOSTS: ${PEGARR_OPENSUBTITLES_ALLOWED_HOSTS:-api.opensubtitles.com}
+      PEGARR_OPENSUBTITLES_API_KEY_FILE: /run/secrets/opensubtitles_api_key
+      PEGARR_OPENSUBTITLES_INSTANCE_ID: ${PEGARR_OPENSUBTITLES_INSTANCE_ID:-opensubtitles}
+      PEGARR_OPENSUBTITLES_ALLOW_INSECURE_HTTP: ${PEGARR_OPENSUBTITLES_ALLOW_INSECURE_HTTP:-false}
+    secrets:
+      - opensubtitles_api_key
+
+secrets:
+  opensubtitles_api_key:
+    file: ${PEGARR_OPENSUBTITLES_API_KEY_HOST_FILE:?set an absolute PEGARR_OPENSUBTITLES_API_KEY_HOST_FILE}

@@ -227,6 +227,37 @@ test("PEG-ACCESS-004 item feasibility is hidden, authenticated before work, and 
   assert.equal((await resolveRoute("GET", "/api/v1/library/items/sonarr/movie/305/feasibility", tmpdir(), services, access)).statusCode, 404);
 });
 
+test("PEG-INSTANCE-004 instance status is authenticated, bounded, and read-only", async () => {
+  const token = "synthetic-access-token-value-0000000001";
+  let reads = 0;
+  const base = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  const services: RuntimeServices = {
+    ...base,
+    readArrInstanceStatuses: async () => {
+      reads += 1;
+      return [
+        { integration: "sonarr", instanceId: "sonarr-main", mode: "read_only", configured: true, state: "available", appName: "Sonarr", version: "4.0.0.0", transportSecurity: "https", latencyMs: 12, observedAt: "2030-01-01T00:00:00.000Z" },
+        { integration: "radarr", instanceId: "radarr-4k", mode: "read_only", configured: true, state: "rate_limited", retryAfterSeconds: 60, transportSecurity: "https", latencyMs: 8, observedAt: "2030-01-01T00:00:00.000Z" },
+      ];
+    },
+  };
+  const path = "/api/v1/library/instances";
+
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control: new AccessControl(undefined) })).statusCode, 404);
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control: new AccessControl(new SecretValue(token)), authorization: "Bearer wrong-token-value-000000000000000" })).statusCode, 401);
+  assert.equal(reads, 0);
+  const response = await resolveRoute("GET", path, tmpdir(), services, {
+    control: new AccessControl(new SecretValue(token)),
+    authorization: `Bearer ${token}`,
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(reads, 1);
+  assert.deepEqual((response.body as { instances: Array<{ instanceId: string }> }).instances.map(({ instanceId }) => instanceId), ["sonarr-main", "radarr-4k"]);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control: new AccessControl(new SecretValue(token)), authorization: `Bearer ${token}` })).statusCode, 405);
+  assert.doesNotMatch(JSON.stringify(response), /api.?key|hostname|baseUrl|authorization|token/iu);
+  assert.equal(requestLogEntry("GET", path, 200, 0, 1).route, "arr_instances");
+});
+
 test("PEG-INSTANCE-001 scoped item and Grab routes preserve exact instance identity", async () => {
   const token = "synthetic-access-token-value-0000000001";
   const adminToken = "synthetic-admin-token-value-00000000002";

@@ -1231,6 +1231,54 @@
       "title": "Controlled Grab mutates only the confirmed Arr instance",
       "evidence": "src/runtime.test.ts",
       "boundary": "Injected synthetic Arr mutation and temporary audit database; no live service"
+    },
+    {
+      "id": "PEG-INSTANCE-004",
+      "title": "Per-instance Arr status is authenticated, bounded, and read-only",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process authenticated route with injected status readers; no network or mutation"
+    },
+    {
+      "id": "PEG-RUNTIME-011",
+      "title": "Per-instance status probes every configured Arr once per cache window",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected multi-instance transports and synthetic status responses; no network"
+    },
+    {
+      "id": "PEG-OPENSUBTITLES-001",
+      "title": "OpenSubtitles exact searches are bounded and authenticate only through headers",
+      "evidence": "src/adapters/opensubtitles.test.ts",
+      "boundary": "Injected transport and sanitized synthetic OpenSubtitles response; no network"
+    },
+    {
+      "id": "PEG-OPENSUBTITLES-002",
+      "title": "OpenSubtitles retains safe preference evidence and discards download handles",
+      "evidence": "src/adapters/opensubtitles.test.ts",
+      "boundary": "Pure mapping over a sanitized synthetic response"
+    },
+    {
+      "id": "PEG-OPENSUBTITLES-003",
+      "title": "OpenSubtitles empty, irrelevant, and malformed responses stay distinct",
+      "evidence": "src/adapters/opensubtitles.test.ts",
+      "boundary": "Injected transport and sanitized synthetic responses; no network"
+    },
+    {
+      "id": "PEG-OPENSUBTITLES-004",
+      "title": "OpenSubtitles failures and measured per-second quotas remain honest",
+      "evidence": "src/adapters/opensubtitles.test.ts",
+      "boundary": "Injected failures and synthetic safe response headers; no network"
+    },
+    {
+      "id": "PEG-OPENSUBTITLES-005",
+      "title": "OpenSubtitles stable search windows are single-flight and cached",
+      "evidence": "src/adapters/opensubtitles.test.ts",
+      "boundary": "Injected clock and transport; no network"
+    },
+    {
+      "id": "PEG-CONFIG-010",
+      "title": "OpenSubtitles credentials load only from a bounded secret file",
+      "evidence": "src/config.test.ts",
+      "boundary": "Temporary secret files; no process environment mutation or network"
     }
   ],
   "manualGaps": [
@@ -1258,6 +1306,11 @@
       "id": "PEG-MANUAL-005",
       "title": "Live SubDL v2 search and language-code compatibility",
       "reason": "The official request, quota contract, live route, and authentication boundary are pinned, but an authenticated sanitized response and Bazarr-to-SubDL language mapping have not been verified"
+    },
+    {
+      "id": "PEG-MANUAL-006",
+      "title": "Live OpenSubtitles REST search and language-code compatibility",
+      "reason": "The official search contract and deterministic adapter are pinned, but an operator-owned API key, sanitized live response, measured rate headers, and Bazarr-to-OpenSubtitles language mappings have not been verified"
     }
   ]
 }
