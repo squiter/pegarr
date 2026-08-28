@@ -1,0 +1,7 @@
+services:
+  pegarr:
+    environment:
+      PEGARR_RADARR_INSTANCES_FILE: /run/pegarr/radarr-instances.json
+    volumes:
+      - ${PEGARR_RADARR_INSTANCES_HOST_FILE:?set an absolute PEGARR_RADARR_INSTANCES_HOST_FILE}:/run/pegarr/radarr-instances.json:ro
+      - ${PEGARR_RADARR_API_KEYS_HOST_DIR:?set a dedicated PEGARR_RADARR_API_KEYS_HOST_DIR}:/run/secrets/radarr:ro

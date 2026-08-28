@@ -3,12 +3,12 @@
 The protected Phase 1 item route turns one row from the bounded missing inventory into an explainable, read-only release analysis:
 
 ```text
-GET /api/v1/library/items/sonarr/episode/<episode-id>/feasibility
-GET /api/v1/library/items/radarr/movie/<movie-id>/feasibility
+GET /api/v1/library/items/sonarr/<instance-id>/episode/<episode-id>/feasibility
+GET /api/v1/library/items/radarr/<instance-id>/movie/<movie-id>/feasibility
 Authorization: Bearer <Pegarr access token>
 ```
 
-The browser sends only the application, item kind, and positive Arr item ID already returned by the inventory. Pegarr resolves the title, parent ID, episode coordinates, year, and media identifiers again from its server-side inventory window. It does not accept those private matching fields from the browser.
+The browser sends only the application, instance ID, item kind, and positive Arr item ID already returned by the inventory. Pegarr resolves the title, parent ID, episode coordinates, year, and media identifiers again from its server-side inventory window. It does not accept those private matching fields from the browser. The earlier single-instance routes remain compatible, but fail closed with `not_found` when an item ID is ambiguous across instances.
 
 For a resolved item, Pegarr performs one interactive Arr release search, two Bazarr policy reads, and at most one SubDL request per unique Bazarr policy language with an explicit mapping. Successful reports share one in-flight request and a 30-second, 100-entry in-memory window. The durable provider cache remains authoritative for longer successful item/language reuse.
 
@@ -35,6 +35,6 @@ Provider rate limits, timeouts, unsupported mappings, and outages remain visible
 
 Each release also retains the safe Arr evidence needed for a manual decision: quality, protocol, indexer, size, age, seeders/leechers when supplied, Arr language and custom-format names, plus normalized release-group or edition traits. Download URLs, magnet links, info hashes, and upstream credentials are never copied into the report.
 
-Only `GET` is accepted. Missing or invalid credentials are rejected before inventory, release, Bazarr, or provider work. No Grab route exists in Phase 1.
+Only `GET` is accepted. Missing or invalid credentials are rejected before inventory, release, Bazarr, or provider work. The analysis path remains read-only; controlled Grab is a separate administrator-only Phase 2 boundary.
 
-`PEG-ACCESS-004`, `PEG-ITEM-001` through `PEG-ITEM-006`, `PEG-MATCH-011`, and `PEG-DOCKER-013` through `PEG-DOCKER-015` are the deterministic evidence for this route.
+`PEG-ACCESS-004`, `PEG-ITEM-001` through `PEG-ITEM-006`, `PEG-INSTANCE-001`, `PEG-INSTANCE-002`, `PEG-MATCH-011`, and `PEG-DOCKER-013` through `PEG-DOCKER-015` are the deterministic evidence for this route.

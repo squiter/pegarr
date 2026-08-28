@@ -174,6 +174,9 @@ for (const contract of [
   "PEGARR_GRAB_ENABLED",
   "PEGARR_ADMIN_TOKEN_FILE",
   "PEGARR_GRAB_AUDIT_FILE",
+  "configuredSonarrInstances",
+  "configuredRadarrInstances",
+  "_INSTANCES_FILE",
 ]) {
   if (!configuration.includes(contract)) {
     issues.push(`The runtime configuration must retain ${contract}`);
@@ -253,6 +256,15 @@ if (/PEGARR_SUBDL_API_KEY\s*:/u.test(subdlCompose)) {
 }
 if (/PEGARR_RADARR_API_KEY\s*:/u.test(radarrCompose)) {
   issues.push("The Radarr Compose overlay may not pass the API key as an environment value");
+}
+
+for (const [integration, file] of [["Sonarr", "deploy/compose.sonarr-instances.yaml"], ["Radarr", "deploy/compose.radarr-instances.yaml"]]) {
+  const compose = readFileSync(resolve(repoRoot, file), "utf8");
+  const upper = integration.toUpperCase();
+  for (const contract of [`PEGARR_${upper}_INSTANCES_FILE`, ":/run/pegarr/", `:/run/secrets/${integration.toLowerCase()}:ro`]) {
+    if (!compose.includes(contract)) issues.push(`${integration} multi-instance Compose must retain ${contract}`);
+  }
+  if (/API_KEY\s*:/u.test(compose)) issues.push(`${integration} multi-instance Compose may not pass API keys as environment values`);
 }
 
 const packageJson = readJson("package.json");
@@ -382,7 +394,7 @@ if (/^phase-[01]-/u.test(manifest.phase)) {
   }
 }
 
-if (/^phase-2-/u.test(manifest.phase)) {
+if (/^phase-(?:2|3)-/u.test(manifest.phase)) {
   const app = readFileSync(resolve(repoRoot, "src/app.ts"), "utf8");
   const controlledGrab = readFileSync(resolve(repoRoot, "src/controlled-grab.ts"), "utf8");
   const grabAudit = readFileSync(resolve(repoRoot, "src/grab-audit.ts"), "utf8");
@@ -397,11 +409,11 @@ if (/^phase-2-/u.test(manifest.phase)) {
     if (!app.includes(contract)) issues.push(`The Phase 2 API boundary must retain ${contract}`);
   }
   for (const contract of [
-    "source.revalidate(validated, normalizedReleaseId)",
+    "source.revalidate(canonicalSelection, normalizedReleaseId)",
     "confirmationText(releaseTitle, targetLabel)",
     "this.#options.audit.begin",
-    "source.revalidate(selection, challenge.releaseId)",
-    "await source.grab(revalidated.handle)",
+    "source.revalidate(canonicalSelection, challenge.releaseId)",
+    "await source.grab(revalidated.handle, canonicalSelection)",
     '"timeout_unknown"',
     '"reconciliation_required"',
     "reconciliationText(event, validatedOutcome)",

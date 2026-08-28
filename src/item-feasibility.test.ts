@@ -100,7 +100,7 @@ test("PEG-ITEM-002 missing configuration and inventory failures remain distinct 
       kind: "item-feasibility",
       mode: "read_only",
       status: "disabled",
-      selection: { application: "sonarr", kind: "episode", itemId: 305 },
+      selection: { application: "sonarr", instanceId: "sonarr", kind: "episode", itemId: 305 },
       missingIntegrations: ["bazarr", "subdl"],
     },
   );
@@ -262,4 +262,48 @@ test("PEG-ITEM-006 transient failures use a labeled stale report only inside the
   const expired = await service.read(selection);
   assert.equal(expired.status, "integration_failure");
   assert.equal(builds, 4);
+});
+
+test("PEG-INSTANCE-002 colliding item IDs require and preserve exact Arr instance identity", async () => {
+  const requests: SonarrEpisodeFeasibilityRequest[] = [];
+  const alternate = {
+    ...episode,
+    instanceId: "sonarr-anime",
+    parentId: 84,
+    parentTitle: "Synthetic Anime",
+    ids: { tvdb: "840305" },
+  };
+  const service = new ItemFeasibilityService({
+    readInventory: async () => ({
+      ...readyInventory,
+      sources: [
+        readyInventory.sources[0],
+        { integration: "sonarr", status: "ready", page: { page: 1, pageSize: 2, totalRecords: 1, items: [alternate] } },
+        readyInventory.sources[1],
+      ],
+    }),
+    episode: {
+      build: async (request) => {
+        requests.push(request);
+        return {
+          status: "policy_unresolved",
+          mode: "read_only",
+          reason: "unassigned",
+          releases: [],
+          metrics: { sonarrRequests: 1, bazarrRequests: 2, providerRequests: 0, elapsedMs: 1 },
+        };
+      },
+    },
+    subdlLanguages: [],
+    missingIntegrations: { episode: [], movie: [] },
+  });
+
+  const ambiguous = await service.read({ application: "sonarr", kind: "episode", itemId: 305 });
+  const main = await service.read({ application: "sonarr", instanceId: "sonarr", kind: "episode", itemId: 305 });
+  const anime = await service.read({ application: "sonarr", instanceId: "sonarr-anime", kind: "episode", itemId: 305 });
+
+  assert.equal(ambiguous.status, "not_found");
+  assert.equal(main.selection.instanceId, "sonarr");
+  assert.equal(anime.selection.instanceId, "sonarr-anime");
+  assert.deepEqual(requests.map(({ sonarrSeriesId }) => sonarrSeriesId), [42, 84]);
 });

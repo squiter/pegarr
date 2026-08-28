@@ -22,6 +22,26 @@ Pegarr starts with every external integration disabled. Sonarr, Radarr, Bazarr, 
 | `PEGARR_RADARR_INSTANCE_ID` | No | Safe non-secret label; defaults to `radarr` |
 | `PEGARR_RADARR_ALLOW_INSECURE_HTTP` | No | Must be explicitly `true` to permit HTTP; defaults to `false` |
 
+## Multiple Sonarr and Radarr instances
+
+Use `PEGARR_SONARR_INSTANCES_FILE` or `PEGARR_RADARR_INSTANCES_FILE` instead of the corresponding single-instance variables. Each must point to an absolute, read-only JSON file containing 1 through 16 entries. The file contains connection metadata and absolute API-key file references, never API keys:
+
+```json
+[
+  {
+    "instanceId": "sonarr-main",
+    "baseUrl": "http://sonarr-main:8989",
+    "allowedHosts": ["sonarr-main"],
+    "allowInsecureHttp": true,
+    "apiKeyFile": "/run/secrets/sonarr/main_api_key"
+  }
+]
+```
+
+Instance IDs are unique, case-insensitive safe labels. Unknown fields, duplicate IDs, direct key values, oversized files, partial entries, and mixing an instances file with legacy settings stop startup. The first configured instance currently supplies the aggregate integration-status probe; inventory, item analysis, dashboard identity, controlled Grab, and audit isolation use every configured instance.
+
+The `compose.sonarr-instances.yaml` and `compose.radarr-instances.yaml` overlays mount one metadata file plus a dedicated read-only API-key directory. Copy the matching file from `deploy/examples`, edit only non-secret topology, create each referenced key file in the dedicated host directory, and keep both locations outside the repository. Do not point the directory mount at a general NAS secrets directory.
+
 ## Bazarr settings
 
 | Variable | Required when enabled | Meaning |

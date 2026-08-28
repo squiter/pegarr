@@ -53,12 +53,14 @@ Before upgrading Pegarr, stop the running instance and back up the private data 
 
 All endpoints use `Authorization: Bearer <administrator token>`. The regular library token cannot authorize them.
 
-- `POST /api/v1/library/items/{sonarr/episode|radarr/movie}/{itemId}/grab/prepare` accepts only `{ "releaseId": "..." }` and returns a short-lived challenge after revalidation.
-- `POST /api/v1/library/items/{sonarr/episode|radarr/movie}/{itemId}/grab/execute` accepts only the returned `challengeId`, the exact `confirmation`, and a client-generated `idempotencyKey`.
+- `POST /api/v1/library/items/{application}/{instanceId}/{kind}/{itemId}/grab/prepare` accepts only `{ "releaseId": "..." }` and returns a short-lived, instance-bound challenge after revalidation.
+- `POST /api/v1/library/items/{application}/{instanceId}/{kind}/{itemId}/grab/execute` accepts only the returned `challengeId`, the exact `confirmation`, and a client-generated `idempotencyKey`.
 - `GET /api/v1/grabs/history?limit=50` returns at most 100 public audit events and never returns idempotency keys or Arr handles.
 - `POST /api/v1/grabs/{eventId}/reconcile` accepts only an outcome (`grabbed` or `not_grabbed`) and its exact event-specific confirmation phrase.
 
 Request bodies are JSON-only and limited to 16 KiB. Challenges live only in process memory, expire after two minutes, and are bounded to 100 entries. Restarting Pegarr invalidates outstanding challenges but preserves audit history.
+
+The earlier single-instance item routes remain compatible. An instance-scoped request is required when an item ID would otherwise be ambiguous, and challenge binding, duplicate protection, and audit history are isolated by instance.
 
 ## Timeouts and reconciliation
 

@@ -53,6 +53,8 @@ export interface ControlledGrabRuntimeConfiguration {
 export interface RuntimeConfiguration {
   readonly sonarr?: SonarrRuntimeConfiguration;
   readonly radarr?: RadarrRuntimeConfiguration;
+  readonly sonarrInstances?: readonly SonarrRuntimeConfiguration[];
+  readonly radarrInstances?: readonly RadarrRuntimeConfiguration[];
   readonly bazarr?: BazarrRuntimeConfiguration;
   readonly subdl?: SubdlRuntimeConfiguration;
   readonly accessToken?: SecretValue;
@@ -62,6 +64,8 @@ export interface RuntimeConfiguration {
 }
 
 const maximumSecretBytes = 4_096;
+const maximumInstancesFileBytes = 65_536;
+const maximumArrInstances = 16;
 
 interface IntegrationConfigurationSpec {
   readonly displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL";
@@ -73,18 +77,22 @@ interface IntegrationConfigurationSpec {
 export async function loadRuntimeConfiguration(
   environment: Readonly<Record<string, string | undefined>>,
 ): Promise<RuntimeConfiguration> {
-  const sonarr = await loadIntegrationConfiguration(environment, {
+  const sonarrSpec = {
     displayName: "Sonarr",
     prefix: "PEGARR_SONARR",
     defaultInstanceId: "sonarr",
     secretFormat: "arr",
-  });
-  const radarr = await loadIntegrationConfiguration(environment, {
+  } as const;
+  const radarrSpec = {
     displayName: "Radarr",
     prefix: "PEGARR_RADARR",
     defaultInstanceId: "radarr",
     secretFormat: "arr",
-  });
+  } as const;
+  const sonarrInstances = await loadArrInstancesConfiguration(environment, sonarrSpec);
+  const radarrInstances = await loadArrInstancesConfiguration(environment, radarrSpec);
+  const sonarr = sonarrInstances === undefined ? await loadIntegrationConfiguration(environment, sonarrSpec) : undefined;
+  const radarr = radarrInstances === undefined ? await loadIntegrationConfiguration(environment, radarrSpec) : undefined;
   const bazarr = await loadIntegrationConfiguration(environment, {
     displayName: "Bazarr",
     prefix: "PEGARR_BAZARR",
@@ -122,6 +130,8 @@ export async function loadRuntimeConfiguration(
   return {
     ...(sonarr === undefined ? {} : { sonarr }),
     ...(radarr === undefined ? {} : { radarr }),
+    ...(sonarrInstances === undefined ? {} : { sonarrInstances }),
+    ...(radarrInstances === undefined ? {} : { radarrInstances }),
     ...(bazarr === undefined ? {} : { bazarr }),
     ...(subdl === undefined ? {} : { subdl }),
     ...(accessToken === undefined ? {} : { accessToken }),
@@ -129,6 +139,86 @@ export async function loadRuntimeConfiguration(
     ...(missingPageSize === undefined ? {} : { missingPageSize }),
     ...(subdlLanguageMappings === undefined ? {} : { subdlLanguageMappings }),
   };
+}
+
+export function configuredSonarrInstances(configuration: RuntimeConfiguration): readonly SonarrRuntimeConfiguration[] {
+  return configuration.sonarrInstances ?? (configuration.sonarr === undefined ? [] : [configuration.sonarr]);
+}
+
+export function configuredRadarrInstances(configuration: RuntimeConfiguration): readonly RadarrRuntimeConfiguration[] {
+  return configuration.radarrInstances ?? (configuration.radarr === undefined ? [] : [configuration.radarr]);
+}
+
+async function loadArrInstancesConfiguration(
+  environment: Readonly<Record<string, string | undefined>>,
+  spec: IntegrationConfigurationSpec,
+): Promise<readonly ServiceRuntimeConfiguration[] | undefined> {
+  const fileName = `${spec.prefix}_INSTANCES_FILE`;
+  const path = optional(environment[fileName]);
+  if (path === undefined) return undefined;
+  const legacyNames = [
+    `${spec.prefix}_URL`, `${spec.prefix}_ALLOWED_HOSTS`, `${spec.prefix}_API_KEY_FILE`,
+    `${spec.prefix}_INSTANCE_ID`, `${spec.prefix}_ALLOW_INSECURE_HTTP`, `${spec.prefix}_API_KEY`,
+  ];
+  if (legacyNames.some((name) => present(environment[name]))) {
+    throw new ConfigurationError(`${fileName} cannot be combined with single-instance ${spec.displayName} settings`);
+  }
+  if (!isAbsolute(path)) throw new ConfigurationError(`${fileName} must be an absolute path`);
+  let parsed: unknown;
+  let handle;
+  try {
+    handle = await open(path, "r");
+    const buffer = Buffer.alloc(maximumInstancesFileBytes + 1);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.byteLength, 0);
+    if (bytesRead > maximumInstancesFileBytes) throw new ConfigurationError(`${fileName} exceeds the 65536-byte limit`);
+    parsed = JSON.parse(buffer.subarray(0, bytesRead).toString("utf8"));
+  } catch (error) {
+    if (error instanceof ConfigurationError) throw error;
+    throw new ConfigurationError(`${fileName} could not be read as valid JSON`);
+  } finally {
+    await handle?.close();
+  }
+  if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > maximumArrInstances) {
+    throw new ConfigurationError(`${fileName} must contain between 1 and ${maximumArrInstances} instances`);
+  }
+  const configurations: ServiceRuntimeConfiguration[] = [];
+  const instanceIds = new Set<string>();
+  for (const [index, value] of parsed.entries()) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new ConfigurationError(`${fileName} entry ${index + 1} is invalid`);
+    }
+    const record = value as Record<string, unknown>;
+    const allowedKeys = new Set(["instanceId", "baseUrl", "allowedHosts", "allowInsecureHttp", "apiKeyFile"]);
+    if (Object.keys(record).some((key) => !allowedKeys.has(key))) {
+      throw new ConfigurationError(`${fileName} entry ${index + 1} contains unsupported fields`);
+    }
+    const instanceId = typeof record.instanceId === "string" ? record.instanceId.trim() : "";
+    const baseUrl = typeof record.baseUrl === "string" ? record.baseUrl.trim() : "";
+    const apiKeyFile = typeof record.apiKeyFile === "string" ? record.apiKeyFile.trim() : "";
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(instanceId) || instanceIds.has(instanceId.toLowerCase())) {
+      throw new ConfigurationError(`${fileName} instance IDs must be unique safe labels`);
+    }
+    if (!baseUrl || baseUrl.length > 2_048 || !apiKeyFile) {
+      throw new ConfigurationError(`${fileName} entry ${index + 1} is incomplete`);
+    }
+    if (!Array.isArray(record.allowedHosts) || record.allowedHosts.some((host) => typeof host !== "string")) {
+      throw new ConfigurationError(`${fileName} entry ${index + 1} has invalid allowedHosts`);
+    }
+    if (record.allowInsecureHttp !== undefined && typeof record.allowInsecureHttp !== "boolean") {
+      throw new ConfigurationError(`${fileName} entry ${index + 1} has invalid allowInsecureHttp`);
+    }
+    const allowedHosts = parseAllowedHosts((record.allowedHosts as string[]).join(","), `${fileName} allowedHosts`);
+    const apiKey = await readSecret(apiKeyFile, spec.displayName, `${fileName} apiKeyFile`, "arr");
+    instanceIds.add(instanceId.toLowerCase());
+    configurations.push({
+      instanceId,
+      baseUrl,
+      allowedHosts,
+      allowInsecureHttp: record.allowInsecureHttp === true,
+      apiKey,
+    });
+  }
+  return configurations;
 }
 
 async function loadControlledGrabConfiguration(

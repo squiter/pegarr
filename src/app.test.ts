@@ -227,6 +227,59 @@ test("PEG-ACCESS-004 item feasibility is hidden, authenticated before work, and 
   assert.equal((await resolveRoute("GET", "/api/v1/library/items/sonarr/movie/305/feasibility", tmpdir(), services, access)).statusCode, 404);
 });
 
+test("PEG-INSTANCE-001 scoped item and Grab routes preserve exact instance identity", async () => {
+  const token = "synthetic-access-token-value-0000000001";
+  const adminToken = "synthetic-admin-token-value-00000000002";
+  const selections: unknown[] = [];
+  const baseServices = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  const services: RuntimeServices = {
+    ...baseServices,
+    readItemFeasibility: async (selection) => {
+      selections.push(selection);
+      return { kind: "item-feasibility", mode: "read_only", status: "not_found", selection };
+    },
+    controlledGrab: {
+      prepare: async (selection, releaseId) => {
+        selections.push(selection);
+        return {
+          status: "confirmation_required",
+          mode: "controlled_grab",
+          challengeId: "challenge_instance_001",
+          application: "sonarr",
+          instanceId: "sonarr-anime",
+          kind: "episode",
+          itemId: 305,
+          targetLabel: "Synthetic Anime S03E05",
+          releaseId,
+          releaseTitle: "Synthetic.Anime.S03E05.1080p.WEB-DL-GROUP",
+          confirmation: "GRAB Synthetic.Anime.S03E05.1080p.WEB-DL-GROUP FOR Synthetic Anime S03E05",
+          expiresAt: "2030-01-01T00:00:00.000Z",
+        };
+      },
+      execute: async () => { throw new Error("not expected"); },
+      history: () => [],
+      reconcile: () => { throw new Error("not expected"); },
+    },
+  };
+  const libraryAccess = { control: new AccessControl(new SecretValue(token)), authorization: `Bearer ${token}` };
+  const adminAccess = {
+    control: new AccessControl(new SecretValue(token)),
+    adminControl: new AccessControl(new SecretValue(adminToken)),
+    authorization: `Bearer ${adminToken}`,
+  };
+  const pathBase = "/api/v1/library/items/sonarr/sonarr-anime/episode/305";
+
+  assert.equal((await resolveRoute("GET", `${pathBase}/feasibility`, tmpdir(), services, libraryAccess)).statusCode, 404);
+  assert.equal((await resolveRoute("POST", `${pathBase}/grab/prepare`, tmpdir(), services, adminAccess, {
+    releaseId: "sonarr-0123456789abcdef01234567",
+  })).statusCode, 200);
+  assert.deepEqual(selections, [
+    { application: "sonarr", instanceId: "sonarr-anime", kind: "episode", itemId: 305 },
+    { application: "sonarr", instanceId: "sonarr-anime", kind: "episode", itemId: 305 },
+  ]);
+  assert.equal((await resolveRoute("GET", "/api/v1/library/items/sonarr/bad%2Fid/episode/305/feasibility", tmpdir(), services, libraryAccess)).statusCode, 404);
+});
+
 test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe", async () => {
   const page = await resolveRoute("GET", "/", tmpdir());
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
@@ -363,6 +416,7 @@ test("PEG-GRABAPI-001 controlled Grab routes require the independent administrat
           mode: "controlled_grab",
           challengeId: "challenge_00000001",
           application: "sonarr",
+          instanceId: "sonarr",
           kind: "episode",
           itemId: 305,
           targetLabel: "Synthetic Show S03E05",
@@ -405,6 +459,7 @@ test("PEG-GRABAPI-002 execution and audit history expose bounded public outcomes
   const event = {
     eventId: "event_00000001",
     application: "sonarr",
+    instanceId: "sonarr",
     kind: "episode",
     itemId: 305,
     targetLabel: "Synthetic Show S03E05",
@@ -480,6 +535,7 @@ test("PEG-GRABAPI-003 timeout reconciliation is administrator-only, exact, and b
           event: {
             eventId,
             application: "sonarr",
+            instanceId: "sonarr",
             kind: "episode",
             itemId: 305,
             targetLabel: "Synthetic Show S03E05",

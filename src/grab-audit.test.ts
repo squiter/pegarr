@@ -129,3 +129,27 @@ test("PEG-GRAB-007 reconciliation migrates durably and releases duplicates only 
   assert.equal(reopened.byEventId("event_00000005")?.reconciliationOutcome, "grabbed");
   reopened.close();
 });
+
+test("PEG-INSTANCE-003 duplicate protection is isolated by Arr instance", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-grab-instance-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  const store = new GrabAuditStore(join(directory, "audit.sqlite"));
+  const main = { application: "sonarr", instanceId: "sonarr-main", kind: "episode", itemId: 305 } as const;
+  const anime = { application: "sonarr", instanceId: "sonarr-anime", kind: "episode", itemId: 305 } as const;
+  const releaseId = "sonarr-0123456789abcdef01234567";
+  store.begin({
+    eventId: "event_instance_0001",
+    idempotencyKey: "idempotency_instance_0001",
+    selection: main,
+    targetLabel: "Synthetic Show S03E05",
+    releaseId,
+    releaseTitle: "Synthetic.Show.S03E05.1080p.WEB-DL-GROUP",
+    requestedAtMs: 1_000,
+  });
+  const completed = store.complete("idempotency_instance_0001", "grabbed", "arr_accepted_grab", 1_010);
+
+  assert.equal(completed.instanceId, "sonarr-main");
+  assert.equal(store.recentBlocking(main, releaseId, 0)?.eventId, "event_instance_0001");
+  assert.equal(store.recentBlocking(anime, releaseId, 0), undefined);
+  store.close();
+});

@@ -330,14 +330,17 @@ function authorizeAdministratorRoute(access: RouteAccess | undefined): RouteResu
 }
 
 function parseItemFeasibilityPath(pathname: string): ItemFeasibilitySelection | undefined {
-  const match = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/(episode|movie)\/(\d+)\/feasibility$/u.exec(pathname);
+  const scoped = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/([a-z0-9][a-z0-9_-]{0,63})\/(episode|movie)\/(\d+)\/feasibility$/iu.exec(pathname);
+  const legacy = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/(episode|movie)\/(\d+)\/feasibility$/u.exec(pathname);
+  const match = scoped ?? legacy;
   if (match === null) return undefined;
   const application = match[1];
-  const kind = match[2];
-  const itemId = Number(match[3]);
+  const instanceId = scoped === null ? undefined : match[2];
+  const kind = scoped === null ? match[2] : match[3];
+  const itemId = Number(scoped === null ? match[3] : match[4]);
   if (!Number.isSafeInteger(itemId) || itemId < 1) return undefined;
-  if (application === "sonarr" && kind === "episode") return { application, kind, itemId };
-  if (application === "radarr" && kind === "movie") return { application, kind, itemId };
+  if (application === "sonarr" && kind === "episode") return { application, ...(instanceId === undefined ? {} : { instanceId }), kind, itemId };
+  if (application === "radarr" && kind === "movie") return { application, ...(instanceId === undefined ? {} : { instanceId }), kind, itemId };
   return undefined;
 }
 
@@ -347,15 +350,18 @@ interface GrabPath {
 }
 
 function parseGrabPath(pathname: string): GrabPath | undefined {
-  const match = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/(episode|movie)\/(\d+)\/grab\/(prepare|execute)$/u.exec(pathname);
+  const scoped = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/([a-z0-9][a-z0-9_-]{0,63})\/(episode|movie)\/(\d+)\/grab\/(prepare|execute)$/iu.exec(pathname);
+  const legacy = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/(episode|movie)\/(\d+)\/grab\/(prepare|execute)$/u.exec(pathname);
+  const match = scoped ?? legacy;
   if (match === null) return undefined;
   const application = match[1];
-  const kind = match[2];
-  const itemId = Number(match[3]);
-  const action = match[4];
+  const instanceId = scoped === null ? undefined : match[2];
+  const kind = scoped === null ? match[2] : match[3];
+  const itemId = Number(scoped === null ? match[3] : match[4]);
+  const action = scoped === null ? match[4] : match[5];
   if (!Number.isSafeInteger(itemId) || itemId < 1 || (action !== "prepare" && action !== "execute")) return undefined;
-  if (application === "sonarr" && kind === "episode") return { selection: { application, kind, itemId }, action };
-  if (application === "radarr" && kind === "movie") return { selection: { application, kind, itemId }, action };
+  if (application === "sonarr" && kind === "episode") return { selection: { application, ...(instanceId === undefined ? {} : { instanceId }), kind, itemId }, action };
+  if (application === "radarr" && kind === "movie") return { selection: { application, ...(instanceId === undefined ? {} : { instanceId }), kind, itemId }, action };
   return undefined;
 }
 

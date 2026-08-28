@@ -16,6 +16,7 @@ export interface GrabAuditEntry {
   readonly eventId: string;
   readonly idempotencyKey: string;
   readonly application: "sonarr" | "radarr";
+  readonly instanceId: string;
   readonly kind: "episode" | "movie";
   readonly itemId: number;
   readonly targetLabel: string;
@@ -67,12 +68,20 @@ export class GrabAuditStore {
         ON grab_audit(requested_at_ms DESC, event_id DESC);
     `);
     const columns = this.#database.prepare("PRAGMA table_info(grab_audit)").all() as unknown as Array<{ readonly name: string }>;
+    if (!columns.some(({ name }) => name === "instance_id")) {
+      this.#database.exec("ALTER TABLE grab_audit ADD COLUMN instance_id TEXT");
+      this.#database.exec("UPDATE grab_audit SET instance_id = application WHERE instance_id IS NULL");
+    }
     if (!columns.some(({ name }) => name === "reconciliation_outcome")) {
       this.#database.exec("ALTER TABLE grab_audit ADD COLUMN reconciliation_outcome TEXT CHECK (reconciliation_outcome IN ('grabbed', 'not_grabbed'))");
     }
     if (!columns.some(({ name }) => name === "reconciled_at_ms")) {
       this.#database.exec("ALTER TABLE grab_audit ADD COLUMN reconciled_at_ms INTEGER CHECK (reconciled_at_ms >= 0)");
     }
+    this.#database.exec(`
+      CREATE INDEX IF NOT EXISTS grab_audit_instance_target_recent
+        ON grab_audit(application, instance_id, kind, item_id, release_id, requested_at_ms DESC)
+    `);
     const recoveredAtMs = now();
     safeEpoch(recoveredAtMs, "recoveredAtMs");
     this.#database.prepare(`
@@ -88,13 +97,14 @@ export class GrabAuditStore {
     validateBegin(entry);
     this.#database.prepare(`
       INSERT INTO grab_audit(
-        event_id, idempotency_key, application, kind, item_id,
+        event_id, idempotency_key, application, instance_id, kind, item_id,
         target_label, release_id, release_title, status, requested_at_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?)
     `).run(
       entry.eventId,
       entry.idempotencyKey,
       entry.selection.application,
+      entry.selection.instanceId ?? entry.selection.application,
       entry.selection.kind,
       entry.selection.itemId,
       entry.targetLabel,
@@ -164,7 +174,7 @@ export class GrabAuditStore {
     safeEpoch(sinceMs, "sinceMs");
     const row = this.#database.prepare(`
       SELECT * FROM grab_audit
-      WHERE application = ? AND kind = ? AND item_id = ? AND release_id = ?
+      WHERE application = ? AND instance_id = ? AND kind = ? AND item_id = ? AND release_id = ?
         AND (
           (status = 'timeout_unknown' AND reconciliation_outcome IS NULL)
           OR (status IN ('in_progress', 'grabbed') AND requested_at_ms >= ?)
@@ -172,7 +182,7 @@ export class GrabAuditStore {
         )
       ORDER BY requested_at_ms DESC, event_id DESC
       LIMIT 1
-    `).get(selection.application, selection.kind, selection.itemId, releaseId, sinceMs, sinceMs) as AuditRow | undefined;
+    `).get(selection.application, selection.instanceId ?? selection.application, selection.kind, selection.itemId, releaseId, sinceMs, sinceMs) as AuditRow | undefined;
     return row === undefined ? undefined : mapRow(row);
   }
 
@@ -201,6 +211,7 @@ interface AuditRow {
   readonly event_id: string;
   readonly idempotency_key: string;
   readonly application: "sonarr" | "radarr";
+  readonly instance_id: string | null;
   readonly kind: "episode" | "movie";
   readonly item_id: number;
   readonly target_label: string;
@@ -219,6 +230,7 @@ function mapRow(row: AuditRow): GrabAuditEntry {
     eventId: row.event_id,
     idempotencyKey: row.idempotency_key,
     application: row.application,
+    instanceId: row.instance_id ?? row.application,
     kind: row.kind,
     itemId: row.item_id,
     targetLabel: row.target_label,
@@ -250,6 +262,7 @@ function validateBegin(entry: BeginGrabAudit): void {
 function validateSelection(selection: ItemFeasibilitySelection): void {
   if (!Number.isSafeInteger(selection.itemId) || selection.itemId < 1) throw new TypeError("itemId must be positive");
   if ((selection.application === "sonarr") !== (selection.kind === "episode")) throw new TypeError("selection is inconsistent");
+  if (selection.instanceId !== undefined && !/^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(selection.instanceId)) throw new TypeError("instanceId is invalid");
 }
 
 function validateToken(value: string, field: string, maximum: number): void {

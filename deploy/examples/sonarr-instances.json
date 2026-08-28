@@ -1,0 +1,16 @@
+[
+  {
+    "instanceId": "sonarr-main",
+    "baseUrl": "http://sonarr-main:8989",
+    "allowedHosts": ["sonarr-main"],
+    "allowInsecureHttp": true,
+    "apiKeyFile": "/run/secrets/sonarr/main_api_key"
+  },
+  {
+    "instanceId": "sonarr-anime",
+    "baseUrl": "http://sonarr-anime:8989",
+    "allowedHosts": ["sonarr-anime"],
+    "allowInsecureHttp": true,
+    "apiKeyFile": "/run/secrets/sonarr/anime_api_key"
+  }
+]

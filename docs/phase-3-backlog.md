@@ -1,6 +1,14 @@
-# Phase 3 backlog
+# Phase 3 supporting backlog
 
-This backlog captures reliability and provider-expansion work after the completed Phase 2 controlled Grab milestone. Entries are product intentions, not shipped behavior. Each implementation slice must receive stable harness scenarios before its status changes.
+This backlog supports the active Phase 3 reliability and provider-expansion work. Entries are product intentions, not shipped behavior. Each implementation slice must receive stable harness scenarios before its status changes; authoritative progress lives in `harness/phase-3.json` and `docs/phase-3.md`.
+
+## Portainer example for a combined media stack
+
+**Status:** proposed for later documentation work
+
+Create a secret-safe Portainer stack example showing Pegarr deployed beside Sonarr, Radarr, Bazarr, and the supported subtitle-provider configuration. The example should reuse the existing Compose overlays, private data volume, secret-file mounts, internal service names, read-only container hardening, and explicit controlled-Grab opt-in.
+
+This is documentation and deployment composition only. Pegarr must remain independently deployable, must not take ownership of the Arr/Bazarr containers, and must not require Portainer at runtime. The guide should cover both first deployment and a reversible update without embedding API keys, NAS paths, hostnames, or architecture assumptions.
 
 ## Quota-aware provider scheduling and cache retention
 

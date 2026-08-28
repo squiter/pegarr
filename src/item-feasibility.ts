@@ -13,8 +13,8 @@ import type {
 import type { ProviderLanguageMapping } from "./provider-policy-search.js";
 
 export type ItemFeasibilitySelection =
-  | { readonly application: "sonarr"; readonly kind: "episode"; readonly itemId: number }
-  | { readonly application: "radarr"; readonly kind: "movie"; readonly itemId: number };
+  | { readonly application: "sonarr"; readonly instanceId?: string; readonly kind: "episode"; readonly itemId: number }
+  | { readonly application: "radarr"; readonly instanceId?: string; readonly kind: "movie"; readonly itemId: number };
 
 type IntegrationName = "sonarr" | "radarr" | "bazarr" | "subdl";
 
@@ -90,6 +90,8 @@ export interface ItemFeasibilityServiceOptions {
   readonly readInventory: () => Promise<MissingInventoryResult>;
   readonly episode?: EpisodeFeasibilityBuilder;
   readonly movie?: MovieFeasibilityBuilder;
+  readonly episodeForInstance?: (instanceId: string) => EpisodeFeasibilityBuilder | undefined;
+  readonly movieForInstance?: (instanceId: string) => MovieFeasibilityBuilder | undefined;
   readonly subdlLanguages: readonly ProviderLanguageMapping[];
   readonly missingIntegrations: Readonly<{
     episode: readonly ("sonarr" | "bazarr" | "subdl")[];
@@ -128,7 +130,7 @@ export class ItemFeasibilityService {
     options: ItemFeasibilityReadOptions = {},
   ): Promise<ItemFeasibilityResult> {
     const validated = validateSelection(selection);
-    const key = `${validated.application}:${validated.kind}:${validated.itemId}`;
+    const key = `${validated.application}:${validated.instanceId ?? "legacy"}:${validated.kind}:${validated.itemId}`;
     const requestedAt = this.#now();
     let cached = this.#cache.get(key);
     if (
@@ -225,43 +227,66 @@ export class ItemFeasibilityService {
 
   async #build(selection: ItemFeasibilitySelection): Promise<ItemFeasibilityBuildResult> {
     const inventory = await this.#options.readInventory();
-    const source = inventory.status === "disabled"
-      ? undefined
-      : inventory.sources.find(({ integration }) => integration === selection.application);
-    if (source === undefined || source.status === "disabled") {
+    const sources = inventory.status === "disabled"
+      ? []
+      : inventory.sources.filter(({ integration }) => integration === selection.application);
+    if (sources.length === 0 || sources.every(({ status }) => status === "disabled")) {
       return disabled(selection, this.#missing(selection));
     }
-    if (source.status === "integration_failure") {
+    const readyItems = sources.flatMap((source) => source.status === "ready" ? source.page.items : []);
+    const matchingItems = readyItems.filter((candidate) =>
+      candidate.application === selection.application &&
+      candidate.kind === selection.kind &&
+      candidate.itemId === selection.itemId &&
+      (selection.instanceId === undefined || candidate.instanceId === selection.instanceId)
+    );
+    if (matchingItems.length > 1 && selection.instanceId === undefined) {
+      return { kind: "item-feasibility", mode: "read_only", status: "not_found", selection };
+    }
+    const item = matchingItems[0];
+    if (item === undefined) {
+      const failure = sources.find((source) =>
+        source.status === "integration_failure"
+        && (selection.instanceId === undefined || source.instanceId === selection.instanceId)
+      );
+      if (failure?.status !== "integration_failure") {
+        return { kind: "item-feasibility", mode: "read_only", status: "not_found", selection };
+      }
       return {
         kind: "item-feasibility",
         mode: "read_only",
         status: "inventory_unavailable",
         selection,
-        state: source.state,
-        ...(source.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: source.retryAfterSeconds }),
+        state: failure.state,
+        ...(failure.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: failure.retryAfterSeconds }),
       };
     }
-    const item = source.page.items.find((candidate) =>
-      candidate.application === selection.application &&
-      candidate.kind === selection.kind &&
-      candidate.itemId === selection.itemId
-    );
-    if (item === undefined) {
-      return { kind: "item-feasibility", mode: "read_only", status: "not_found", selection };
-    }
+    const canonicalSelection: ItemFeasibilitySelection = { ...selection, instanceId: item.instanceId };
     const missing = this.#missing(selection);
-    if (missing.length > 0) return disabled(selection, missing);
+    if (missing.length > 0) return disabled(canonicalSelection, missing);
 
     if (selection.kind === "episode") {
-      const builder = this.#options.episode;
-      if (builder === undefined) return disabled(selection, ["sonarr", "bazarr", "subdl"]);
+      const builder = this.#options.episodeForInstance?.(item.instanceId) ?? this.#options.episode;
+      if (builder === undefined) return disabled(canonicalSelection, ["sonarr", "bazarr", "subdl"]);
       const outcome = await builder.build(episodeRequest(item, this.#options.subdlLanguages));
-      return { kind: "item-feasibility", selection, ...outcome };
+      const canonicalEpisodeSelection: Extract<ItemFeasibilitySelection, { readonly kind: "episode" }> = {
+        application: "sonarr",
+        instanceId: item.instanceId,
+        kind: "episode",
+        itemId: selection.itemId,
+      };
+      return { kind: "item-feasibility", selection: canonicalEpisodeSelection, ...outcome };
     }
-    const builder = this.#options.movie;
-    if (builder === undefined) return disabled(selection, ["radarr", "bazarr", "subdl"]);
+    const builder = this.#options.movieForInstance?.(item.instanceId) ?? this.#options.movie;
+    if (builder === undefined) return disabled(canonicalSelection, ["radarr", "bazarr", "subdl"]);
     const outcome = await builder.build(movieRequest(item, this.#options.subdlLanguages));
-    return { kind: "item-feasibility", selection, ...outcome };
+    const canonicalMovieSelection: Extract<ItemFeasibilitySelection, { readonly kind: "movie" }> = {
+      application: "radarr",
+      instanceId: item.instanceId,
+      kind: "movie",
+      itemId: selection.itemId,
+    };
+    return { kind: "item-feasibility", selection: canonicalMovieSelection, ...outcome };
   }
 
   #missing(selection: ItemFeasibilitySelection) {
@@ -352,6 +377,9 @@ function validateSelection(selection: ItemFeasibilitySelection): ItemFeasibility
     (selection.application !== "radarr" || selection.kind !== "movie")
   ) {
     throw new TypeError("Unsupported item feasibility selection");
+  }
+  if (selection.instanceId !== undefined && !/^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(selection.instanceId)) {
+    throw new TypeError("instanceId must be a safe label");
   }
   return selection;
 }

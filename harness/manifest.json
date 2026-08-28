@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "phase": "phase-2-controlled-grab-complete",
+  "phase": "phase-3-reliability-in-progress",
   "completion": {
-    "status": "complete",
-    "criteria": "harness/phase-2.json",
+    "status": "in_progress",
+    "criteria": "harness/phase-3.json",
     "affected": "npm run check:affected",
     "full": "npm run check"
   },
@@ -1177,6 +1177,60 @@
       "title": "Packaged restart recovery migrates and reconciles an interrupted Grab before one later mutation",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Legacy synthetic SQLite fixture and disposable internal-only containers; no live service or NAS mutation"
+    },
+    {
+      "id": "PEG-INSTANCE-001",
+      "title": "Instance-scoped item analysis and Grab routes preserve exact Arr identity",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process authenticated route contracts; no network or mutation"
+    },
+    {
+      "id": "PEG-INSTANCE-002",
+      "title": "Colliding Arr item IDs require explicit instance selection",
+      "evidence": "src/item-feasibility.test.ts",
+      "boundary": "Synthetic multi-source inventory and injected report builder"
+    },
+    {
+      "id": "PEG-INSTANCE-003",
+      "title": "Grab duplicate protection is isolated by Arr instance",
+      "evidence": "src/grab-audit.test.ts",
+      "boundary": "Temporary SQLite audit with synthetic events; no network or mutation"
+    },
+    {
+      "id": "PEG-DASH-040",
+      "title": "Dashboard inventory identity remains unique across Arr instances",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure mapping over synthetic inventory"
+    },
+    {
+      "id": "PEG-HARNESS-007",
+      "title": "Phase 3 in-progress evidence preserves completed Phase 1 and Phase 2 baselines",
+      "evidence": "scripts/harness/phase-contract.mjs",
+      "boundary": "Repository-owned phase ledgers, scenario manifest, and documentation only"
+    },
+    {
+      "id": "PEG-CONFIG-009",
+      "title": "Multiple Arr instances load from bounded secret-reference files",
+      "evidence": "src/config.test.ts",
+      "boundary": "Temporary metadata and secret files; no process environment mutation or network"
+    },
+    {
+      "id": "PEG-INVENTORY-005",
+      "title": "Missing inventory fans out across bounded Arr instances",
+      "evidence": "src/inventory-missing.test.ts",
+      "boundary": "Injected transport and sanitized synthetic Arr responses; no network"
+    },
+    {
+      "id": "PEG-RUNTIME-009",
+      "title": "Scoped analysis selects the exact Arr client",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected multi-instance transports and synthetic responses; no network"
+    },
+    {
+      "id": "PEG-RUNTIME-010",
+      "title": "Controlled Grab mutates only the confirmed Arr instance",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected synthetic Arr mutation and temporary audit database; no live service"
     }
   ],
   "manualGaps": [

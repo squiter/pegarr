@@ -8,8 +8,8 @@ The protected read-only routes are:
 GET /api/v1/library/missing
 Authorization: Bearer <access token>
 
-GET /api/v1/library/items/sonarr/episode/<episode-id>/feasibility
-GET /api/v1/library/items/radarr/movie/<movie-id>/feasibility
+GET /api/v1/library/items/sonarr/<instance-id>/episode/<episode-id>/feasibility
+GET /api/v1/library/items/radarr/<instance-id>/movie/<movie-id>/feasibility
 Authorization: Bearer <access token>
 ```
 
@@ -51,6 +51,6 @@ The read-only token is deliberately unable to authorize a controlled Grab. Phase
 
 Authorized inventory reads request at most one configured page from each Arr instance. Concurrent requests share one in-flight operation, and completed results are reused for 30 seconds. `PEGARR_MISSING_PAGE_SIZE` defaults to 50 and accepts values from 1 through 100.
 
-Authorized item reads resolve the requested ID from that server-owned inventory before starting release, Bazarr, or provider work. Successful item reports share a 30-second bounded in-memory window. See [item feasibility API](item-feasibility-api.md).
+Authorized item reads resolve the requested instance and ID from that server-owned inventory before starting release, Bazarr, or provider work. Legacy unscoped URLs remain available only when the item identity is unambiguous. Successful item reports share a 30-second bounded in-memory window. See [item feasibility API](item-feasibility-api.md).
 
 `PEG-ACCESS-001` through `PEG-ACCESS-004`, `PEG-CONFIG-006`, `PEG-INVENTORY-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-011`, and `PEG-DOCKER-013` are the deterministic evidence for this boundary.

@@ -12,7 +12,12 @@ import {
   type SonarrSystemStatus,
 } from "./adapters/sonarr.js";
 import { createConfiguredSubdlSource } from "./configured-subdl-source.js";
-import type { ArrRuntimeConfiguration, RuntimeConfiguration } from "./config.js";
+import {
+  configuredRadarrInstances,
+  configuredSonarrInstances,
+  type ArrRuntimeConfiguration,
+  type RuntimeConfiguration,
+} from "./config.js";
 import { SonarrEpisodeFeasibilityService } from "./episode-feasibility.js";
 import {
   buildMissingInventory,
@@ -135,14 +140,18 @@ export function createRuntimeServices(
     ...inventoryConfiguration
   } = configuration;
   const now = options.now ?? Date.now;
+  const sonarrConfigurations = configuredSonarrInstances(configuration);
+  const radarrConfigurations = configuredRadarrInstances(configuration);
+  const primarySonarrConfiguration = sonarrConfigurations[0];
+  const primaryRadarrConfiguration = radarrConfigurations[0];
   const readSonarrStatus = createStatusReader<"sonarr", "Sonarr", SonarrSystemStatus>({
     integration: "sonarr",
-    configuration: configuration.sonarr,
+    configuration: primarySonarrConfiguration,
     createClient: (transport) =>
       new SonarrClient(
         {
-          instanceId: configuration.sonarr?.instanceId ?? "sonarr",
-          apiKey: configuration.sonarr?.apiKey.reveal() ?? "unreachable-disabled-key",
+          instanceId: primarySonarrConfiguration?.instanceId ?? "sonarr",
+          apiKey: primarySonarrConfiguration?.apiKey.reveal() ?? "unreachable-disabled-key",
         },
         transport,
       ),
@@ -156,12 +165,12 @@ export function createRuntimeServices(
   });
   const readRadarrStatus = createStatusReader<"radarr", "Radarr", RadarrSystemStatus>({
     integration: "radarr",
-    configuration: configuration.radarr,
+    configuration: primaryRadarrConfiguration,
     createClient: (transport) =>
       new RadarrClient(
         {
-          instanceId: configuration.radarr?.instanceId ?? "radarr",
-          apiKey: configuration.radarr?.apiKey.reveal() ?? "unreachable-disabled-key",
+          instanceId: primaryRadarrConfiguration?.instanceId ?? "radarr",
+          apiKey: primaryRadarrConfiguration?.apiKey.reveal() ?? "unreachable-disabled-key",
         },
         transport,
       ),
@@ -186,36 +195,38 @@ export function createRuntimeServices(
   const fetchOption = options.fetchImplementation === undefined
     ? {}
     : { fetchImplementation: options.fetchImplementation };
-  const sonarrClient = configuration.sonarr === undefined
-    ? undefined
-    : new SonarrClient(
+  const sonarrClients = new Map(sonarrConfigurations.map((arrConfiguration) => [
+    arrConfiguration.instanceId,
+    new SonarrClient(
         {
-          instanceId: configuration.sonarr.instanceId,
-          apiKey: configuration.sonarr.apiKey.reveal(),
+          instanceId: arrConfiguration.instanceId,
+          apiKey: arrConfiguration.apiKey.reveal(),
           timeoutMs: 60_000,
         },
         new FetchJsonTransport({
-          baseUrl: configuration.sonarr.baseUrl,
-          allowedHosts: configuration.sonarr.allowedHosts,
-          allowInsecureHttp: configuration.sonarr.allowInsecureHttp,
+          baseUrl: arrConfiguration.baseUrl,
+          allowedHosts: arrConfiguration.allowedHosts,
+          allowInsecureHttp: arrConfiguration.allowInsecureHttp,
           ...fetchOption,
         }),
-      );
-  const radarrClient = configuration.radarr === undefined
-    ? undefined
-    : new RadarrClient(
+      ),
+  ]));
+  const radarrClients = new Map(radarrConfigurations.map((arrConfiguration) => [
+    arrConfiguration.instanceId,
+    new RadarrClient(
         {
-          instanceId: configuration.radarr.instanceId,
-          apiKey: configuration.radarr.apiKey.reveal(),
+          instanceId: arrConfiguration.instanceId,
+          apiKey: arrConfiguration.apiKey.reveal(),
           timeoutMs: 60_000,
         },
         new FetchJsonTransport({
-          baseUrl: configuration.radarr.baseUrl,
-          allowedHosts: configuration.radarr.allowedHosts,
-          allowInsecureHttp: configuration.radarr.allowInsecureHttp,
+          baseUrl: arrConfiguration.baseUrl,
+          allowedHosts: arrConfiguration.allowedHosts,
+          allowInsecureHttp: arrConfiguration.allowInsecureHttp,
           ...fetchOption,
         }),
-      );
+      ),
+  ]));
   const bazarrClient = configuration.bazarr === undefined
     ? undefined
     : new BazarrClient(
@@ -244,37 +255,43 @@ export function createRuntimeServices(
       });
   const missingIntegrations = {
     episode: [
-      ...(sonarrClient === undefined ? ["sonarr" as const] : []),
+      ...(sonarrClients.size === 0 ? ["sonarr" as const] : []),
       ...(bazarrClient === undefined ? ["bazarr" as const] : []),
       ...(managedSubdl === undefined ? ["subdl" as const] : []),
     ],
     movie: [
-      ...(radarrClient === undefined ? ["radarr" as const] : []),
+      ...(radarrClients.size === 0 ? ["radarr" as const] : []),
       ...(bazarrClient === undefined ? ["bazarr" as const] : []),
       ...(managedSubdl === undefined ? ["subdl" as const] : []),
     ],
   };
   const itemFeasibility = new ItemFeasibilityService({
     readInventory: readMissingInventory,
-    ...(sonarrClient === undefined || bazarrClient === undefined || managedSubdl === undefined
+    ...(sonarrClients.size === 0 || bazarrClient === undefined || managedSubdl === undefined
       ? {}
       : {
-          episode: new SonarrEpisodeFeasibilityService({
-            sonarr: sonarrClient,
-            bazarr: bazarrClient,
-            subdl: managedSubdl.source,
-            now,
-          }),
+          episodeForInstance: (instanceId: string) => {
+            const sonarr = sonarrClients.get(instanceId);
+            return sonarr === undefined ? undefined : new SonarrEpisodeFeasibilityService({
+              sonarr,
+              bazarr: bazarrClient,
+              subdl: managedSubdl.source,
+              now,
+            });
+          },
         }),
-    ...(radarrClient === undefined || bazarrClient === undefined || managedSubdl === undefined
+    ...(radarrClients.size === 0 || bazarrClient === undefined || managedSubdl === undefined
       ? {}
       : {
-          movie: new RadarrMovieFeasibilityService({
-            radarr: radarrClient,
-            bazarr: bazarrClient,
-            subdl: managedSubdl.source,
-            now,
-          }),
+          movieForInstance: (instanceId: string) => {
+            const radarr = radarrClients.get(instanceId);
+            return radarr === undefined ? undefined : new RadarrMovieFeasibilityService({
+              radarr,
+              bazarr: bazarrClient,
+              subdl: managedSubdl.source,
+              now,
+            });
+          },
         }),
     subdlLanguages: configuration.subdlLanguageMappings ?? [],
     missingIntegrations,
@@ -293,7 +310,7 @@ export function createRuntimeServices(
     ? undefined
     : new ControlledGrabService({
         readInventory: readMissingInventory,
-        ...(sonarrClient === undefined
+        ...(sonarrClients.size === 0
           ? {}
           : {
               sonarr: {
@@ -301,12 +318,18 @@ export function createRuntimeServices(
                   if (selection.application !== "sonarr" || selection.kind !== "episode") {
                     throw new TypeError("Sonarr Grab selection is inconsistent");
                   }
-                  return sonarrClient.revalidateEpisodeRelease(selection.itemId, releaseId);
+                  const client = selection.instanceId === undefined ? undefined : sonarrClients.get(selection.instanceId);
+                  if (client === undefined) throw new TypeError("Sonarr Grab instance is inconsistent");
+                  return client.revalidateEpisodeRelease(selection.itemId, releaseId);
                 },
-                grab: (handle) => sonarrClient.grabRelease(handle),
+                grab: (handle, selection) => {
+                  const client = selection.instanceId === undefined ? undefined : sonarrClients.get(selection.instanceId);
+                  if (client === undefined) throw new TypeError("Sonarr Grab instance is inconsistent");
+                  return client.grabRelease(handle);
+                },
               },
             }),
-        ...(radarrClient === undefined
+        ...(radarrClients.size === 0
           ? {}
           : {
               radarr: {
@@ -314,9 +337,15 @@ export function createRuntimeServices(
                   if (selection.application !== "radarr" || selection.kind !== "movie") {
                     throw new TypeError("Radarr Grab selection is inconsistent");
                   }
-                  return radarrClient.revalidateMovieRelease(selection.itemId, releaseId);
+                  const client = selection.instanceId === undefined ? undefined : radarrClients.get(selection.instanceId);
+                  if (client === undefined) throw new TypeError("Radarr Grab instance is inconsistent");
+                  return client.revalidateMovieRelease(selection.itemId, releaseId);
                 },
-                grab: (handle) => radarrClient.grabRelease(handle),
+                grab: (handle, selection) => {
+                  const client = selection.instanceId === undefined ? undefined : radarrClients.get(selection.instanceId);
+                  if (client === undefined) throw new TypeError("Radarr Grab instance is inconsistent");
+                  return client.grabRelease(handle);
+                },
               },
             }),
         audit: new GrabAuditStore(configuration.controlledGrab.auditFile, now),

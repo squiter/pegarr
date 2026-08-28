@@ -298,3 +298,40 @@ test("PEG-CONFIG-008 controlled Grab is opt-in and requires independent secret-f
     /must be different/u,
   );
 });
+
+test("PEG-CONFIG-009 multiple Arr instances load from bounded secret-reference files", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-multi-arr-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const mainKey = join(directory, "sonarr-main-key");
+  const animeKey = join(directory, "sonarr-anime-key");
+  const instancesFile = join(directory, "sonarr-instances.json");
+  await Promise.all([
+    writeFile(mainKey, "synthetic-sonarr-main-key", { mode: 0o600 }),
+    writeFile(animeKey, "synthetic-sonarr-anime-key", { mode: 0o600 }),
+    writeFile(instancesFile, JSON.stringify([
+      { instanceId: "sonarr-main", baseUrl: "https://sonarr-main.example.invalid", allowedHosts: ["sonarr-main.example.invalid"], apiKeyFile: mainKey },
+      { instanceId: "sonarr-anime", baseUrl: "http://sonarr-anime.example.invalid:8989", allowedHosts: ["sonarr-anime.example.invalid"], allowInsecureHttp: true, apiKeyFile: animeKey },
+    ]), { mode: 0o600 }),
+  ]);
+
+  const configuration = await loadRuntimeConfiguration({ PEGARR_SONARR_INSTANCES_FILE: instancesFile });
+  assert.deepEqual(configuration.sonarrInstances?.map(({ instanceId, allowInsecureHttp }) => ({ instanceId, allowInsecureHttp })), [
+    { instanceId: "sonarr-main", allowInsecureHttp: false },
+    { instanceId: "sonarr-anime", allowInsecureHttp: true },
+  ]);
+  assert.equal(configuration.sonarrInstances?.[1]?.apiKey.reveal(), "synthetic-sonarr-anime-key");
+  assert.doesNotMatch(JSON.stringify(configuration), /synthetic-sonarr-(?:main|anime)-key/u);
+
+  await assert.rejects(loadRuntimeConfiguration({
+    PEGARR_SONARR_INSTANCES_FILE: instancesFile,
+    PEGARR_SONARR_URL: "https://legacy.example.invalid",
+  }), /cannot be combined/u);
+  await writeFile(instancesFile, JSON.stringify([
+    { instanceId: "duplicate", baseUrl: "https://one.example.invalid", allowedHosts: ["one.example.invalid"], apiKeyFile: mainKey },
+    { instanceId: "DUPLICATE", baseUrl: "https://two.example.invalid", allowedHosts: ["two.example.invalid"], apiKeyFile: animeKey },
+  ]), { mode: 0o600 });
+  await assert.rejects(loadRuntimeConfiguration({ PEGARR_SONARR_INSTANCES_FILE: instancesFile }), /unique safe labels/u);
+});

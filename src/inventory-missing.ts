@@ -5,6 +5,8 @@ import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
 import { RadarrAdapterError, RadarrClient } from "./adapters/radarr.js";
 import { SonarrAdapterError, SonarrClient } from "./adapters/sonarr.js";
 import {
+  configuredRadarrInstances,
+  configuredSonarrInstances,
   loadRuntimeConfiguration,
   type RuntimeConfiguration,
   type ServiceRuntimeConfiguration,
@@ -32,11 +34,13 @@ export type InventorySource =
     }
   | {
       readonly integration: "sonarr" | "radarr";
+      readonly instanceId?: string;
       readonly status: "ready";
       readonly page: MissingItemPage;
     }
   | {
       readonly integration: "sonarr" | "radarr";
+      readonly instanceId?: string;
       readonly status: "integration_failure";
       readonly state: InventoryFailureState;
       readonly retryAfterSeconds?: number;
@@ -52,7 +56,7 @@ export type MissingInventoryResult =
       readonly kind: "missing-item-inventory";
       readonly mode: "read_only";
       readonly status: "ready" | "partial" | "integration_failure";
-      readonly sources: readonly [InventorySource, InventorySource];
+      readonly sources: readonly InventorySource[];
       readonly metrics: {
         readonly requestCount: number;
         readonly itemCount: number;
@@ -90,16 +94,21 @@ export async function buildMissingInventory(
   options: MissingInventoryBuildOptions,
 ): Promise<MissingInventoryResult> {
   const pageSize = boundedPageSize(options.pageSize ?? 50);
-  if (options.configuration.sonarr === undefined && options.configuration.radarr === undefined) {
+  const sonarrConfigurations = configuredSonarrInstances(options.configuration);
+  const radarrConfigurations = configuredRadarrInstances(options.configuration);
+  if (sonarrConfigurations.length === 0 && radarrConfigurations.length === 0) {
     return { kind: "missing-item-inventory", mode: "read_only", status: "disabled" };
   }
   const now = options.now ?? Date.now;
   const startedAt = now();
-  const [sonarr, radarr] = await Promise.all([
-    readSonarr(options.configuration.sonarr, pageSize, options.fetchImplementation),
-    readRadarr(options.configuration.radarr, pageSize, options.fetchImplementation),
+  const sources = await Promise.all([
+    ...(sonarrConfigurations.length === 0
+      ? [Promise.resolve({ integration: "sonarr", status: "disabled" } as const)]
+      : sonarrConfigurations.map((configuration) => readSonarr(configuration, pageSize, options.fetchImplementation))),
+    ...(radarrConfigurations.length === 0
+      ? [Promise.resolve({ integration: "radarr", status: "disabled" } as const)]
+      : radarrConfigurations.map((configuration) => readRadarr(configuration, pageSize, options.fetchImplementation))),
   ]);
-  const sources = [sonarr, radarr] as const;
   const readyCount = sources.filter((source) => source.status === "ready").length;
   const failureCount = sources.filter((source) => source.status === "integration_failure").length;
   const status = readyCount === 0
@@ -136,9 +145,9 @@ async function readSonarr(
       apiKey: configuration.apiKey.reveal(),
       timeoutMs: 30_000,
     }, transport).listMissingEpisodes({ page: 1, pageSize });
-    return { integration: "sonarr", status: "ready", page };
+    return { integration: "sonarr", instanceId: configuration.instanceId, status: "ready", page };
   } catch (error) {
-    return failure("sonarr", error);
+    return failure("sonarr", configuration.instanceId, error);
   }
 }
 
@@ -155,9 +164,9 @@ async function readRadarr(
       apiKey: configuration.apiKey.reveal(),
       timeoutMs: 30_000,
     }, transport).listMissingMovies({ page: 1, pageSize });
-    return { integration: "radarr", status: "ready", page };
+    return { integration: "radarr", instanceId: configuration.instanceId, status: "ready", page };
   } catch (error) {
-    return failure("radarr", error);
+    return failure("radarr", configuration.instanceId, error);
   }
 }
 
@@ -173,12 +182,13 @@ function transportFor(
   });
 }
 
-function failure(integration: "sonarr" | "radarr", error: unknown): InventorySource {
+function failure(integration: "sonarr" | "radarr", instanceId: string, error: unknown): InventorySource {
   const adapterError = error instanceof SonarrAdapterError || error instanceof RadarrAdapterError
     ? error
     : undefined;
   return {
     integration,
+    instanceId,
     status: "integration_failure",
     state: adapterError?.code ?? "unavailable",
     ...(adapterError?.retryAfterSeconds === undefined

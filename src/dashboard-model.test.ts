@@ -15,6 +15,7 @@ const inventory = {
         items: [
           {
             application: "sonarr",
+            instanceId: "sonarr-main",
             kind: "episode",
             itemId: 305,
             title: "Episode Five",
@@ -33,6 +34,7 @@ const inventory = {
         items: [
           {
             application: "radarr",
+            instanceId: "radarr-main",
             kind: "movie",
             itemId: 84,
             title: "A Synthetic Movie",
@@ -41,6 +43,7 @@ const inventory = {
           },
           {
             application: "radarr",
+            instanceId: "radarr-main",
             kind: "movie",
             itemId: 85,
             title: "Later Movie",
@@ -57,33 +60,53 @@ test("PEG-DASH-001 inventory view-model mapping preserves only display-safe fiel
 
   assert.deepEqual(rows, [
     {
-      key: "sonarr:episode:305",
+      key: "sonarr:sonarr-main:episode:305",
       itemId: 305,
       application: "sonarr",
+      instanceId: "sonarr-main",
       kind: "episode",
       title: "Synthetic Show",
       context: "S03E05 · Episode Five",
       availableAt: "2024-03-05T20:00:00Z",
     },
     {
-      key: "radarr:movie:84",
+      key: "radarr:radarr-main:movie:84",
       itemId: 84,
       application: "radarr",
+      instanceId: "radarr-main",
       kind: "movie",
       title: "A Synthetic Movie",
       context: "2024",
       availableAt: "2024-05-12T00:00:00Z",
     },
     {
-      key: "radarr:movie:85",
+      key: "radarr:radarr-main:movie:85",
       itemId: 85,
       application: "radarr",
+      instanceId: "radarr-main",
       kind: "movie",
       title: "Later Movie",
       context: "2023",
     },
   ]);
   assert.doesNotMatch(JSON.stringify(rows), /ids|path|overview|token/iu);
+});
+
+test("PEG-DASH-040 inventory keys remain unique across Arr instances", () => {
+  const item = inventory.sources[0]!.page.items[0]!;
+  const rows = rowsFromInventory({
+    status: "ready",
+    sources: [{
+      status: "ready",
+      page: { items: [item, { ...item, instanceId: "sonarr-anime" }] },
+    }],
+  });
+
+  assert.deepEqual(rows.map(({ key }) => key), [
+    "sonarr:sonarr-main:episode:305",
+    "sonarr:sonarr-anime:episode:305",
+  ]);
+  assert.equal(new Set(rows.map(({ key }) => key)).size, 2);
 });
 
 test("PEG-DASH-004 release view preserves Arr rejections and honest subtitle evidence", () => {
@@ -482,24 +505,24 @@ test("PEG-DASH-024 leading candidate is deterministic and never overrides Arr re
 test("PEG-DASH-026 application filtering keeps Sonarr and Radarr identities separate", () => {
   const rows = rowsFromInventory(inventory);
 
-  assert.deepEqual(selectRows(rows, { application: "sonarr" }).map(({ key }) => key), ["sonarr:episode:305"]);
-  assert.deepEqual(selectRows(rows, { application: "radarr" }).map(({ key }) => key), ["radarr:movie:84", "radarr:movie:85"]);
+  assert.deepEqual(selectRows(rows, { application: "sonarr" }).map(({ key }) => key), ["sonarr:sonarr-main:episode:305"]);
+  assert.deepEqual(selectRows(rows, { application: "radarr" }).map(({ key }) => key), ["radarr:radarr-main:movie:84", "radarr:radarr-main:movie:85"]);
   assert.deepEqual(selectRows(rows, { application: "unsafe" }), selectRows(rows, {}));
 });
 
 test("PEG-DASH-027 profile filtering uses exact analyzed Bazarr policy names", () => {
   const rows = triageRows();
 
-  assert.deepEqual(selectRows(rows, { profile: "profile:Brazilian Portuguese" }).map(({ key }) => key), ["sonarr:episode:305"]);
-  assert.deepEqual(selectRows(rows, { profile: "profile:english fallback" }).map(({ key }) => key), ["radarr:movie:84"]);
+  assert.deepEqual(selectRows(rows, { profile: "profile:Brazilian Portuguese" }).map(({ key }) => key), ["sonarr:sonarr-main:episode:305"]);
+  assert.deepEqual(selectRows(rows, { profile: "profile:english fallback" }).map(({ key }) => key), ["radarr:radarr-main:movie:84"]);
   assert.deepEqual(selectRows(rows, { profile: "Brazilian Portuguese" }), selectRows(rows, {}));
 });
 
 test("PEG-DASH-028 policy-language filtering is derived from analyzed summaries", () => {
   const rows = triageRows();
 
-  assert.deepEqual(selectRows(rows, { language: "language:pt-BR" }).map(({ key }) => key), ["sonarr:episode:305"]);
-  assert.deepEqual(selectRows(rows, { language: "language:en" }).map(({ key }) => key), ["radarr:movie:84", "sonarr:episode:305"]);
+  assert.deepEqual(selectRows(rows, { language: "language:pt-BR" }).map(({ key }) => key), ["sonarr:sonarr-main:episode:305"]);
+  assert.deepEqual(selectRows(rows, { language: "language:en" }).map(({ key }) => key), ["radarr:radarr-main:movie:84", "sonarr:sonarr-main:episode:305"]);
   assert.deepEqual(selectRows(rows, { language: "language:missing" }), []);
 });
 
@@ -507,9 +530,9 @@ test("PEG-DASH-029 analysis-age filtering has a deterministic one-hour boundary"
   const rows = triageRows();
   const nowEpochMs = Date.parse("2026-08-28T12:00:00.000Z");
 
-  assert.deepEqual(selectRows(rows, { analysisAge: "recent", nowEpochMs }).map(({ key }) => key), ["sonarr:episode:305"]);
-  assert.deepEqual(selectRows(rows, { analysisAge: "older", nowEpochMs }).map(({ key }) => key), ["radarr:movie:84"]);
-  assert.deepEqual(selectRows(rows, { analysisAge: "unknown", nowEpochMs }).map(({ key }) => key), ["radarr:movie:85"]);
+  assert.deepEqual(selectRows(rows, { analysisAge: "recent", nowEpochMs }).map(({ key }) => key), ["sonarr:sonarr-main:episode:305"]);
+  assert.deepEqual(selectRows(rows, { analysisAge: "older", nowEpochMs }).map(({ key }) => key), ["radarr:radarr-main:movie:84"]);
+  assert.deepEqual(selectRows(rows, { analysisAge: "unknown", nowEpochMs }).map(({ key }) => key), ["radarr:radarr-main:movie:85"]);
   assert.deepEqual(selectRows(rows, { analysisAge: "unsafe", nowEpochMs }), selectRows(rows, { nowEpochMs }));
 });
 
@@ -528,7 +551,7 @@ test("PEG-DASH-030 active inventory filter count ignores sorting and unsafe valu
 
 function triageRows() {
   return rowsWithAnalysis(rowsFromInventory(inventory), new Map([
-    ["sonarr:episode:305", {
+    ["sonarr:sonarr-main:episode:305", {
       state: "ready" as const,
       bestConfidence: "confirmed" as const,
       releaseCount: 4,
@@ -543,7 +566,7 @@ function triageRows() {
       providerFailures: [],
       generatedAt: "2026-08-28T11:30:00.000Z",
     }],
-    ["radarr:movie:84", {
+    ["radarr:radarr-main:movie:84", {
       state: "stale" as const,
       bestConfidence: "likely" as const,
       releaseCount: 2,
@@ -620,7 +643,7 @@ test("PEG-DASH-008 item summaries use the best Arr-accepted confidence and retai
 test("PEG-DASH-009 analyzed-item filtering and ordering are deterministic page-memory operations", () => {
   const rows = rowsFromInventory(inventory);
   const analyses = new Map([
-    ["sonarr:episode:305", {
+    ["sonarr:sonarr-main:episode:305", {
       state: "ready" as const,
       bestConfidence: "likely" as const,
       releaseCount: 3,
@@ -635,7 +658,7 @@ test("PEG-DASH-009 analyzed-item filtering and ordering are deterministic page-m
       providerFailures: [],
       generatedAt: "2026-08-27T12:00:00.000Z",
     }],
-    ["radarr:movie:84", {
+    ["radarr:radarr-main:movie:84", {
       state: "stale" as const,
       bestConfidence: "confirmed" as const,
       releaseCount: 2,
@@ -653,18 +676,18 @@ test("PEG-DASH-009 analyzed-item filtering and ordering are deterministic page-m
   ]);
   const analyzedRows = rowsWithAnalysis(rows, analyses);
 
-  assert.deepEqual(selectRows(analyzedRows, { analysis: "not_analyzed" }).map(({ key }) => key), ["radarr:movie:85"]);
-  assert.deepEqual(selectRows(analyzedRows, { analysis: "needs_attention" }).map(({ key }) => key), ["radarr:movie:84"]);
-  assert.deepEqual(selectRows(analyzedRows, { analysis: "stale" }).map(({ key }) => key), ["radarr:movie:84"]);
-  assert.deepEqual(selectRows(analyzedRows, { confidence: "likely" }).map(({ key }) => key), ["sonarr:episode:305"]);
-  assert.deepEqual(selectRows(analyzedRows, { requiredCoverage: "strong" }).map(({ key }) => key), ["sonarr:episode:305"]);
-  assert.deepEqual(selectRows(analyzedRows, { providerEvidence: "unavailable" }).map(({ key }) => key), ["radarr:movie:84"]);
-  assert.deepEqual(selectRows(analyzedRows, { query: "pt-br" }).map(({ key }) => key), ["sonarr:episode:305"]);
-  assert.deepEqual(selectRows(analyzedRows, { query: "timeout" }).map(({ key }) => key), ["radarr:movie:84"]);
-  assert.deepEqual(selectRows(analyzedRows, { sort: "confidence-desc" }).map(({ key }) => key), ["radarr:movie:84", "sonarr:episode:305", "radarr:movie:85"]);
-  assert.deepEqual(selectRows(analyzedRows, { sort: "analyzed-desc" }).map(({ key }) => key), ["sonarr:episode:305", "radarr:movie:84", "radarr:movie:85"]);
-  const unresolvedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:movie:85", itemAnalysisSummary({ state: "policy_unresolved" })]]));
-  const noAcceptedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:movie:85", {
+  assert.deepEqual(selectRows(analyzedRows, { analysis: "not_analyzed" }).map(({ key }) => key), ["radarr:radarr-main:movie:85"]);
+  assert.deepEqual(selectRows(analyzedRows, { analysis: "needs_attention" }).map(({ key }) => key), ["radarr:radarr-main:movie:84"]);
+  assert.deepEqual(selectRows(analyzedRows, { analysis: "stale" }).map(({ key }) => key), ["radarr:radarr-main:movie:84"]);
+  assert.deepEqual(selectRows(analyzedRows, { confidence: "likely" }).map(({ key }) => key), ["sonarr:sonarr-main:episode:305"]);
+  assert.deepEqual(selectRows(analyzedRows, { requiredCoverage: "strong" }).map(({ key }) => key), ["sonarr:sonarr-main:episode:305"]);
+  assert.deepEqual(selectRows(analyzedRows, { providerEvidence: "unavailable" }).map(({ key }) => key), ["radarr:radarr-main:movie:84"]);
+  assert.deepEqual(selectRows(analyzedRows, { query: "pt-br" }).map(({ key }) => key), ["sonarr:sonarr-main:episode:305"]);
+  assert.deepEqual(selectRows(analyzedRows, { query: "timeout" }).map(({ key }) => key), ["radarr:radarr-main:movie:84"]);
+  assert.deepEqual(selectRows(analyzedRows, { sort: "confidence-desc" }).map(({ key }) => key), ["radarr:radarr-main:movie:84", "sonarr:sonarr-main:episode:305", "radarr:radarr-main:movie:85"]);
+  assert.deepEqual(selectRows(analyzedRows, { sort: "analyzed-desc" }).map(({ key }) => key), ["sonarr:sonarr-main:episode:305", "radarr:radarr-main:movie:84", "radarr:radarr-main:movie:85"]);
+  const unresolvedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:radarr-main:movie:85", itemAnalysisSummary({ state: "policy_unresolved" })]]));
+  const noAcceptedRow = rowsWithAnalysis([rows[2]!], new Map([["radarr:radarr-main:movie:85", {
     state: "ready",
     bestConfidence: "none",
     releaseCount: 2,
@@ -738,11 +761,11 @@ test("PEG-DASH-002 search, filtering, and sorting are pure local operations", ()
   );
   assert.deepEqual(
     selectRows(rows, { query: "s03e05" }).map(({ key }) => key),
-    ["sonarr:episode:305"],
+    ["sonarr:sonarr-main:episode:305"],
   );
   assert.deepEqual(
     selectRows(rows, { sort: "available-desc" }).map(({ key }) => key),
-    ["radarr:movie:84", "sonarr:episode:305", "radarr:movie:85"],
+    ["radarr:radarr-main:movie:84", "sonarr:sonarr-main:episode:305", "radarr:radarr-main:movie:85"],
   );
   assert.deepEqual(rowsFromInventory({ sources: [{ status: "ready", page: { items: [{}] } }] }), []);
 });

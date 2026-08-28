@@ -381,6 +381,7 @@ function dashboardRow(value) {
   if (!isRecord(value) || (value.kind !== "episode" && value.kind !== "movie")) return undefined;
   if ((value.application !== "sonarr" && value.application !== "radarr") || typeof value.title !== "string") return undefined;
   if (!Number.isSafeInteger(value.itemId) || value.itemId < 1 || value.title.trim().length === 0) return undefined;
+  if (typeof value.instanceId !== "string" || !/^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(value.instanceId)) return undefined;
   const title = value.kind === "episode" && typeof value.parentTitle === "string" && value.parentTitle.trim()
     ? value.parentTitle.trim()
     : value.title.trim();
@@ -388,9 +389,10 @@ function dashboardRow(value) {
     ? [episodeLabel(value.season, value.episode), value.title.trim()].filter(Boolean).join(" · ")
     : Number.isSafeInteger(value.year) ? String(value.year) : "Movie";
   return {
-    key: `${value.application}:${value.kind}:${value.itemId}`,
+    key: `${value.application}:${value.instanceId}:${value.kind}:${value.itemId}`,
     itemId: value.itemId,
     application: value.application,
+    instanceId: value.instanceId,
     kind: value.kind,
     title,
     context,

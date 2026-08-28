@@ -201,6 +201,15 @@
 | PEG-HARNESS-006 | Phase 2 completion preserves Phase 1 and maps completed evidence | `scripts/harness/phase-contract.mjs` |
 | PEG-DOCKER-024 | Packaged controlled Grab performs one confirmed synthetic Arr mutation | `scripts/harness/docker-build.mjs` |
 | PEG-DOCKER-025 | Packaged restart recovery migrates and reconciles an interrupted Grab | `scripts/harness/docker-build.mjs` |
+| PEG-INSTANCE-001 | Instance-scoped analysis and Grab routes preserve exact Arr identity | `src/app.test.ts` |
+| PEG-INSTANCE-002 | Colliding item IDs require explicit Arr instance selection | `src/item-feasibility.test.ts` |
+| PEG-INSTANCE-003 | Grab duplicate protection is isolated by Arr instance | `src/grab-audit.test.ts` |
+| PEG-DASH-040 | Dashboard inventory keys remain unique across Arr instances | `src/dashboard-model.test.ts` |
+| PEG-HARNESS-007 | Phase 3 progress preserves completed Phase 1 and Phase 2 evidence | `scripts/harness/phase-contract.mjs` |
+| PEG-CONFIG-009 | Multiple Arr instances load from bounded secret-reference files | `src/config.test.ts` |
+| PEG-INVENTORY-005 | Missing inventory fans out across bounded Arr instances | `src/inventory-missing.test.ts` |
+| PEG-RUNTIME-009 | Scoped analysis selects the exact Arr client | `src/runtime.test.ts` |
+| PEG-RUNTIME-010 | Controlled Grab mutates only the confirmed Arr instance | `src/runtime.test.ts` |
 
 ## Explicit manual gaps
 

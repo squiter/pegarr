@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "phase": "phase-3-reliability-and-providers",
+  "status": "in_progress",
+  "startedOn": "2026-08-28",
+  "completionRule": "Every Phase 3 criterion must be complete with deterministic evidence while live service and NAS compatibility remain explicit manual gaps.",
+  "criteria": [
+    {
+      "id": "P3-MULTI-ARR",
+      "title": "Multiple Sonarr and Radarr instances",
+      "status": "in_progress",
+      "scenarioIds": ["PEG-CONFIG-009", "PEG-INVENTORY-005", "PEG-INSTANCE-001", "PEG-INSTANCE-002", "PEG-INSTANCE-003", "PEG-DASH-040", "PEG-RUNTIME-009", "PEG-RUNTIME-010"]
+    },
+    {
+      "id": "P3-OPENSUBTITLES",
+      "title": "OpenSubtitles provider adapter",
+      "status": "pending",
+      "scenarioIds": []
+    },
+    {
+      "id": "P3-PROVIDER-QUOTA",
+      "title": "Provider-specific rate limits, quota display, ordering, and asymmetric caching",
+      "status": "pending",
+      "scenarioIds": []
+    },
+    {
+      "id": "P3-SEASON-PACKS",
+      "title": "Season-pack matching",
+      "status": "pending",
+      "scenarioIds": []
+    },
+    {
+      "id": "P3-SUBTITLE-PREFERENCES",
+      "title": "Forced and hearing-impaired preference semantics",
+      "status": "complete",
+      "scenarioIds": ["PEG-MATCH-006", "PEG-MATCH-007"]
+    },
+    {
+      "id": "P3-RELEASE-PARSING",
+      "title": "Expanded release parsing and matching fixtures",
+      "status": "pending",
+      "scenarioIds": []
+    }
+  ],
+  "manualGapIds": ["PEG-MANUAL-001", "PEG-MANUAL-002", "PEG-MANUAL-003", "PEG-MANUAL-004", "PEG-MANUAL-005"]
+}

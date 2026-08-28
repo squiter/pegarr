@@ -1,0 +1,16 @@
+[
+  {
+    "instanceId": "radarr-main",
+    "baseUrl": "http://radarr-main:7878",
+    "allowedHosts": ["radarr-main"],
+    "allowInsecureHttp": true,
+    "apiKeyFile": "/run/secrets/radarr/main_api_key"
+  },
+  {
+    "instanceId": "radarr-4k",
+    "baseUrl": "http://radarr-4k:7878",
+    "allowedHosts": ["radarr-4k"],
+    "allowInsecureHttp": true,
+    "apiKeyFile": "/run/secrets/radarr/4k_api_key"
+  }
+]

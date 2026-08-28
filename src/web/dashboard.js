@@ -430,7 +430,7 @@ async function loadFeasibility(row, refresh = false) {
   setFeasibilityNotice("Searching releases, resolving Bazarr policy, and checking subtitle evidence…", "loading");
   setBusy(true);
   try {
-    const endpoint = `/api/v1/library/items/${row.application}/${row.kind}/${row.itemId}/feasibility${refresh ? "?refresh=1" : ""}`;
+    const endpoint = `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/feasibility${refresh ? "?refresh=1" : ""}`;
     const response = await fetch(endpoint, {
       method: "GET",
       headers: { authorization: `Bearer ${accessToken}` },
@@ -729,7 +729,7 @@ async function prepareControlledGrab() {
   try {
     const { row, release } = grabContext;
     const result = await grabRequest(
-      `/api/v1/library/items/${row.application}/${row.kind}/${row.itemId}/grab/prepare`,
+      `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/grab/prepare`,
       { releaseId: release.id },
     );
     if (result.response.status === 401) {
@@ -767,7 +767,7 @@ async function executeControlledGrab() {
   try {
     const { row, challengeId, confirmation } = grabContext;
     const result = await grabRequest(
-      `/api/v1/library/items/${row.application}/${row.kind}/${row.itemId}/grab/execute`,
+      `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/grab/execute`,
       { challengeId, confirmation, idempotencyKey: crypto.randomUUID() },
     );
     if (result.response.status === 401) {

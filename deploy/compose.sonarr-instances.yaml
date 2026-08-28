@@ -1,0 +1,7 @@
+services:
+  pegarr:
+    environment:
+      PEGARR_SONARR_INSTANCES_FILE: /run/pegarr/sonarr-instances.json
+    volumes:
+      - ${PEGARR_SONARR_INSTANCES_HOST_FILE:?set an absolute PEGARR_SONARR_INSTANCES_HOST_FILE}:/run/pegarr/sonarr-instances.json:ro
+      - ${PEGARR_SONARR_API_KEYS_HOST_DIR:?set a dedicated PEGARR_SONARR_API_KEYS_HOST_DIR}:/run/secrets/sonarr:ro

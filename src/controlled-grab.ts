@@ -13,7 +13,7 @@ import type { ItemFeasibilitySelection } from "./item-feasibility.js";
 
 export interface ControlledGrabSource {
   revalidate(selection: ItemFeasibilitySelection, releaseId: string): Promise<RevalidatedArrRelease | undefined>;
-  grab(handle: ArrReleaseHandle): Promise<ArrGrabReceipt>;
+  grab(handle: ArrReleaseHandle, selection: ItemFeasibilitySelection): Promise<ArrGrabReceipt>;
 }
 
 export interface ControlledGrabServiceOptions {
@@ -33,6 +33,7 @@ export interface GrabChallenge {
   readonly mode: "controlled_grab";
   readonly challengeId: string;
   readonly application: "sonarr" | "radarr";
+  readonly instanceId: string;
   readonly kind: "episode" | "movie";
   readonly itemId: number;
   readonly targetLabel: string;
@@ -123,9 +124,10 @@ export class ControlledGrabService {
     if (source === undefined) return failure("item_unavailable", "integration_disabled");
     const item = await this.#item(validated);
     if (item === undefined) return failure("item_unavailable", "item_not_missing");
+    const canonicalSelection = { ...validated, instanceId: item.instanceId };
     let release: RevalidatedArrRelease | undefined;
     try {
-      release = await source.revalidate(validated, normalizedReleaseId);
+      release = await source.revalidate(canonicalSelection, normalizedReleaseId);
     } catch (error) {
       return failure("integration_failure", safeUpstreamCode(error));
     }
@@ -147,6 +149,7 @@ export class ControlledGrabService {
       mode: "controlled_grab",
       challengeId,
       application: validated.application,
+      instanceId: item.instanceId,
       kind: validated.kind,
       itemId: validated.itemId,
       targetLabel,
@@ -230,6 +233,7 @@ export class ControlledGrabService {
     const previous = this.#options.audit.byIdempotencyKey(idempotencyKey);
     if (previous !== undefined) {
       const sameRequest = previous.application === selection.application
+        && (selection.instanceId === undefined || previous.instanceId === selection.instanceId)
         && previous.kind === selection.kind
         && previous.itemId === selection.itemId
         && confirmation === confirmationText(previous.releaseTitle, previous.targetLabel);
@@ -243,6 +247,7 @@ export class ControlledGrabService {
     if (challenge === undefined) return executionFailure("challenge_expired", "challenge_missing_or_expired");
     if (
       challenge.application !== selection.application ||
+      (selection.instanceId !== undefined && challenge.instanceId !== selection.instanceId) ||
       challenge.kind !== selection.kind ||
       challenge.itemId !== selection.itemId
     ) {
@@ -250,10 +255,11 @@ export class ControlledGrabService {
     }
     if (confirmation !== challenge.confirmation) return executionFailure("confirmation_mismatch", "exact_confirmation_required");
 
-    const targetKey = `${selection.application}:${selection.kind}:${selection.itemId}:${challenge.releaseId}`;
+    const canonicalSelection = { ...selection, instanceId: challenge.instanceId };
+    const targetKey = `${canonicalSelection.application}:${canonicalSelection.instanceId}:${canonicalSelection.kind}:${canonicalSelection.itemId}:${challenge.releaseId}`;
     if (this.#targets.has(targetKey)) return executionFailure("duplicate_in_progress", "target_grab_in_progress");
     const blocking = this.#options.audit.recentBlocking(
-      selection,
+      canonicalSelection,
       challenge.releaseId,
       Math.max(0, requestedAt - this.#duplicateWindowMs),
     );
@@ -275,7 +281,7 @@ export class ControlledGrabService {
         this.#options.audit.begin({
           eventId: validateOpaqueId(this.#randomId(), "eventId"),
           idempotencyKey,
-          selection,
+          selection: canonicalSelection,
           targetLabel: challenge.targetLabel,
           releaseId: challenge.releaseId,
           releaseTitle: challenge.releaseTitle,
@@ -287,11 +293,11 @@ export class ControlledGrabService {
         throw new Error("Grab audit could not record the request");
       }
 
-      const source = this.#source(selection.application);
+      const source = this.#source(canonicalSelection.application);
       if (source === undefined) return this.#complete(idempotencyKey, "revalidation_failed", "integration_disabled");
       let revalidated: RevalidatedArrRelease | undefined;
       try {
-        revalidated = await source.revalidate(selection, challenge.releaseId);
+        revalidated = await source.revalidate(canonicalSelection, challenge.releaseId);
       } catch (error) {
         return this.#complete(idempotencyKey, "revalidation_failed", safeUpstreamCode(error));
       }
@@ -304,7 +310,7 @@ export class ControlledGrabService {
       }
 
       try {
-        await source.grab(revalidated.handle);
+        await source.grab(revalidated.handle, canonicalSelection);
         this.#challenges.delete(challengeId);
         return this.#complete(idempotencyKey, "grabbed", "arr_accepted_grab");
       } catch (error) {
@@ -335,11 +341,16 @@ export class ControlledGrabService {
   async #item(selection: ItemFeasibilitySelection): Promise<MissingMediaItem | undefined> {
     const inventory = await this.#options.readInventory();
     if (inventory.status === "disabled") return undefined;
-    const source = inventory.sources.find(({ integration }) => integration === selection.application);
-    if (source === undefined || source.status !== "ready") return undefined;
-    return source.page.items.find((item) =>
-      item.application === selection.application && item.kind === selection.kind && item.itemId === selection.itemId
-    );
+    const matches = inventory.sources
+      .filter(({ integration, status }) => integration === selection.application && status === "ready")
+      .flatMap((source) => source.status === "ready" ? source.page.items : [])
+      .filter((item) =>
+        item.application === selection.application
+        && item.kind === selection.kind
+        && item.itemId === selection.itemId
+        && (selection.instanceId === undefined || item.instanceId === selection.instanceId)
+      );
+    return matches.length === 1 ? matches[0] : undefined;
   }
 
   #pruneChallenges(now: number): void {
@@ -424,13 +435,19 @@ function itemLabel(item: MissingMediaItem): string {
 
 function validateSelection(selection: ItemFeasibilitySelection): ItemFeasibilitySelection {
   if (!Number.isSafeInteger(selection.itemId) || selection.itemId < 1) throw new TypeError("itemId must be positive");
+  if (selection.instanceId !== undefined && !/^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(selection.instanceId)) {
+    throw new TypeError("instanceId is invalid");
+  }
   if (selection.application === "sonarr" && selection.kind === "episode") return selection;
   if (selection.application === "radarr" && selection.kind === "movie") return selection;
   throw new TypeError("selection is inconsistent");
 }
 
 function sameSelection(left: ItemFeasibilitySelection, right: ItemFeasibilitySelection): boolean {
-  return left.application === right.application && left.kind === right.kind && left.itemId === right.itemId;
+  return left.application === right.application
+    && (left.instanceId === undefined || right.instanceId === undefined || left.instanceId === right.instanceId)
+    && left.kind === right.kind
+    && left.itemId === right.itemId;
 }
 
 function validateReleaseId(value: string, application: "sonarr" | "radarr"): string {

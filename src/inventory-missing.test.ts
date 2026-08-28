@@ -88,6 +88,7 @@ test("PEG-INVENTORY-002 one unavailable Arr produces usable partial inventory", 
     assert.equal(inventory.sources[0].status, "ready");
     assert.deepEqual(inventory.sources[1], {
       integration: "radarr",
+      instanceId: "radarr",
       status: "integration_failure",
       state: "unavailable",
     });
@@ -128,6 +129,42 @@ test("PEG-INVENTORY-003 disabled or invalid inventory configuration fails before
   assert.equal(invalidExitCode, 2);
   assert.equal(fetchCalls, 0);
   assert.equal(JSON.parse(invalidOutput.join("")).status, "invalid_configuration");
+});
+
+test("PEG-INVENTORY-005 packaged inventory fans out across bounded Arr instances", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-multi-inventory-"));
+  try {
+    const mainKey = join(directory, "main-key");
+    const animeKey = join(directory, "anime-key");
+    const instancesFile = join(directory, "sonarr-instances.json");
+    await Promise.all([
+      writeFile(mainKey, "synthetic-sonarr-main-key", { mode: 0o600 }),
+      writeFile(animeKey, "synthetic-sonarr-anime-key", { mode: 0o600 }),
+      writeFile(instancesFile, JSON.stringify([
+        { instanceId: "sonarr-main", baseUrl: "https://sonarr-main.example.invalid", allowedHosts: ["sonarr-main.example.invalid"], apiKeyFile: mainKey },
+        { instanceId: "sonarr-anime", baseUrl: "https://sonarr-anime.example.invalid", allowedHosts: ["sonarr-anime.example.invalid"], apiKeyFile: animeKey },
+      ]), { mode: 0o600 }),
+    ]);
+    const output: string[] = [];
+    const requests: string[] = [];
+    const exitCode = await runMissingInventory({
+      environment: { PEGARR_SONARR_INSTANCES_FILE: instancesFile, PEGARR_MISSING_PAGE_SIZE: "2" },
+      fetchImplementation: async (input) => {
+        requests.push(new URL(input).hostname);
+        return json(syntheticSonarrMissingItemsResponse);
+      },
+      write: (value) => output.push(value),
+    });
+    const inventory = JSON.parse(output.join(""));
+
+    assert.equal(exitCode, 0);
+    assert.equal(inventory.status, "ready");
+    assert.equal(inventory.metrics.requestCount, 2);
+    assert.deepEqual(inventory.sources.slice(0, 2).map((source: { page: { items: Array<{ instanceId: string }> } }) => source.page.items[0]?.instanceId), ["sonarr-main", "sonarr-anime"]);
+    assert.deepEqual(requests.toSorted(), ["sonarr-anime.example.invalid", "sonarr-main.example.invalid"]);
+  } finally {
+    await rm(directory, { recursive: true });
+  }
 });
 
 function json(body: unknown): Response {

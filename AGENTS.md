@@ -8,7 +8,7 @@ Read `ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md` before making architectural or pr
 
 ## Current phase
 
-The Phase 1 read-only MVP and Phase 2 controlled Grab are complete and ratcheted by `harness/phase-1.json` and `harness/phase-2.json`. Phase 3 reliability and provider expansion is next. Keep the default read-only, live routes authenticated, caches bounded, logs redacted, and behavior deterministic. Never execute an automated Grab against a live service.
+The Phase 1 read-only MVP and Phase 2 controlled Grab are complete and ratcheted by `harness/phase-1.json` and `harness/phase-2.json`. Phase 3 reliability and provider expansion is in progress under `harness/phase-3.json`. Keep the default read-only, live routes authenticated, caches bounded, logs redacted, and behavior deterministic. Never execute an automated Grab against a live service.
 
 ## Non-negotiable behavior
 

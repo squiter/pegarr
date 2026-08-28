@@ -378,3 +378,119 @@ test("PEG-ITEM-004 runtime selection composes inventory, Arr, Bazarr, and one sc
   assert.equal(requests.length, 9);
   assert.doesNotMatch(JSON.stringify(first), /synthetic-(?:sonarr|radarr|bazarr|subdl)-key|example\.invalid/iu);
 });
+
+test("PEG-RUNTIME-009 scoped analysis selects the exact Arr client", async () => {
+  const configuration = {
+    sonarrInstances: [
+      { instanceId: "sonarr-main", baseUrl: "https://sonarr-main.example.invalid", allowedHosts: ["sonarr-main.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-sonarr-main-key") },
+      { instanceId: "sonarr-anime", baseUrl: "https://sonarr-anime.example.invalid", allowedHosts: ["sonarr-anime.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-sonarr-anime-key") },
+    ],
+    bazarr: {
+      instanceId: "synthetic-bazarr",
+      baseUrl: "https://bazarr.example.invalid",
+      allowedHosts: ["bazarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-bazarr-key-value"),
+    },
+    subdl: {
+      instanceId: "synthetic-subdl",
+      baseUrl: "https://subdl.example.invalid",
+      allowedHosts: ["subdl.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-subdl-key-value"),
+    },
+    subdlLanguageMappings: [{ policyCode: "en", providerCode: "EN" }],
+  };
+  const releaseHosts: string[] = [];
+  const services = createRuntimeServices(configuration, {
+    fetchImplementation: async (input) => {
+      const url = new URL(input);
+      let body: unknown;
+      if (url.pathname === "/api/v3/wanted/missing") {
+        body = syntheticSonarrMissingItemsResponse;
+      } else if (url.pathname === "/api/v3/release") {
+        releaseHosts.push(url.hostname);
+        body = syntheticSonarrEpisodeReleaseResponse;
+      } else if (url.pathname === "/api/system/languages/profiles") {
+        body = syntheticBazarrLanguageProfilesResponse;
+      } else if (url.pathname === "/api/series") {
+        body = syntheticBazarrSeriesAssignmentResponse;
+      } else if (url.pathname === "/api/v2/subtitles/search") {
+        body = syntheticSubdlV2EpisodeSearchResponse;
+      } else {
+        return new Response("{}", { status: 404 });
+      }
+      return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+    },
+    now: () => 1_000,
+    missingInventoryPageSize: 2,
+  });
+
+  const result = await services.readItemFeasibility({
+    application: "sonarr",
+    instanceId: "sonarr-anime",
+    kind: "episode",
+    itemId: 305,
+  });
+  services.close();
+
+  assert.equal(result.status, "ready");
+  assert.equal(result.selection.instanceId, "sonarr-anime");
+  assert.deepEqual(releaseHosts, ["sonarr-anime.example.invalid"]);
+  assert.doesNotMatch(JSON.stringify(result), /example\.invalid|synthetic-sonarr-(?:main|anime)-key/iu);
+});
+
+test("PEG-RUNTIME-010 controlled Grab mutates only the confirmed Arr instance", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-multi-grab-runtime-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  const configuration = {
+    sonarrInstances: [
+      { instanceId: "sonarr-main", baseUrl: "https://sonarr-main.example.invalid", allowedHosts: ["sonarr-main.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-sonarr-main-key") },
+      { instanceId: "sonarr-anime", baseUrl: "https://sonarr-anime.example.invalid", allowedHosts: ["sonarr-anime.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-sonarr-anime-key") },
+    ],
+    bazarr: { instanceId: "bazarr", baseUrl: "https://bazarr.example.invalid", allowedHosts: ["bazarr.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-bazarr-key") },
+    subdl: { instanceId: "subdl", baseUrl: "https://subdl.example.invalid", allowedHosts: ["subdl.example.invalid"], allowInsecureHttp: false, apiKey: new SecretValue("synthetic-subdl-key") },
+    subdlLanguageMappings: [{ policyCode: "en", providerCode: "EN" }],
+    accessToken: new SecretValue("synthetic-access-token-value-0000000001"),
+    controlledGrab: {
+      enabled: true as const,
+      adminToken: new SecretValue("synthetic-admin-token-value-00000000001"),
+      auditFile: join(directory, "grab-audit.sqlite"),
+    },
+  };
+  const postHosts: string[] = [];
+  const services = createRuntimeServices(configuration, {
+    fetchImplementation: async (input, init) => {
+      const url = new URL(input);
+      if (init?.method === "POST") {
+        postHosts.push(url.hostname);
+        return new Response(null, { status: 200 });
+      }
+      let body: unknown;
+      if (url.pathname === "/api/v3/wanted/missing") body = syntheticSonarrMissingItemsResponse;
+      else if (url.pathname === "/api/v3/release") body = syntheticSonarrEpisodeReleaseResponse;
+      else if (url.pathname === "/api/system/languages/profiles") body = syntheticBazarrLanguageProfilesResponse;
+      else if (url.pathname === "/api/series") body = syntheticBazarrSeriesAssignmentResponse;
+      else if (url.pathname === "/api/v2/subtitles/search") body = syntheticSubdlV2EpisodeSearchResponse;
+      else return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+    },
+    now: () => 1_000,
+    missingInventoryPageSize: 2,
+  });
+  const selection = { application: "sonarr", instanceId: "sonarr-anime", kind: "episode", itemId: 305 } as const;
+  const analysis = await services.readItemFeasibility(selection);
+  assert.equal(analysis.status, "ready");
+  if (analysis.status !== "ready") return;
+  const releaseId = analysis.report.releases.find(({ video }) => video.downloadAllowed)?.releaseId;
+  assert.ok(releaseId);
+  const prepared = await services.controlledGrab?.prepare(selection, releaseId);
+  assert.equal(prepared?.status, "confirmation_required");
+  if (prepared?.status !== "confirmation_required") return;
+  const result = await services.controlledGrab?.execute(selection, prepared.challengeId, prepared.confirmation, "idempotency_runtime_0001");
+  services.close();
+
+  assert.equal(result?.status, "grabbed");
+  assert.equal(result?.status === "grabbed" ? result.event.instanceId : undefined, "sonarr-anime");
+  assert.deepEqual(postHosts, ["sonarr-anime.example.invalid"]);
+});

@@ -86,6 +86,7 @@ test("PEG-GRAB-001 preparation revalidates and requires the exact target and rel
   assert.equal(prepared.status, "confirmation_required");
   assert.equal(revalidations, 1);
   if (prepared.status !== "confirmation_required") return;
+  assert.equal(prepared.instanceId, "sonarr");
   assert.equal(
     prepared.confirmation,
     "GRAB Synthetic.Show.S03E05.1080p.WEB-DL-GROUP FOR Synthetic Show S03E05 · Synthetic Episode Five",
@@ -127,6 +128,15 @@ test("PEG-GRAB-002 execution revalidates again and performs exactly one confirme
   );
   assert.equal(wrongTarget.status, "confirmation_mismatch");
   assert.equal("detailCode" in wrongTarget && wrongTarget.detailCode, "challenge_target_mismatch");
+  assert.equal(grabs, 0);
+  const wrongInstance = await service.execute(
+    { ...selection, instanceId: "sonarr-anime" },
+    prepared.challengeId,
+    prepared.confirmation,
+    "idempotency_wrong_instance_01",
+  );
+  assert.equal(wrongInstance.status, "confirmation_mismatch");
+  assert.equal("detailCode" in wrongInstance && wrongInstance.detailCode, "challenge_target_mismatch");
   assert.equal(grabs, 0);
   const result = await service.execute(selection, prepared.challengeId, prepared.confirmation, "idempotency_00000001");
   assert.equal(result.status, "grabbed");

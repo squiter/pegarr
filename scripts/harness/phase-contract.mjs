@@ -6,10 +6,12 @@ import { failContract, readJson, repoRoot } from "./lib.mjs";
 const contract = "PEG-PHASE";
 const phaseOneScenario = "PEG-HARNESS-004";
 const phaseTwoScenario = "PEG-HARNESS-006";
+const phaseThreeScenario = "PEG-HARNESS-007";
 const issues = [];
 const manifest = readJson("harness/manifest.json");
 const phaseOne = readJson("harness/phase-1.json");
 const phaseTwo = readJson("harness/phase-2.json");
+const phaseThree = readJson("harness/phase-3.json");
 const automatedIds = new Set((manifest.automatedScenarios ?? []).map(({ id }) => id));
 const expectedPhaseOneCriteria = [
   "P1-ARR-INSTANCES", "P1-BAZARR-POLICY", "P1-SUBDL-ADAPTER", "P1-MISSING-DASHBOARD",
@@ -18,6 +20,10 @@ const expectedPhaseOneCriteria = [
 const expectedPhaseTwoCriteria = [
   "P2-ADMIN-BOUNDARY", "P2-REVALIDATION", "P2-CONFIRMATION", "P2-ARR-GRAB",
   "P2-AUDIT-IDEMPOTENCY", "P2-CONTROLLED-UX", "P2-TIMEOUT-RECONCILIATION",
+];
+const expectedPhaseThreeCriteria = [
+  "P3-MULTI-ARR", "P3-OPENSUBTITLES", "P3-PROVIDER-QUOTA", "P3-SEASON-PACKS",
+  "P3-SUBTITLE-PREFERENCES", "P3-RELEASE-PARSING",
 ];
 
 if (phaseOne.schemaVersion !== 1 || phaseOne.phase !== "phase-1-read-only-mvp" || phaseOne.status !== "complete") {
@@ -30,18 +36,38 @@ if (phaseTwo.schemaVersion !== 1 || phaseTwo.phase !== "phase-2-controlled-grab"
 }
 validateCriteria(phaseTwo, expectedPhaseTwoCriteria, new Set(["complete"]), "Phase 2");
 
-if (manifest.phase !== "phase-2-controlled-grab-complete" || manifest.completion?.status !== "complete") {
-  issues.push("harness/manifest.json must expose the completed Phase 2 state honestly");
+if (phaseThree.schemaVersion !== 1 || phaseThree.phase !== "phase-3-reliability-and-providers" || phaseThree.status !== "in_progress") {
+  issues.push("the Phase 3 ledger must expose reliability and provider expansion as in progress");
 }
-if (manifest.completion?.criteria !== "harness/phase-2.json") {
-  issues.push("harness/manifest.json must point to the Phase 2 criteria ledger");
+validateCriteria(phaseThree, expectedPhaseThreeCriteria, new Set(["complete", "in_progress", "pending"]), "Phase 3");
+if (!(phaseThree.criteria ?? []).some(({ status }) => status === "in_progress")) {
+  issues.push("Phase 3 must retain at least one honestly in-progress criterion until completion");
+}
+
+if (manifest.phase !== "phase-3-reliability-in-progress" || manifest.completion?.status !== "in_progress") {
+  issues.push("harness/manifest.json must expose the active Phase 3 state honestly");
+}
+if (manifest.completion?.criteria !== "harness/phase-3.json") {
+  issues.push("harness/manifest.json must point to the Phase 3 criteria ledger");
 }
 
 const expectedManualGaps = (manifest.manualGaps ?? []).map(({ id }) => id);
-for (const [name, phase] of [["Phase 1", phaseOne], ["Phase 2", phaseTwo]]) {
+for (const [name, phase] of [["Phase 1", phaseOne], ["Phase 2", phaseTwo], ["Phase 3", phaseThree]]) {
   if (JSON.stringify(phase.manualGapIds) !== JSON.stringify(expectedManualGaps)) {
     issues.push(`${name} manual gaps must exactly match the manifest and preserve their order`);
   }
+}
+
+const phaseThreeGuidePath = resolve(repoRoot, "docs/phase-3.md");
+if (!existsSync(phaseThreeGuidePath)) {
+  issues.push("docs/phase-3.md is missing");
+} else {
+  const guide = readFileSync(phaseThreeGuidePath, "utf8");
+  for (const id of expectedPhaseThreeCriteria) {
+    if (!guide.includes(id)) issues.push(`docs/phase-3.md is missing ${id}`);
+  }
+  if (!guide.includes("Phase 3 is in progress")) issues.push("the Phase 3 guide must preserve its active implementation outcome");
+  if (!guide.includes("default read-only")) issues.push("the Phase 3 guide must preserve the default read-only boundary");
 }
 
 const phaseOneGuidePath = resolve(repoRoot, "docs/phase-1-completion.md");
@@ -78,7 +104,7 @@ if (!existsSync(phaseTwoGuidePath)) {
 }
 
 const sensorSource = readFileSync(new URL(import.meta.url), "utf8");
-for (const scenario of [phaseOneScenario, phaseTwoScenario]) {
+for (const scenario of [phaseOneScenario, phaseTwoScenario, phaseThreeScenario]) {
   if (!sensorSource.includes(scenario)) issues.push(`${scenario} must remain attached to this phase sensor`);
 }
 
@@ -90,9 +116,12 @@ function validateCriteria(phase, expectedIds, allowedStatuses, label) {
   for (const criterion of criteria) {
     if (!allowedStatuses.has(criterion.status)) issues.push(`${criterion.id ?? "unknown criterion"} has an invalid status`);
     if (typeof criterion.title !== "string" || criterion.title.length === 0) issues.push(`${criterion.id ?? "unknown criterion"} needs a title`);
-    if (!Array.isArray(criterion.scenarioIds) || criterion.scenarioIds.length === 0) {
-      issues.push(`${criterion.id ?? "unknown criterion"} has no automated evidence`);
+    if (!Array.isArray(criterion.scenarioIds)) {
+      issues.push(`${criterion.id ?? "unknown criterion"} has invalid automated evidence`);
       continue;
+    }
+    if (criterion.status !== "pending" && criterion.scenarioIds.length === 0) {
+      issues.push(`${criterion.id ?? "unknown criterion"} has no automated evidence`);
     }
     for (const scenarioId of criterion.scenarioIds) {
       if (!automatedIds.has(scenarioId)) issues.push(`${criterion.id} references non-automated evidence ${scenarioId}`);
