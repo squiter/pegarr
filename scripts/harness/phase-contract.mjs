@@ -25,16 +25,13 @@ if (phaseOne.schemaVersion !== 1 || phaseOne.phase !== "phase-1-read-only-mvp" |
 }
 validateCriteria(phaseOne, expectedPhaseOneCriteria, new Set(["complete"]), "Phase 1");
 
-if (phaseTwo.schemaVersion !== 1 || phaseTwo.phase !== "phase-2-controlled-grab" || phaseTwo.status !== "in_progress") {
-  issues.push("the Phase 2 ledger must identify controlled Grab as in progress");
+if (phaseTwo.schemaVersion !== 1 || phaseTwo.phase !== "phase-2-controlled-grab" || phaseTwo.status !== "complete") {
+  issues.push("the Phase 2 ledger must preserve the completed controlled Grab record");
 }
-validateCriteria(phaseTwo, expectedPhaseTwoCriteria, new Set(["complete", "in_progress"]), "Phase 2");
-if (!(phaseTwo.criteria ?? []).some(({ status }) => status === "in_progress")) {
-  issues.push("Phase 2 may not claim completion while live timeout reconciliation is still open");
-}
+validateCriteria(phaseTwo, expectedPhaseTwoCriteria, new Set(["complete"]), "Phase 2");
 
-if (manifest.phase !== "phase-2-controlled-grab-in-progress" || manifest.completion?.status !== "in_progress") {
-  issues.push("harness/manifest.json must expose the active Phase 2 state honestly");
+if (manifest.phase !== "phase-2-controlled-grab-complete" || manifest.completion?.status !== "complete") {
+  issues.push("harness/manifest.json must expose the completed Phase 2 state honestly");
 }
 if (manifest.completion?.criteria !== "harness/phase-2.json") {
   issues.push("harness/manifest.json must point to the Phase 2 criteria ledger");
@@ -66,6 +63,18 @@ if (!existsSync(controlledGrabGuidePath)) {
   for (const phrase of ["disabled by default", "exact release-and-target confirmation", "timeout_unknown", "PEG-MANUAL-004"]) {
     if (!guide.includes(phrase)) issues.push(`docs/controlled-grab.md must retain ${phrase}`);
   }
+}
+
+const phaseTwoGuidePath = resolve(repoRoot, "docs/phase-2-completion.md");
+if (!existsSync(phaseTwoGuidePath)) {
+  issues.push("docs/phase-2-completion.md is missing");
+} else {
+  const guide = readFileSync(phaseTwoGuidePath, "utf8");
+  for (const id of expectedPhaseTwoCriteria) {
+    if (!guide.includes(id)) issues.push(`docs/phase-2-completion.md is missing ${id}`);
+  }
+  if (!guide.includes("Phase 2 implementation is complete")) issues.push("the Phase 2 guide must preserve its implementation outcome");
+  if (!guide.includes("PEG-MANUAL-004")) issues.push("the Phase 2 guide must preserve the live mutation gap");
 }
 
 const sensorSource = readFileSync(new URL(import.meta.url), "utf8");

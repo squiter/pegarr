@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
 import { GrabAuditStore } from "./grab-audit.js";
@@ -74,5 +75,57 @@ test("PEG-GRAB-006 interrupted mutations recover as unknown and require reconcil
     "radarr-0123456789abcdef01234567",
     0,
   )?.status, "timeout_unknown");
+  assert.equal(recovered.recentBlocking(
+    { application: "radarr", kind: "movie", itemId: 84 },
+    "radarr-0123456789abcdef01234567",
+    1_000_000,
+  )?.status, "timeout_unknown");
   recovered.close();
+});
+
+test("PEG-GRAB-007 reconciliation migrates durably and releases duplicates only when Arr did not Grab", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-grab-reconciliation-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  const path = join(directory, "audit.sqlite");
+  const selection = { application: "sonarr", kind: "episode", itemId: 305 } as const;
+  const releaseId = "sonarr-0123456789abcdef01234567";
+  const current = new GrabAuditStore(path);
+  current.close();
+  const legacy = new DatabaseSync(path);
+  legacy.exec("ALTER TABLE grab_audit DROP COLUMN reconciled_at_ms; ALTER TABLE grab_audit DROP COLUMN reconciliation_outcome");
+  legacy.close();
+  const store = new GrabAuditStore(path);
+
+  const recordUnknown = (suffix: "04" | "05", requestedAt: number) => {
+    store.begin({
+      eventId: `event_000000${suffix}`,
+      idempotencyKey: `idempotency_000000${suffix}`,
+      selection,
+      targetLabel: "Synthetic Show S03E05 · Synthetic Episode Five",
+      releaseId,
+      releaseTitle: "Synthetic.Show.S03E05.1080p.WEB-DL-GROUP",
+      requestedAtMs: requestedAt,
+    });
+    store.complete(`idempotency_000000${suffix}`, "timeout_unknown", "reconciliation_required", requestedAt + 10);
+  };
+
+  recordUnknown("04", 4_000);
+  const notGrabbed = store.reconcile("event_00000004", "not_grabbed", 4_100);
+  assert.equal(notGrabbed.status, "timeout_unknown");
+  assert.equal(notGrabbed.reconciliationOutcome, "not_grabbed");
+  assert.equal(notGrabbed.reconciledAt, "1970-01-01T00:00:04.100Z");
+  assert.throws(() => store.reconcile("event_00000004", "grabbed", 4_200));
+  assert.equal(store.recentBlocking(selection, releaseId, 0), undefined);
+  recordUnknown("05", 5_000);
+  const grabbed = store.reconcile("event_00000005", "grabbed", 5_100);
+  assert.equal(grabbed.reconciliationOutcome, "grabbed");
+  assert.equal(store.recentBlocking(selection, releaseId, 4_500)?.eventId, "event_00000005");
+  assert.equal(store.recentBlocking(selection, releaseId, 5_050)?.eventId, "event_00000005");
+  assert.equal(store.recentBlocking(selection, releaseId, 0)?.reconciliationOutcome, "grabbed");
+  store.close();
+
+  const reopened = new GrabAuditStore(path);
+  assert.equal(reopened.byEventId("event_00000004")?.reconciliationOutcome, "not_grabbed");
+  assert.equal(reopened.byEventId("event_00000005")?.reconciliationOutcome, "grabbed");
+  reopened.close();
 });

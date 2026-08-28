@@ -20,7 +20,7 @@ The guides are `AGENTS.md`, this document, the research record, the scenario led
 The computational sensors currently enforce:
 
 - scenario-to-test traceability and explicit manual gaps;
-- completed Phase 1 and active Phase 2 criterion-to-scenario traceability;
+- completed Phase 1 and Phase 2 criterion-to-scenario traceability;
 - default-read-only, controlled-mutation, authentication, audit, and confidence-state architecture ratchets;
 - core matching isolation from Node, adapters, and fixtures;
 - local Markdown links and required contributor documentation;

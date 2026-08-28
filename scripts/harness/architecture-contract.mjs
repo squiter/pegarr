@@ -390,6 +390,7 @@ if (/^phase-2-/u.test(manifest.phase)) {
     "authorizeAdministratorRoute(access)",
     "parsePrepareGrabBody",
     "parseExecuteGrabBody",
+    "parseReconcileGrabBody",
     'pathname === "/api/v1/grabs/history"',
     "readBoundedJsonBody(request)",
   ]) {
@@ -403,13 +404,14 @@ if (/^phase-2-/u.test(manifest.phase)) {
     "await source.grab(revalidated.handle)",
     '"timeout_unknown"',
     '"reconciliation_required"',
+    "reconciliationText(event, validatedOutcome)",
   ]) {
     if (!controlledGrab.includes(contract)) issues.push(`The controlled Grab service must retain ${contract}`);
   }
   for (const forbidden of ["api_key", "authorization", "guid", "indexer_id"]) {
     if (grabAudit.toLocaleLowerCase().includes(forbidden)) issues.push(`The Grab audit must not persist ${forbidden}`);
   }
-  for (const contract of ["idempotency_key TEXT NOT NULL UNIQUE", "status = 'in_progress'", "LIMIT ?"]) {
+  for (const contract of ["idempotency_key TEXT NOT NULL UNIQUE", "status = 'in_progress'", "reconciliation_outcome", "LIMIT ?"]) {
     if (!grabAudit.includes(contract)) issues.push(`The Grab audit must retain ${contract}`);
   }
   for (const contract of [
@@ -417,6 +419,8 @@ if (/^phase-2-/u.test(manifest.phase)) {
     "crypto.randomUUID()",
     'credentials: "omit"',
     "activeFeasibility?.controlledGrab === true",
+    "historyAdministratorToken = undefined",
+    "submitReconciliation",
   ]) {
     if (!dashboardClient.includes(contract)) issues.push(`The controlled Grab dashboard must retain ${contract}`);
   }

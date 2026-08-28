@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "phase": "phase-2-controlled-grab-in-progress",
+  "phase": "phase-2-controlled-grab-complete",
   "completion": {
-    "status": "in_progress",
+    "status": "complete",
     "criteria": "harness/phase-2.json",
     "affected": "npm run check:affected",
     "full": "npm run check"
@@ -1098,7 +1098,7 @@
       "id": "PEG-GRAB-004",
       "title": "Timeout remains unknown and blocks a duplicate pending reconciliation",
       "evidence": "src/controlled-grab.test.ts",
-      "boundary": "Injected timeout and deterministic clock; operator reconciliation remains manual"
+      "boundary": "Injected timeout and deterministic clock; checking the real Arr state remains manual"
     },
     {
       "id": "PEG-GRAB-005",
@@ -1113,6 +1113,18 @@
       "boundary": "Temporary SQLite reopen with an injected clock; no network or live mutation"
     },
     {
+      "id": "PEG-GRAB-007",
+      "title": "Reconciliation is durable and releases duplicates only after a verified not-grabbed outcome",
+      "evidence": "src/grab-audit.test.ts",
+      "boundary": "Temporary SQLite transitions with synthetic events; no network or live mutation"
+    },
+    {
+      "id": "PEG-GRAB-008",
+      "title": "Operator reconciliation requires an exact outcome-specific attestation",
+      "evidence": "src/controlled-grab.test.ts",
+      "boundary": "Injected timeout, deterministic clock, and synthetic retry callback only"
+    },
+    {
       "id": "PEG-GRABAPI-001",
       "title": "Controlled Grab routes require an independent administrator token",
       "evidence": "src/app.test.ts",
@@ -1123,6 +1135,12 @@
       "title": "Grab execution and audit history expose only bounded public outcomes",
       "evidence": "src/app.test.ts",
       "boundary": "In-process route contract with injected controlled Grab service"
+    },
+    {
+      "id": "PEG-GRABAPI-003",
+      "title": "Timeout reconciliation is administrator-only, exact, and bounded",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route and authorization contract; no network or live mutation"
     },
     {
       "id": "PEG-DASH-037",
@@ -1137,8 +1155,14 @@
       "boundary": "Pure mapping over synthetic response capabilities"
     },
     {
+      "id": "PEG-DASH-039",
+      "title": "Audit history preserves Unknown and requires exact page-memory reconciliation",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process HTML, CSS, and JavaScript security inspection"
+    },
+    {
       "id": "PEG-HARNESS-006",
-      "title": "Phase 2 progress preserves Phase 1 completion and maps active criteria to evidence",
+      "title": "Phase 2 completion preserves Phase 1 and maps every controlled Grab criterion to evidence",
       "evidence": "scripts/harness/phase-contract.mjs",
       "boundary": "Repository-owned phase ledgers, scenario manifest, and documentation only"
     },

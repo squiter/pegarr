@@ -1,8 +1,9 @@
 {
   "schemaVersion": 1,
   "phase": "phase-2-controlled-grab",
-  "status": "in_progress",
+  "status": "complete",
   "startedOn": "2026-08-28",
+  "completedOn": "2026-08-28",
   "completionRule": "All implementation criteria must be complete and live mutation compatibility must remain an explicit, manually reconciled gap.",
   "criteria": [
     {
@@ -44,8 +45,8 @@
     {
       "id": "P2-TIMEOUT-RECONCILIATION",
       "title": "Operator reconciliation after unknown mutation outcomes",
-      "status": "in_progress",
-      "scenarioIds": ["PEG-GRAB-004", "PEG-GRAB-006"]
+      "status": "complete",
+      "scenarioIds": ["PEG-GRAB-004", "PEG-GRAB-006", "PEG-GRAB-007", "PEG-GRAB-008", "PEG-GRABAPI-003", "PEG-DASH-039"]
     }
   ],
   "manualGapIds": ["PEG-MANUAL-001", "PEG-MANUAL-002", "PEG-MANUAL-003", "PEG-MANUAL-004", "PEG-MANUAL-005"]

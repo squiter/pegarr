@@ -190,10 +190,14 @@
 | PEG-GRAB-004 | Timeout stays Unknown and blocks duplicate attempts | `src/controlled-grab.test.ts` |
 | PEG-GRAB-005 | Durable audit excludes credentials and Arr handles | `src/grab-audit.test.ts` |
 | PEG-GRAB-006 | Interrupted mutations recover as Unknown and require reconciliation | `src/grab-audit.test.ts` |
+| PEG-GRAB-007 | Durable reconciliation releases only verified not-grabbed duplicates | `src/grab-audit.test.ts` |
+| PEG-GRAB-008 | Reconciliation requires an exact outcome-specific attestation | `src/controlled-grab.test.ts` |
 | PEG-GRABAPI-001 | Grab routes require the independent administrator token | `src/app.test.ts` |
 | PEG-GRABAPI-002 | Execution and history expose only bounded public outcomes | `src/app.test.ts` |
+| PEG-GRABAPI-003 | Reconciliation is administrator-only, exact, and bounded | `src/app.test.ts` |
 | PEG-DASH-037 | Controlled Grab UI is confirmation-bound and page-memory-only | `src/app.test.ts` |
 | PEG-DASH-038 | Controlled Grab capability is explicit and defaults off | `src/dashboard-model.test.ts` |
+| PEG-DASH-039 | Audit history preserves Unknown and exact page-memory reconciliation | `src/app.test.ts` |
 | PEG-HARNESS-006 | Phase 2 progress preserves Phase 1 and maps active evidence | `scripts/harness/phase-contract.mjs` |
 | PEG-DOCKER-024 | Packaged controlled Grab performs one confirmed synthetic Arr mutation | `scripts/harness/docker-build.mjs` |
 

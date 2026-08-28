@@ -37,7 +37,7 @@ export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -90,12 +90,13 @@ export async function resolveRoute(
   const itemSelection = parseItemFeasibilityPath(pathname);
   const grabSelection = parseGrabPath(pathname);
   const grabHistory = pathname === "/api/v1/grabs/history";
+  const grabReconciliation = parseGrabReconciliationPath(pathname);
   const protectedLibraryRoute = pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   const controlledGrabAvailable = services?.controlledGrab !== undefined && access?.adminControl?.configured === true;
-  if ((grabSelection !== undefined || grabHistory) && !controlledGrabAvailable) {
+  if ((grabSelection !== undefined || grabHistory || grabReconciliation !== undefined) && !controlledGrabAvailable) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   const knownReadOnlyRoutes = new Set([
@@ -118,6 +119,9 @@ export async function resolveRoute(
   }
   if (grabHistory && method !== "GET") {
     return { statusCode: 405, headers: { allow: "GET" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (grabReconciliation !== undefined && method !== "POST") {
+    return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
   }
   if (grabSelection !== undefined && method !== "POST") {
     return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
@@ -278,6 +282,23 @@ export async function resolveRoute(
     }
   }
 
+  if (grabReconciliation !== undefined) {
+    const rejection = authorizeAdministratorRoute(access);
+    if (rejection !== undefined) return rejection;
+    if (services?.controlledGrab === undefined) {
+      return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+    }
+    try {
+      const body = parseReconcileGrabBody(requestBody);
+      const result = services.controlledGrab.reconcile(grabReconciliation.eventId, body.outcome, body.confirmation);
+      return { statusCode: reconcileGrabStatusCode(result.status), body: result };
+    } catch (error) {
+      return error instanceof InvalidRequestBodyError
+        ? { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } }
+        : { statusCode: 503, body: { service: "pegarr", status: "controlled_grab_unavailable" } };
+    }
+  }
+
   return {
     statusCode: 404,
     body: { service: "pegarr", status: "not_found" },
@@ -338,6 +359,11 @@ function parseGrabPath(pathname: string): GrabPath | undefined {
   return undefined;
 }
 
+function parseGrabReconciliationPath(pathname: string): { readonly eventId: string } | undefined {
+  const match = /^\/api\/v1\/grabs\/([a-z0-9_-]{8,128})\/reconcile$/iu.exec(pathname);
+  return match?.[1] === undefined ? undefined : { eventId: match[1] };
+}
+
 class InvalidRequestBodyError extends Error {}
 
 function parsePrepareGrabBody(value: unknown): { readonly releaseId: string } {
@@ -355,6 +381,19 @@ function parseExecuteGrabBody(value: unknown): {
     challengeId: requestString(body.challengeId, "challengeId", 128),
     confirmation: requestString(body.confirmation, "confirmation", 8_192),
     idempotencyKey: requestString(body.idempotencyKey, "idempotencyKey", 128),
+  };
+}
+
+function parseReconcileGrabBody(value: unknown): {
+  readonly outcome: "grabbed" | "not_grabbed";
+  readonly confirmation: string;
+} {
+  const body = requestRecord(value, ["outcome", "confirmation"]);
+  const outcome = requestString(body.outcome, "outcome", 32);
+  if (outcome !== "grabbed" && outcome !== "not_grabbed") throw new InvalidRequestBodyError("outcome is invalid");
+  return {
+    outcome,
+    confirmation: requestString(body.confirmation, "confirmation", 8_192),
   };
 }
 
@@ -387,6 +426,12 @@ function executeGrabStatusCode(status: string): number {
   if (status === "challenge_expired") return 410;
   if (status === "revalidation_failed" || status === "confirmation_mismatch" || status === "duplicate_blocked" || status === "duplicate_in_progress" || status === "idempotency_conflict") return 409;
   return 503;
+}
+
+function reconcileGrabStatusCode(status: string): number {
+  if (status === "reconciled") return 200;
+  if (status === "event_not_found") return 404;
+  return 409;
 }
 
 async function safeRadarrStatus(services: RuntimeServices | undefined): Promise<RadarrIntegrationStatus> {
@@ -546,6 +591,7 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (grab?.action === "prepare") return "grab_prepare";
   if (grab?.action === "execute") return "grab_execute";
   if (pathname === "/api/v1/grabs/history") return "grab_history";
+  if (parseGrabReconciliationPath(pathname) !== undefined) return "grab_reconcile";
   return "not_found";
 }
 

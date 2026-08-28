@@ -1,6 +1,6 @@
 # Contributing to Pegarr
 
-Pegarr's Phase 1 read-only MVP is complete and Phase 2 controlled Grab is in progress; external compatibility gaps remain documented separately. Small, evidence-backed changes are easier to review than implicit phase expansion.
+Pegarr's Phase 1 read-only MVP and Phase 2 controlled Grab are complete; external compatibility gaps remain documented separately, and Phase 3 reliability work must preserve both ledgers. Small, evidence-backed changes are easier to review than implicit phase expansion.
 
 ## Before opening a change
 

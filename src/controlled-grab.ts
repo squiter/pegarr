@@ -6,7 +6,7 @@ import type {
   MissingMediaItem,
   RevalidatedArrRelease,
 } from "./domain.js";
-import type { GrabAuditEntry } from "./grab-audit.js";
+import type { GrabAuditEntry, GrabReconciliationOutcome } from "./grab-audit.js";
 import { GrabAuditStore } from "./grab-audit.js";
 import type { MissingInventoryResult } from "./inventory-missing.js";
 import type { ItemFeasibilitySelection } from "./item-feasibility.js";
@@ -65,7 +65,24 @@ export type ExecuteGrabResult =
       readonly previousEvent?: PublicGrabAuditEntry;
     };
 
-export type PublicGrabAuditEntry = Omit<GrabAuditEntry, "idempotencyKey">;
+export type PublicGrabAuditEntry = Omit<GrabAuditEntry, "idempotencyKey"> & {
+  readonly reconciliationConfirmations?: {
+    readonly grabbed: string;
+    readonly notGrabbed: string;
+  };
+};
+
+export type ReconcileGrabResult =
+  | {
+      readonly status: "reconciled";
+      readonly mode: "controlled_grab";
+      readonly event: PublicGrabAuditEntry;
+    }
+  | {
+      readonly status: "event_not_found" | "not_reconcilable" | "confirmation_mismatch";
+      readonly mode: "controlled_grab";
+      readonly detailCode: string;
+    };
 
 interface StoredChallenge extends GrabChallenge {
   readonly expiresAtMs: number;
@@ -177,6 +194,29 @@ export class ControlledGrabService {
     return this.#options.audit.list(limit).map(publicAudit);
   }
 
+  reconcile(eventId: string, outcome: GrabReconciliationOutcome, confirmation: string): ReconcileGrabResult {
+    const normalizedEventId = validateOpaqueId(eventId, "eventId");
+    const validatedOutcome = validateReconciliationOutcome(outcome);
+    const validatedConfirmation = boundedText(confirmation, "confirmation", 8_192);
+    const event = this.#options.audit.byEventId(normalizedEventId);
+    if (event === undefined) return reconciliationFailure("event_not_found", "audit_event_not_found");
+    if (event.status !== "timeout_unknown" || event.reconciliationOutcome !== undefined) {
+      return reconciliationFailure("not_reconcilable", "audit_event_not_reconcilable");
+    }
+    if (validatedConfirmation !== reconciliationText(event, validatedOutcome)) {
+      return reconciliationFailure("confirmation_mismatch", "exact_confirmation_required");
+    }
+    try {
+      return {
+        status: "reconciled",
+        mode: "controlled_grab",
+        event: publicAudit(this.#options.audit.reconcile(normalizedEventId, validatedOutcome, safeNow(this.#now()))),
+      };
+    } catch {
+      return reconciliationFailure("not_reconcilable", "audit_event_not_reconcilable");
+    }
+  }
+
   close(): void {
     this.#options.audit.close();
   }
@@ -219,7 +259,12 @@ export class ControlledGrabService {
     );
     if (blocking !== undefined) {
       return {
-        ...executionFailure("duplicate_blocked", blocking.status === "timeout_unknown" ? "reconciliation_required" : "recent_grab_exists"),
+        ...executionFailure(
+          "duplicate_blocked",
+          blocking.status === "timeout_unknown" && blocking.reconciliationOutcome === undefined
+            ? "reconciliation_required"
+            : "recent_grab_exists",
+        ),
         previousEvent: publicAudit(blocking),
       };
     }
@@ -311,7 +356,15 @@ function publicChallenge(challenge: StoredChallenge): GrabChallenge {
 
 function publicAudit(entry: GrabAuditEntry): PublicGrabAuditEntry {
   const { idempotencyKey: _idempotencyKey, ...result } = entry;
-  return result;
+  return entry.status === "timeout_unknown" && entry.reconciliationOutcome === undefined
+    ? {
+        ...result,
+        reconciliationConfirmations: {
+          grabbed: reconciliationText(entry, "grabbed"),
+          notGrabbed: reconciliationText(entry, "not_grabbed"),
+        },
+      }
+    : result;
 }
 
 function resultFromAudit(entry: GrabAuditEntry, replayed: boolean): ExecuteGrabResult {
@@ -322,7 +375,7 @@ function resultFromAudit(entry: GrabAuditEntry, replayed: boolean): ExecuteGrabR
     mode: "controlled_grab",
     event: publicAudit(entry),
     replayed,
-    requiresReconciliation: status === "timeout_unknown",
+    requiresReconciliation: status === "timeout_unknown" && entry.reconciliationOutcome === undefined,
   };
 }
 
@@ -342,6 +395,22 @@ function executionFailure(
 
 function confirmationText(releaseTitle: string, targetLabel: string): string {
   return `GRAB ${releaseTitle} FOR ${targetLabel}`;
+}
+
+function reconciliationText(entry: Pick<GrabAuditEntry, "releaseTitle" | "targetLabel">, outcome: GrabReconciliationOutcome): string {
+  return `RECONCILE ${entry.releaseTitle} FOR ${entry.targetLabel} AS ${outcome === "grabbed" ? "GRABBED" : "NOT GRABBED"}`;
+}
+
+function validateReconciliationOutcome(value: string): GrabReconciliationOutcome {
+  if (value === "grabbed" || value === "not_grabbed") return value;
+  throw new TypeError("reconciliation outcome is invalid");
+}
+
+function reconciliationFailure(
+  status: Extract<ReconcileGrabResult, { readonly detailCode: string }>["status"],
+  detailCode: string,
+): Extract<ReconcileGrabResult, { readonly detailCode: string }> {
+  return { status, mode: "controlled_grab", detailCode };
 }
 
 function itemLabel(item: MissingMediaItem): string {

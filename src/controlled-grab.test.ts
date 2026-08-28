@@ -178,3 +178,37 @@ test("PEG-GRAB-004 timeout stays unknown and blocks a duplicate until reconcilia
   assert.equal(blocked.status, "duplicate_blocked");
   assert.equal("detailCode" in blocked && blocked.detailCode, "reconciliation_required");
 });
+
+test("PEG-GRAB-008 exact operator reconciliation releases only a confirmed not-grabbed retry", async (context) => {
+  const timeout = Object.assign(new Error("private timeout"), { code: "timeout" });
+  let grabs = 0;
+  const service = await fixture(context, {
+    revalidate: async () => revalidated,
+    grab: async () => { grabs += 1; throw timeout; },
+  }, [1_000, 1_010, 1_020, 1_030, 1_040, 1_050, 1_060]);
+  context.after(() => service.close());
+  const prepared = await service.prepare(selection, releaseId);
+  if (prepared.status !== "confirmation_required") return;
+  const unknown = await service.execute(selection, prepared.challengeId, prepared.confirmation, "idempotency_00000008");
+  if (unknown.status !== "timeout_unknown") return;
+  const confirmations = unknown.event.reconciliationConfirmations;
+  assert.ok(confirmations);
+  assert.equal(
+    confirmations.notGrabbed,
+    "RECONCILE Synthetic.Show.S03E05.1080p.WEB-DL-GROUP FOR Synthetic Show S03E05 · Synthetic Episode Five AS NOT GRABBED",
+  );
+  assert.equal(service.reconcile(unknown.event.eventId, "not_grabbed", "not exact").status, "confirmation_mismatch");
+  const reconciled = service.reconcile(unknown.event.eventId, "not_grabbed", confirmations.notGrabbed);
+  assert.equal(reconciled.status, "reconciled");
+  if (reconciled.status !== "reconciled") return;
+  assert.equal(reconciled.event.status, "timeout_unknown");
+  assert.equal(reconciled.event.reconciliationOutcome, "not_grabbed");
+  assert.equal(reconciled.event.reconciliationConfirmations, undefined);
+  assert.equal(service.reconcile(unknown.event.eventId, "grabbed", confirmations.grabbed).status, "not_reconcilable");
+
+  const retry = await service.prepare(selection, releaseId);
+  if (retry.status !== "confirmation_required") return;
+  const retryResult = await service.execute(selection, retry.challengeId, retry.confirmation, "idempotency_00000009");
+  assert.equal(retryResult.status, "timeout_unknown");
+  assert.equal(grabs, 2);
+});

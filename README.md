@@ -9,7 +9,7 @@
 Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It compares interactive-search releases with subtitle-provider evidence, explains the confidence of each match, and can optionally let an administrator Grab one explicitly confirmed release.
 
 > [!IMPORTANT]
-> Pegarr's Phase 1 read-only MVP is complete and remains the default. Phase 2 controlled Grab is now in progress behind a separate opt-in setting and administrator secret. It revalidates, requires an exact release-and-target confirmation, audits every attempt, and never runs automatically. Live Grab compatibility remains a manual test boundary.
+> Pegarr's Phase 1 read-only MVP and Phase 2 controlled Grab are complete, while read-only remains the default. Controlled Grab stays behind a separate opt-in setting and administrator secret, revalidates twice, requires exact confirmation, audits every attempt, and never runs automatically. Live Grab compatibility remains a manual test boundary.
 
 ## Why Pegarr?
 
@@ -26,7 +26,7 @@ Provider failures are never treated as proof that subtitles do not exist.
 
 ## Project status
 
-The API-feasibility milestone and Phase 1 implementation are complete. Phase 2 has begun with the first full controlled-Grab vertical slice: independent administration, two-step revalidation, exact confirmation, minimal Arr mutation payloads, durable audit history, idempotency, and timeout-aware duplicate protection. The implementation is synthetic-test proven; live Sonarr/Radarr mutation behavior and NAS compatibility remain explicit manual gaps. See the [controlled Grab guide](docs/controlled-grab.md), [Phase 1 completion record](docs/phase-1-completion.md), and [research proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md).
+The API-feasibility milestone, Phase 1 read-only MVP, and Phase 2 controlled Grab are complete. Phase 2 includes independent administration, two-step revalidation, exact confirmation, minimal Arr mutation payloads, durable audit history, idempotency, timeout-aware duplicate protection, and explicit operator reconciliation that preserves Unknown outcomes. The implementation is synthetic-test proven; live Sonarr/Radarr mutation behavior and NAS compatibility remain explicit manual gaps. See the [controlled Grab guide](docs/controlled-grab.md), [Phase 1 completion record](docs/phase-1-completion.md), [Phase 2 completion record](docs/phase-2-completion.md), and [research proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md).
 
 The current repository foundation includes:
 
@@ -87,7 +87,7 @@ The demo maps a sanitized synthetic Sonarr v3 response into four release candida
 
 ## Development harness
 
-Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise. Every harness mode preserves the completed [Phase 1 criteria ledger](harness/phase-1.json) and validates the active [Phase 2 criteria ledger](harness/phase-2.json).
+Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise. Every harness mode preserves the completed [Phase 1 criteria ledger](harness/phase-1.json) and [Phase 2 criteria ledger](harness/phase-2.json), including the explicit live-service gaps.
 
 See [the controlled Grab guide](docs/controlled-grab.md), [Phase 1 completion record](docs/phase-1-completion.md), [harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [access-control guide](docs/access-control.md), [missing-item dashboard guide](docs/missing-item-dashboard.md), [item feasibility API](docs/item-feasibility-api.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), and the versioned integration contracts. Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 

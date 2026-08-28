@@ -30,7 +30,9 @@ import {
   type ExecuteGrabResult,
   type PrepareGrabResult,
   type PublicGrabAuditEntry,
+  type ReconcileGrabResult,
 } from "./controlled-grab.js";
+import type { GrabReconciliationOutcome } from "./grab-audit.js";
 import { GrabAuditStore } from "./grab-audit.js";
 
 export type ArrIntegrationState =
@@ -75,6 +77,7 @@ export interface RuntimeServices {
     prepare(selection: ItemFeasibilitySelection, releaseId: string): Promise<PrepareGrabResult>;
     execute(selection: ItemFeasibilitySelection, challengeId: string, confirmation: string, idempotencyKey: string): Promise<ExecuteGrabResult>;
     history(limit?: number): readonly PublicGrabAuditEntry[];
+    reconcile(eventId: string, outcome: GrabReconciliationOutcome, confirmation: string): ReconcileGrabResult;
   };
   close(): void;
 }
@@ -332,6 +335,7 @@ export function createRuntimeServices(
             prepare: (selection, releaseId) => controlledGrab.prepare(selection, releaseId),
             execute: (selection, challengeId, confirmation, idempotencyKey) => controlledGrab.execute(selection, challengeId, confirmation, idempotencyKey),
             history: (limit) => controlledGrab.history(limit),
+            reconcile: (eventId, outcome, confirmation) => controlledGrab.reconcile(eventId, outcome, confirmation),
           },
         }),
     close: () => {

@@ -29,10 +29,29 @@ const elements = {
   grabDialog: document.querySelector("#grab-dialog"),
   grabExecute: document.querySelector("#grab-execute"),
   grabForm: document.querySelector("#grab-form"),
+  grabHistoryAuth: document.querySelector("#grab-history-auth"),
+  grabHistoryClose: document.querySelector("#grab-history-close"),
+  grabHistoryDialog: document.querySelector("#grab-history-dialog"),
+  grabHistoryForm: document.querySelector("#grab-history-form"),
+  grabHistoryList: document.querySelector("#grab-history-list"),
+  grabHistoryLoad: document.querySelector("#grab-history-load"),
+  grabHistoryOpen: document.querySelector("#grab-history-open"),
+  grabHistoryRefresh: document.querySelector("#grab-history-refresh"),
+  grabHistoryResults: document.querySelector("#grab-history-results"),
+  grabHistoryStatus: document.querySelector("#grab-history-status"),
+  grabHistoryToken: document.querySelector("#grab-history-token"),
   grabPrepare: document.querySelector("#grab-prepare"),
   grabRelease: document.querySelector("#grab-release"),
   grabStatus: document.querySelector("#grab-status"),
   grabTarget: document.querySelector("#grab-target"),
+  grabReconcileCancel: document.querySelector("#grab-reconcile-cancel"),
+  grabReconcileConfirmation: document.querySelector("#grab-reconcile-confirmation"),
+  grabReconcileOutcome: document.querySelector("#grab-reconcile-outcome"),
+  grabReconcilePhrase: document.querySelector("#grab-reconcile-phrase"),
+  grabReconcileRelease: document.querySelector("#grab-reconcile-release"),
+  grabReconcileStep: document.querySelector("#grab-reconcile-step"),
+  grabReconcileSubmit: document.querySelector("#grab-reconcile-submit"),
+  grabReconcileTarget: document.querySelector("#grab-reconcile-target"),
   inventoryList: document.querySelector("#inventory-list"),
   kindFilter: document.querySelector("#kind-filter"),
   providerEvidenceFilter: document.querySelector("#provider-evidence-filter"),
@@ -74,6 +93,8 @@ let activeFeasibility;
 let pageBusy = false;
 let grabContext;
 let administratorToken;
+let historyAdministratorToken;
+let reconciliationContext;
 const feasibilityCache = new Map();
 const analysisByItem = new Map();
 const shortlistedReleaseIds = new Set();
@@ -105,6 +126,20 @@ elements.grabExecute?.addEventListener("click", executeControlledGrab);
 elements.grabConfirmation?.addEventListener("input", () => {
   elements.grabExecute.disabled = elements.grabConfirmation.value !== grabContext?.confirmation;
 });
+elements.grabHistoryOpen?.addEventListener("click", openGrabHistory);
+elements.grabHistoryClose?.addEventListener("click", closeGrabHistory);
+elements.grabHistoryDialog?.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeGrabHistory();
+});
+elements.grabHistoryDialog?.addEventListener("close", clearGrabHistory);
+elements.grabHistoryForm?.addEventListener("submit", (event) => event.preventDefault());
+elements.grabHistoryLoad?.addEventListener("click", loadGrabHistory);
+elements.grabHistoryRefresh?.addEventListener("click", loadGrabHistory);
+elements.grabReconcileCancel?.addEventListener("click", clearReconciliation);
+elements.grabReconcileOutcome?.addEventListener("change", updateReconciliationConfirmation);
+elements.grabReconcileConfirmation?.addEventListener("input", updateReconciliationConfirmation);
+elements.grabReconcileSubmit?.addEventListener("click", submitReconciliation);
 elements.releaseShortlistClear?.addEventListener("click", clearShortlist);
 elements.clearInventoryFilters?.addEventListener("click", clearInventoryFilters);
 for (const control of [elements.searchInput, elements.applicationFilter, elements.kindFilter, elements.analysisFilter, elements.bestConfidenceFilter, elements.requiredCoverageFilter, elements.providerEvidenceFilter, elements.profileFilter, elements.policyLanguageFilter, elements.analysisAgeFilter, elements.sortOrder]) {
@@ -831,6 +866,221 @@ function clearGrabDialog() {
   elements.grabConfirmStep.hidden = true;
   elements.grabExecute.disabled = true;
   setGrabStatus("", "");
+}
+
+function openGrabHistory() {
+  clearGrabHistory();
+  elements.grabHistoryDialog.showModal();
+  elements.grabHistoryToken.focus();
+}
+
+function closeGrabHistory() {
+  if (elements.grabHistoryDialog.open) elements.grabHistoryDialog.close();
+  else clearGrabHistory();
+}
+
+function clearGrabHistory() {
+  historyAdministratorToken = undefined;
+  reconciliationContext = undefined;
+  elements.grabHistoryToken.value = "";
+  elements.grabHistoryAuth.hidden = false;
+  elements.grabHistoryResults.hidden = true;
+  elements.grabHistoryList.replaceChildren();
+  clearReconciliation();
+  setGrabHistoryStatus("", "");
+  setGrabHistoryBusy(false);
+}
+
+async function loadGrabHistory() {
+  if (historyAdministratorToken === undefined) {
+    const candidate = elements.grabHistoryToken.value;
+    if (candidate.length < 32) {
+      setGrabHistoryStatus("Enter the independent administrator token configured for controlled Grab.", "error");
+      return;
+    }
+    historyAdministratorToken = candidate;
+    elements.grabHistoryToken.value = "";
+  }
+  setGrabHistoryBusy(true);
+  setGrabHistoryStatus("Loading bounded audit history…", "loading");
+  try {
+    const response = await fetch("/api/v1/grabs/history?limit=50", {
+      method: "GET",
+      headers: { authorization: `Bearer ${historyAdministratorToken}` },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (response.status === 401) {
+      historyAdministratorToken = undefined;
+      elements.grabHistoryAuth.hidden = false;
+      elements.grabHistoryResults.hidden = true;
+      setGrabHistoryStatus("That administrator token was not accepted.", "error");
+      elements.grabHistoryToken.focus();
+      return;
+    }
+    if (response.status === 404) {
+      historyAdministratorToken = undefined;
+      setGrabHistoryStatus("Controlled Grab is not enabled on this server.", "warning");
+      return;
+    }
+    if (!response.ok) throw new Error("history_unavailable");
+    const result = await response.json();
+    const events = Array.isArray(result.events) ? result.events : [];
+    renderGrabHistory(events);
+    elements.grabHistoryAuth.hidden = true;
+    elements.grabHistoryResults.hidden = false;
+    setGrabHistoryStatus(events.length === 1 ? "Loaded 1 audit event." : `Loaded ${events.length} audit events.`, "success");
+  } catch {
+    setGrabHistoryStatus("Pegarr could not load the controlled Grab history.", "error");
+  } finally {
+    setGrabHistoryBusy(false);
+  }
+}
+
+function renderGrabHistory(events) {
+  const nodes = events.map((auditEvent) => {
+    const card = document.createElement("article");
+    card.className = "grab-history-event";
+    const heading = document.createElement("div");
+    heading.className = "grab-history-event-heading";
+    const title = document.createElement("strong");
+    title.textContent = auditEvent.targetLabel ?? "Unknown target";
+    const status = document.createElement("span");
+    status.className = "grab-history-status-chip";
+    status.dataset.state = auditEvent.status ?? "unknown";
+    status.textContent = grabAuditStatusLabel(auditEvent);
+    heading.append(title, status);
+    const release = document.createElement("span");
+    release.className = "grab-history-release";
+    release.textContent = auditEvent.releaseTitle ?? "Unknown release";
+    const timing = document.createElement("small");
+    timing.textContent = `Requested ${formatAuditTime(auditEvent.requestedAt)}`;
+    card.append(heading, release, timing);
+    if (auditEvent.status === "timeout_unknown" && auditEvent.reconciliationOutcome === undefined && auditEvent.reconciliationConfirmations) {
+      const reconcile = document.createElement("button");
+      reconcile.className = "quiet-button";
+      reconcile.type = "button";
+      reconcile.textContent = "Reconcile Unknown outcome";
+      reconcile.addEventListener("click", () => openReconciliation(auditEvent));
+      card.append(reconcile);
+    }
+    return card;
+  });
+  if (nodes.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "grab-history-empty";
+    empty.textContent = "No controlled Grab events have been recorded yet.";
+    nodes.push(empty);
+  }
+  elements.grabHistoryList.replaceChildren(...nodes);
+}
+
+function grabAuditStatusLabel(auditEvent) {
+  if (auditEvent.status === "timeout_unknown" && auditEvent.reconciliationOutcome === "grabbed") return "Unknown · verified grabbed";
+  if (auditEvent.status === "timeout_unknown" && auditEvent.reconciliationOutcome === "not_grabbed") return "Unknown · verified not grabbed";
+  const labels = {
+    in_progress: "In progress",
+    grabbed: "Grabbed",
+    revalidation_failed: "Revalidation stopped",
+    timeout_unknown: "Unknown · needs reconciliation",
+    upstream_failure: "Upstream failure",
+  };
+  return labels[auditEvent.status] ?? "Unknown status";
+}
+
+function formatAuditTime(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? "at an unknown time" : date.toLocaleString();
+}
+
+function openReconciliation(auditEvent) {
+  reconciliationContext = auditEvent;
+  elements.grabReconcileTarget.textContent = auditEvent.targetLabel;
+  elements.grabReconcileRelease.textContent = auditEvent.releaseTitle;
+  elements.grabReconcileStep.hidden = false;
+  elements.grabReconcileOutcome.value = "";
+  elements.grabReconcileConfirmation.value = "";
+  updateReconciliationConfirmation();
+  elements.grabReconcileStep.scrollIntoView({ block: "start" });
+  elements.grabReconcileOutcome.focus();
+}
+
+function clearReconciliation() {
+  reconciliationContext = undefined;
+  elements.grabReconcileStep.hidden = true;
+  elements.grabReconcileOutcome.value = "";
+  elements.grabReconcileConfirmation.value = "";
+  elements.grabReconcilePhrase.textContent = "";
+  elements.grabReconcileTarget.textContent = "";
+  elements.grabReconcileRelease.textContent = "";
+  elements.grabReconcileSubmit.disabled = true;
+}
+
+function updateReconciliationConfirmation() {
+  const outcome = elements.grabReconcileOutcome.value;
+  const confirmations = reconciliationContext?.reconciliationConfirmations;
+  const phrase = outcome === "grabbed" ? confirmations?.grabbed : outcome === "not_grabbed" ? confirmations?.notGrabbed : "";
+  elements.grabReconcilePhrase.textContent = phrase ?? "";
+  elements.grabReconcileSubmit.disabled = !phrase || elements.grabReconcileConfirmation.value !== phrase;
+}
+
+async function submitReconciliation() {
+  const outcome = elements.grabReconcileOutcome.value;
+  const confirmation = elements.grabReconcilePhrase.textContent;
+  if (reconciliationContext === undefined || historyAdministratorToken === undefined || !confirmation || elements.grabReconcileConfirmation.value !== confirmation) return;
+  setGrabHistoryBusy(true);
+  setGrabHistoryStatus("Recording the verified Arr outcome…", "loading");
+  try {
+    const response = await fetch(`/api/v1/grabs/${encodeURIComponent(reconciliationContext.eventId)}/reconcile`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${historyAdministratorToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ outcome, confirmation }),
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    const result = await response.json().catch(() => undefined);
+    if (response.status === 401) {
+      historyAdministratorToken = undefined;
+      clearReconciliation();
+      elements.grabHistoryAuth.hidden = false;
+      elements.grabHistoryResults.hidden = true;
+      setGrabHistoryStatus("Administrator authorization was not accepted. Reconnect to the audit history.", "error");
+      return;
+    }
+    if (result?.status !== "reconciled") {
+      setGrabHistoryStatus(response.status === 409
+        ? "This event changed or the exact confirmation did not match. Refresh the history before trying again."
+        : "Pegarr could not record the reconciliation.", response.status >= 500 ? "error" : "warning");
+      return;
+    }
+    clearReconciliation();
+    await loadGrabHistory();
+    setGrabHistoryStatus("The original Unknown result is preserved and the verified Arr outcome is now audited.", "success");
+  } catch {
+    setGrabHistoryStatus("Pegarr could not record the reconciliation. No audit outcome was changed.", "error");
+  } finally {
+    setGrabHistoryBusy(false);
+  }
+}
+
+function setGrabHistoryBusy(value) {
+  for (const control of [elements.grabHistoryClose, elements.grabHistoryLoad, elements.grabHistoryRefresh, elements.grabHistoryToken, elements.grabReconcileOutcome, elements.grabReconcileConfirmation, elements.grabReconcileCancel]) {
+    control.disabled = value;
+  }
+  elements.grabReconcileSubmit.disabled = value || elements.grabReconcileConfirmation.value !== elements.grabReconcilePhrase.textContent || !elements.grabReconcilePhrase.textContent;
+  elements.grabHistoryDialog.setAttribute("aria-busy", String(value));
+}
+
+function setGrabHistoryStatus(message, state) {
+  elements.grabHistoryStatus.textContent = message;
+  elements.grabHistoryStatus.dataset.state = state;
 }
 
 function policyLanguageChip(language) {

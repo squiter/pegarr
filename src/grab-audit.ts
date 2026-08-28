@@ -10,6 +10,8 @@ export type GrabAuditStatus =
   | "timeout_unknown"
   | "upstream_failure";
 
+export type GrabReconciliationOutcome = "grabbed" | "not_grabbed";
+
 export interface GrabAuditEntry {
   readonly eventId: string;
   readonly idempotencyKey: string;
@@ -23,6 +25,8 @@ export interface GrabAuditEntry {
   readonly detailCode?: string;
   readonly requestedAt: string;
   readonly completedAt?: string;
+  readonly reconciliationOutcome?: GrabReconciliationOutcome;
+  readonly reconciledAt?: string;
 }
 
 export interface BeginGrabAudit {
@@ -62,6 +66,13 @@ export class GrabAuditStore {
       CREATE INDEX IF NOT EXISTS grab_audit_recent
         ON grab_audit(requested_at_ms DESC, event_id DESC);
     `);
+    const columns = this.#database.prepare("PRAGMA table_info(grab_audit)").all() as unknown as Array<{ readonly name: string }>;
+    if (!columns.some(({ name }) => name === "reconciliation_outcome")) {
+      this.#database.exec("ALTER TABLE grab_audit ADD COLUMN reconciliation_outcome TEXT CHECK (reconciliation_outcome IN ('grabbed', 'not_grabbed'))");
+    }
+    if (!columns.some(({ name }) => name === "reconciled_at_ms")) {
+      this.#database.exec("ALTER TABLE grab_audit ADD COLUMN reconciled_at_ms INTEGER CHECK (reconciled_at_ms >= 0)");
+    }
     const recoveredAtMs = now();
     safeEpoch(recoveredAtMs, "recoveredAtMs");
     this.#database.prepare(`
@@ -120,6 +131,29 @@ export class GrabAuditStore {
     return row === undefined ? undefined : mapRow(row);
   }
 
+  byEventId(eventId: string): GrabAuditEntry | undefined {
+    validateToken(eventId, "eventId", 128);
+    const row = this.#database.prepare(`
+      SELECT * FROM grab_audit WHERE event_id = ?
+    `).get(eventId) as AuditRow | undefined;
+    return row === undefined ? undefined : mapRow(row);
+  }
+
+  reconcile(eventId: string, outcome: GrabReconciliationOutcome, reconciledAtMs: number): GrabAuditEntry {
+    validateToken(eventId, "eventId", 128);
+    validateReconciliationOutcome(outcome);
+    safeEpoch(reconciledAtMs, "reconciledAtMs");
+    const result = this.#database.prepare(`
+      UPDATE grab_audit
+      SET reconciliation_outcome = ?, reconciled_at_ms = ?
+      WHERE event_id = ? AND status = 'timeout_unknown' AND reconciliation_outcome IS NULL
+    `).run(outcome, reconciledAtMs, eventId);
+    if (result.changes !== 1) throw new Error("Grab audit reconciliation was not available");
+    const entry = this.byEventId(eventId);
+    if (entry === undefined) throw new Error("Grab audit reconciliation was not persisted");
+    return entry;
+  }
+
   recentBlocking(
     selection: ItemFeasibilitySelection,
     releaseId: string,
@@ -131,10 +165,14 @@ export class GrabAuditStore {
     const row = this.#database.prepare(`
       SELECT * FROM grab_audit
       WHERE application = ? AND kind = ? AND item_id = ? AND release_id = ?
-        AND requested_at_ms >= ? AND status IN ('in_progress', 'grabbed', 'timeout_unknown')
+        AND (
+          (status = 'timeout_unknown' AND reconciliation_outcome IS NULL)
+          OR (status IN ('in_progress', 'grabbed') AND requested_at_ms >= ?)
+          OR (status = 'timeout_unknown' AND reconciliation_outcome = 'grabbed' AND reconciled_at_ms >= ?)
+        )
       ORDER BY requested_at_ms DESC, event_id DESC
       LIMIT 1
-    `).get(selection.application, selection.kind, selection.itemId, releaseId, sinceMs) as AuditRow | undefined;
+    `).get(selection.application, selection.kind, selection.itemId, releaseId, sinceMs, sinceMs) as AuditRow | undefined;
     return row === undefined ? undefined : mapRow(row);
   }
 
@@ -172,6 +210,8 @@ interface AuditRow {
   readonly detail_code: string | null;
   readonly requested_at_ms: number;
   readonly completed_at_ms: number | null;
+  readonly reconciliation_outcome: GrabReconciliationOutcome | null;
+  readonly reconciled_at_ms: number | null;
 }
 
 function mapRow(row: AuditRow): GrabAuditEntry {
@@ -188,7 +228,13 @@ function mapRow(row: AuditRow): GrabAuditEntry {
     ...(row.detail_code === null ? {} : { detailCode: row.detail_code }),
     requestedAt: new Date(row.requested_at_ms).toISOString(),
     ...(row.completed_at_ms === null ? {} : { completedAt: new Date(row.completed_at_ms).toISOString() }),
+    ...(row.reconciliation_outcome === null ? {} : { reconciliationOutcome: row.reconciliation_outcome }),
+    ...(row.reconciled_at_ms === null ? {} : { reconciledAt: new Date(row.reconciled_at_ms).toISOString() }),
   };
+}
+
+function validateReconciliationOutcome(value: string): asserts value is GrabReconciliationOutcome {
+  if (value !== "grabbed" && value !== "not_grabbed") throw new TypeError("reconciliation outcome is invalid");
 }
 
 function validateBegin(entry: BeginGrabAudit): void {

@@ -371,6 +371,23 @@ button:disabled { cursor: wait; opacity: .55; }
 .grab-status { min-height: 1.4rem; margin: 1rem 0 0; color: var(--muted); font-size: .85rem; line-height: 1.5; }
 .grab-status[data-state="warning"] { color: var(--warning); }
 .grab-status[data-state="error"] { color: var(--danger); }
+.summary-actions { display: flex; gap: .65rem; flex-wrap: wrap; justify-content: flex-end; }
+.history-dialog { width: min(calc(100% - 2rem), 56rem); }
+.history-results-heading { display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
+.history-results-heading h3, .grab-reconcile-step h3 { margin: 0; }
+.grab-history-results { display: grid; gap: .8rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.grab-history-list { display: grid; gap: .65rem; max-height: 22rem; overflow: auto; padding-right: .2rem; }
+.grab-history-event { display: grid; gap: .45rem; padding: .85rem; background: rgb(5 15 13 / 55%); border: 1px solid var(--border); border-radius: .8rem; }
+.grab-history-event-heading { display: flex; gap: .75rem; align-items: flex-start; justify-content: space-between; }
+.grab-history-event-heading strong, .grab-history-release { overflow-wrap: anywhere; }
+.grab-history-release, .grab-history-event small, .grab-history-empty { color: var(--muted); }
+.grab-history-event .quiet-button { justify-self: start; margin-top: .25rem; }
+.grab-history-status-chip { flex: none; padding: .25rem .45rem; color: var(--muted); background: rgb(148 163 184 / 10%); border: 1px solid var(--border); border-radius: 999px; font-size: .68rem; font-weight: 800; }
+.grab-history-status-chip[data-state="grabbed"] { color: var(--accent); border-color: rgb(52 211 153 / 35%); }
+.grab-history-status-chip[data-state="timeout_unknown"] { color: var(--warning); border-color: rgb(251 191 36 / 35%); }
+.grab-history-status-chip[data-state="upstream_failure"], .grab-history-status-chip[data-state="revalidation_failed"] { color: var(--danger); border-color: rgb(248 113 113 / 35%); }
+.grab-reconcile-step { margin-top: 1rem; padding: 1rem; background: rgb(251 191 36 / 5%); border: 1px solid rgb(251 191 36 / 28%); border-radius: .8rem; }
+.reconcile-actions { display: flex; gap: .65rem; flex-wrap: wrap; }
 
 footer {
   display: flex;
@@ -416,6 +433,11 @@ footer {
   .release-table td::before { display: block; margin-bottom: .45rem; color: var(--muted); content: attr(data-label); font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
   .grab-dialog-heading { align-items: stretch; flex-direction: column; }
   .grab-dialog-heading button { width: 100%; }
+  .summary-actions { width: 100%; justify-content: stretch; }
+  .summary-actions button { flex: 1; }
+  .grab-history-event-heading { align-items: stretch; flex-direction: column; }
+  .grab-history-status-chip { align-self: flex-start; }
+  .reconcile-actions { align-items: stretch; flex-direction: column; }
   footer { gap: .7rem; flex-direction: column; }
 }
 

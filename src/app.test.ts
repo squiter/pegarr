@@ -41,6 +41,9 @@ test("PEG-OPS-003 structured request logs are bounded and redact URLs, IDs, and 
     durationMs: 18,
   });
   assert.doesNotMatch(JSON.stringify(entry), /305|refresh|token|synthetic-private|authorization|sonarr\/episode/iu);
+  const reconciliation = requestLogEntry("POST", "/api/v1/grabs/event_private_001/reconcile?token=synthetic-private-token", 200, 2_000, 2_004);
+  assert.equal(reconciliation.route, "grab_reconcile");
+  assert.doesNotMatch(JSON.stringify(reconciliation), /event_private|token|synthetic-private/iu);
   assert.deepEqual(requestLogEntry("TRACE", "http://[", 999, Number.NaN, Infinity), {
     event: "http_request",
     service: "pegarr",
@@ -371,6 +374,7 @@ test("PEG-GRABAPI-001 controlled Grab routes require the independent administrat
       },
       execute: async () => { throw new Error("not expected"); },
       history: () => [],
+      reconcile: () => { throw new Error("not expected"); },
     },
   };
   const path = "/api/v1/library/items/sonarr/episode/305/grab/prepare";
@@ -428,6 +432,7 @@ test("PEG-GRABAPI-002 execution and audit history expose bounded public outcomes
         assert.equal(limit, 10);
         return [event];
       },
+      reconcile: () => { throw new Error("not expected"); },
     },
   };
   const access = {
@@ -452,6 +457,72 @@ test("PEG-GRABAPI-002 execution and audit history expose bounded public outcomes
   assert.equal((await resolveRoute("GET", executePath, tmpdir(), services, access)).statusCode, 405);
 });
 
+test("PEG-GRABAPI-003 timeout reconciliation is administrator-only, exact, and bounded", async () => {
+  const adminToken = "synthetic-admin-token-value-00000000002";
+  const eventId = "event_00000010";
+  const confirmation = "RECONCILE Synthetic.Release FOR Synthetic Show S03E05 AS NOT GRABBED";
+  let reconciliations = 0;
+  const base = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  const services: RuntimeServices = {
+    ...base,
+    controlledGrab: {
+      prepare: async () => { throw new Error("not expected"); },
+      execute: async () => { throw new Error("not expected"); },
+      history: () => [],
+      reconcile: (receivedEventId, outcome, receivedConfirmation) => {
+        reconciliations += 1;
+        assert.equal(receivedEventId, eventId);
+        assert.equal(outcome, "not_grabbed");
+        assert.equal(receivedConfirmation, confirmation);
+        return {
+          status: "reconciled",
+          mode: "controlled_grab",
+          event: {
+            eventId,
+            application: "sonarr",
+            kind: "episode",
+            itemId: 305,
+            targetLabel: "Synthetic Show S03E05",
+            releaseId: "sonarr-0123456789abcdef01234567",
+            releaseTitle: "Synthetic.Release",
+            status: "timeout_unknown",
+            detailCode: "reconciliation_required",
+            requestedAt: "2030-01-01T00:00:00.000Z",
+            completedAt: "2030-01-01T00:00:01.000Z",
+            reconciliationOutcome: "not_grabbed",
+            reconciledAt: "2030-01-01T00:01:00.000Z",
+          },
+        };
+      },
+    },
+  };
+  const path = `/api/v1/grabs/${eventId}/reconcile`;
+  const access = {
+    control: new AccessControl(new SecretValue("synthetic-access-token-value-0000000001")),
+    adminControl: new AccessControl(new SecretValue(adminToken)),
+    authorization: `Bearer ${adminToken}`,
+  };
+
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, {
+    ...access,
+    authorization: "Bearer synthetic-access-token-value-0000000001",
+  }, { outcome: "not_grabbed", confirmation })).statusCode, 401);
+  assert.equal(reconciliations, 0);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, access, {
+    outcome: "unknown",
+    confirmation,
+  })).statusCode, 400);
+  assert.equal(reconciliations, 0);
+  const reconciled = await resolveRoute("POST", path, tmpdir(), services, access, {
+    outcome: "not_grabbed",
+    confirmation,
+  });
+  assert.equal(reconciled.statusCode, 200);
+  assert.equal(reconciliations, 1);
+  assert.doesNotMatch(JSON.stringify(reconciled), /idempotency|guid|indexerId|authorization|synthetic-admin/iu);
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, access)).statusCode, 405);
+});
+
 test("PEG-DASH-037 controlled Grab UI is opt-in, exact-confirmation, and page-memory-only", async () => {
   const page = await resolveRoute("GET", "/", tmpdir());
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
@@ -464,6 +535,19 @@ test("PEG-DASH-037 controlled Grab UI is opt-in, exact-confirmation, and page-me
   assert.match(String(client.body), /timeout_unknown|Check Arr activity|administratorToken = undefined/u);
   assert.match(String(model.body), /controlledGrab: capabilities\.controlledGrab === true/u);
   assert.match(String(styles.body), /grab-dialog|grab-confirmation-phrase|danger-button/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-039 audit history preserves Unknown and exact operator reconciliation in page memory", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, styles.body].join("\n");
+
+  assert.match(String(page.body), /Controlled Grab history|Unknown outcomes must be checked|Verified outcome|Record attestation/u);
+  assert.match(String(client.body), /loadGrabHistory|renderGrabHistory|submitReconciliation|reconciliationConfirmations/u);
+  assert.match(String(client.body), /historyAdministratorToken = undefined|credentials: "omit"|encodeURIComponent/u);
+  assert.match(String(styles.body), /grab-history-event|grab-history-status-chip|grab-reconcile-step/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 

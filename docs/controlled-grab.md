@@ -54,11 +54,14 @@ All endpoints use `Authorization: Bearer <administrator token>`. The regular lib
 - `POST /api/v1/library/items/{sonarr/episode|radarr/movie}/{itemId}/grab/prepare` accepts only `{ "releaseId": "..." }` and returns a short-lived challenge after revalidation.
 - `POST /api/v1/library/items/{sonarr/episode|radarr/movie}/{itemId}/grab/execute` accepts only the returned `challengeId`, the exact `confirmation`, and a client-generated `idempotencyKey`.
 - `GET /api/v1/grabs/history?limit=50` returns at most 100 public audit events and never returns idempotency keys or Arr handles.
+- `POST /api/v1/grabs/{eventId}/reconcile` accepts only an outcome (`grabbed` or `not_grabbed`) and its exact event-specific confirmation phrase.
 
 Request bodies are JSON-only and limited to 16 KiB. Challenges live only in process memory, expire after two minutes, and are bounded to 100 entries. Restarting Pegarr invalidates outstanding challenges but preserves audit history.
 
 ## Timeouts and reconciliation
 
-An Arr timeout is not a failure and is not permission to retry. The result is `timeout_unknown`, the audit event is marked `reconciliation_required`, and Pegarr blocks the same target/release for ten minutes. Check Sonarr or Radarr activity and download-client state before any later attempt.
+An Arr timeout is not a failure and is not permission to retry. The result is `timeout_unknown`, the audit event is marked `reconciliation_required`, and Pegarr blocks the same target/release until it is reconciled. Open **Grab history**, authenticate with the independent administrator token, and check Sonarr or Radarr activity plus download-client state before reconciling the event.
+
+Reconciliation never rewrites the original Unknown result. It appends a durable `grabbed` or `not_grabbed` operator attestation with its own timestamp and requires an exact release-and-target phrase. A verified `not_grabbed` outcome releases duplicate protection; a verified `grabbed` outcome keeps it. This is an operational assertion, so do not use it until the exact release has been checked in Arr.
 
 The harness proves this behavior with synthetic services only. Live Grab compatibility and operational reconciliation remain `PEG-MANUAL-004`; automated tests must never mutate local services or the NAS.

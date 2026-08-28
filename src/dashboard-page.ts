@@ -48,7 +48,10 @@ export const dashboardPage = `<!doctype html>
           <h2 id="inventory-title"><span id="visible-count">0</span> <span id="visible-label">items</span></h2>
         </div>
         <div id="source-status" class="source-status" aria-label="Integration status"></div>
-        <button id="refresh-button" class="secondary-button" type="button">Refresh inventory</button>
+        <div class="summary-actions">
+          <button id="grab-history-open" class="secondary-button" type="button">Grab history</button>
+          <button id="refresh-button" class="secondary-button" type="button">Refresh inventory</button>
+        </div>
       </div>
 
       <div class="controls" aria-label="Inventory controls">
@@ -309,6 +312,61 @@ export const dashboardPage = `<!doctype html>
         <button id="grab-execute" class="danger-button" type="button" disabled>Confirm Grab</button>
       </section>
       <p id="grab-status" class="grab-status" role="status" aria-live="polite"></p>
+    </form>
+  </dialog>
+
+  <dialog id="grab-history-dialog" class="grab-dialog history-dialog" aria-labelledby="grab-history-title">
+    <form id="grab-history-form" method="dialog" class="grab-dialog-card">
+      <div class="grab-dialog-heading">
+        <div>
+          <p class="eyebrow">Administrator audit</p>
+          <h2 id="grab-history-title">Controlled Grab history</h2>
+        </div>
+        <button id="grab-history-close" class="quiet-button" type="button">Close</button>
+      </div>
+      <p class="grab-warning">Unknown outcomes must be checked in Sonarr or Radarr before reconciliation. Pegarr preserves the original Unknown result and records your separate attestation.</p>
+      <section id="grab-history-auth" class="grab-step">
+        <label for="grab-history-token"><span>Administrator token</span>
+          <input id="grab-history-token" type="password" minlength="32" required autocomplete="off" spellcheck="false">
+        </label>
+        <p>The token stays only in this dialog's page memory and is cleared when the dialog closes.</p>
+        <button id="grab-history-load" class="primary-button" type="button">Load audit history</button>
+      </section>
+      <section id="grab-history-results" class="grab-history-results" aria-labelledby="grab-history-results-title" hidden>
+        <div class="history-results-heading">
+          <h3 id="grab-history-results-title">Recent outcomes</h3>
+          <button id="grab-history-refresh" class="quiet-button" type="button">Refresh</button>
+        </div>
+        <div id="grab-history-list" class="grab-history-list"></div>
+      </section>
+      <section id="grab-reconcile-step" class="grab-step grab-reconcile-step" hidden>
+        <div>
+          <p class="eyebrow">Explicit attestation</p>
+          <h3>Reconcile Unknown outcome</h3>
+        </div>
+        <p>First verify the exact release in Arr activity and the download client. Then choose what actually happened.</p>
+        <dl class="grab-selection">
+          <div><dt>Target</dt><dd id="grab-reconcile-target"></dd></div>
+          <div><dt>Release</dt><dd id="grab-reconcile-release"></dd></div>
+        </dl>
+        <label for="grab-reconcile-outcome"><span>Verified outcome</span>
+          <select id="grab-reconcile-outcome">
+            <option value="">Choose after checking Arr</option>
+            <option value="grabbed">Arr grabbed this release</option>
+            <option value="not_grabbed">Arr did not grab this release</option>
+          </select>
+        </label>
+        <p>Type this exact phrase to record the attestation:</p>
+        <code id="grab-reconcile-phrase" class="grab-confirmation-phrase"></code>
+        <label for="grab-reconcile-confirmation"><span>Exact confirmation</span>
+          <input id="grab-reconcile-confirmation" type="text" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="reconcile-actions">
+          <button id="grab-reconcile-cancel" class="quiet-button" type="button">Cancel reconciliation</button>
+          <button id="grab-reconcile-submit" class="danger-button" type="button" disabled>Record attestation</button>
+        </div>
+      </section>
+      <p id="grab-history-status" class="grab-status" role="status" aria-live="polite"></p>
     </form>
   </dialog>
 
