@@ -12,7 +12,8 @@ When the [provider search cache](provider-search-cache.md) is enabled, successfu
 
 - Sonarr's `fullSeason`, season number, and episode-number coverage remain attached to each release row.
 - A subtitle marked `fullSeason: true` may satisfy a season or an episode in that season.
-- A single-episode subtitle never satisfies an entire season.
+- Individual and bounded multi-episode subtitle evidence can satisfy only the episodes it explicitly lists; neither can satisfy an entire season.
+- Mixed provider results do not inflate partial coverage: a full-season pack may win, while individual episode rows remain local evidence only.
 - If a provider omits full-season coverage metadata, season confidence is `Unknown` rather than `No match found`.
 - Provider failures and quota exhaustion remain `Unknown`.
 - Bazarr's installed Brazilian Portuguese code `pb` canonicalizes to `pt-BR`, so the normal `pt-BR` mapping works without a second alias entry.
@@ -65,4 +66,4 @@ Exit code `0` means a report was built. Exit code `1` means policy resolution or
 
 The output includes private titles, identifiers, release names, and policy evidence. Sanitize it before sharing publicly.
 
-`PEG-SONARR-009`, `PEG-SUBDL-006`, `PEG-MATCH-009`, `PEG-MATCH-010`, `PEG-SEASONFLOW-001` through `PEG-SEASONFLOW-003`, `PEG-SEASONREPORT-001`, `PEG-SEASONREPORT-002`, `PEG-CACHE-001` through `PEG-CACHE-008`, `PEG-DOCKER-009`, and `PEG-DOCKER-010` are the deterministic evidence for this path.
+`PEG-SONARR-009`, `PEG-SUBDL-006`, `PEG-SUBDL-007`, `PEG-MATCH-009`, `PEG-MATCH-010`, `PEG-MATCH-012`, `PEG-SEASONFLOW-001` through `PEG-SEASONFLOW-004`, `PEG-SEASONREPORT-001`, `PEG-SEASONREPORT-002`, `PEG-CACHE-001` through `PEG-CACHE-008`, `PEG-DOCKER-009`, and `PEG-DOCKER-010` are the deterministic evidence for this path.

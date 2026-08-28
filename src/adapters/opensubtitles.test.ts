@@ -129,6 +129,8 @@ test("PEG-OPENSUBTITLES-002 safe release evidence preserves preference flags and
 
   assert.equal(result.status, "success");
   assert.deepEqual(result.quota, { limit: 5, remaining: 4, windowSeconds: 1 });
+  assert.deepEqual(result.subtitles[0]?.traits, { frameRate: 23.976 });
+  assert.equal(result.subtitles[1]?.traits, undefined);
   assert.deepEqual(
     result.subtitles.map(({ provider, language, providerLanguage, releaseName, hearingImpaired, forced }) => ({
       provider, language, providerLanguage, releaseName, hearingImpaired, forced,

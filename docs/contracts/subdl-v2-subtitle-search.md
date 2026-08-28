@@ -25,7 +25,7 @@ Authorization: Bearer <server-side secret>
 Accept: application/json
 ```
 
-Season and episode are present only for episodes. The key is never placed in query parameters, URLs, fixtures, logs, or browser-visible models. Pegarr does not call SubDL's download, upload, batch POST, translation, transcription, AI, or account endpoints.
+Season is present for episode and season searches; episode is present only for an exact episode search. The key is never placed in query parameters, URLs, fixtures, logs, or browser-visible models. Pegarr does not call SubDL's download, upload, batch POST, translation, transcription, AI, or account endpoints.
 
 ## One explicit language per window
 
@@ -41,8 +41,9 @@ The provider-independent candidate keeps only:
 - Bazarr policy language and original provider language label when returned;
 - release name;
 - requested IMDb/TMDB identity;
-- season and episode for a targeted episode;
+- season, an exact episode, or a bounded explicit episode range when supplied;
 - hearing-impaired, forced, and full-season flags when supplied.
+- a bounded frame rate when supplied, for local compatibility scoring;
 - bounded rate-limit limit, remaining count, and reset timestamp headers when supplied.
 
 Multiple release names on one subtitle row become separate local candidates. Subtitle download URLs, raw SubDL IDs, archive or file handles, posters, title-page URLs, uploader names, comments, and arbitrary response properties are discarded.

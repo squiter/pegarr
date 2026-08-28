@@ -36,16 +36,13 @@ if (phaseTwo.schemaVersion !== 1 || phaseTwo.phase !== "phase-2-controlled-grab"
 }
 validateCriteria(phaseTwo, expectedPhaseTwoCriteria, new Set(["complete"]), "Phase 2");
 
-if (phaseThree.schemaVersion !== 1 || phaseThree.phase !== "phase-3-reliability-and-providers" || phaseThree.status !== "in_progress") {
-  issues.push("the Phase 3 ledger must expose reliability and provider expansion as in progress");
+if (phaseThree.schemaVersion !== 1 || phaseThree.phase !== "phase-3-reliability-and-providers" || phaseThree.status !== "complete") {
+  issues.push("the Phase 3 ledger must preserve the completed reliability and provider-expansion record");
 }
-validateCriteria(phaseThree, expectedPhaseThreeCriteria, new Set(["complete", "in_progress", "pending"]), "Phase 3");
-if (!(phaseThree.criteria ?? []).some(({ status }) => status === "in_progress")) {
-  issues.push("Phase 3 must retain at least one honestly in-progress criterion until completion");
-}
+validateCriteria(phaseThree, expectedPhaseThreeCriteria, new Set(["complete"]), "Phase 3");
 
-if (manifest.phase !== "phase-3-reliability-in-progress" || manifest.completion?.status !== "in_progress") {
-  issues.push("harness/manifest.json must expose the active Phase 3 state honestly");
+if (manifest.phase !== "phase-3-reliability-complete" || manifest.completion?.status !== "complete") {
+  issues.push("harness/manifest.json must expose the completed Phase 3 state honestly");
 }
 if (manifest.completion?.criteria !== "harness/phase-3.json") {
   issues.push("harness/manifest.json must point to the Phase 3 criteria ledger");
@@ -66,7 +63,7 @@ if (!existsSync(phaseThreeGuidePath)) {
   for (const id of expectedPhaseThreeCriteria) {
     if (!guide.includes(id)) issues.push(`docs/phase-3.md is missing ${id}`);
   }
-  if (!guide.includes("Phase 3 is in progress")) issues.push("the Phase 3 guide must preserve its active implementation outcome");
+  if (!guide.includes("Phase 3 implementation is complete")) issues.push("the Phase 3 guide must preserve its completed implementation outcome");
   if (!guide.includes("default read-only")) issues.push("the Phase 3 guide must preserve the default read-only boundary");
 }
 

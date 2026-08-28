@@ -5,6 +5,7 @@ import type { MediaIdentity } from "../domain.js";
 import {
   syntheticSubdlV2EpisodeSearchResponse,
   syntheticSubdlV2MovieSearchResponse,
+  syntheticSubdlV2MultiEpisodeSearchResponse,
   syntheticSubdlV2SeasonSearchResponse,
 } from "../fixtures/subdl-v2-subtitle-search.js";
 import {
@@ -334,4 +335,44 @@ test("PEG-SUBDL-006 season searches omit episode and retain explicit pack covera
   assert.equal(result.subtitles[1]?.fullSeason, false);
   assert.equal(result.subtitles[1]?.episode, 5);
   assert.doesNotMatch(JSON.stringify(result), /private|\.zip/iu);
+});
+
+test("PEG-SUBDL-007 multi-episode ranges are bounded evidence without download handles", async () => {
+  const transport = new FakeTransport();
+  transport.response = {
+    status: 200,
+    headers: {},
+    body: syntheticSubdlV2MultiEpisodeSearchResponse,
+  };
+  const result = await client(transport).search({
+    item: episode,
+    language: { policyCode: "en", providerCode: "EN" },
+  });
+
+  assert.equal(result.status, "success");
+  assert.deepEqual(result.subtitles[0]?.episodeNumbers, [5, 6, 7]);
+  assert.equal(result.subtitles[0]?.episode, undefined);
+  assert.equal(result.subtitles[0]?.fullSeason, false);
+  assert.deepEqual(result.subtitles[0]?.traits, { frameRate: 23.976 });
+  assert.doesNotMatch(JSON.stringify(result), /private|file.?handle|unpack|\.zip/iu);
+
+  transport.response = {
+    status: 200,
+    headers: {},
+    body: {
+      status: true,
+      subtitles: [{
+        release_name: "Synthetic.Show.S03E05-E07.1080p.WEB-DL.H264-GROUP",
+        language: "EN",
+        episode_from: 5,
+      }],
+    },
+  };
+  await assert.rejects(
+    client(transport).search({
+      item: episode,
+      language: { policyCode: "en", providerCode: "EN" },
+    }),
+    (error: unknown) => error instanceof SubdlAdapterError && error.code === "invalid_response",
+  );
 });

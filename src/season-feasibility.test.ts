@@ -48,6 +48,7 @@ class BazarrSource implements BazarrSeasonPolicySource {
 
 class SubdlSource implements SubdlWindowSource {
   readonly calls: SubdlSearchWindow[] = [];
+  includeFullSeason = true;
 
   async search(window: SubdlSearchWindow): Promise<ProviderSearchResult> {
     this.calls.push(window);
@@ -55,17 +56,31 @@ class SubdlSource implements SubdlWindowSource {
       provider: "subdl",
       status: "success",
       searchedLanguages: [window.language.policyCode],
-      subtitles: window.language.policyCode === "pt-BR" ? [{
-        id: "subdl-season-pack",
-        provider: "subdl",
-        language: "pt-BR",
-        releaseName: "Example.Show.S03.1080p.WEB-DL.H264-GROUP",
-        mediaIds: window.item.ids,
-        season: 3,
-        fullSeason: true,
-        hearingImpaired: true,
-        forced: false,
-      }] : [],
+      subtitles: window.language.policyCode === "pt-BR" ? [
+        {
+          id: "subdl-individual-episode",
+          provider: "subdl",
+          language: "pt-BR",
+          releaseName: "Example.Show.S03E05.1080p.WEB-DL.H264-GROUP",
+          mediaIds: window.item.ids,
+          season: 3,
+          episode: 5,
+          fullSeason: false,
+          hearingImpaired: true,
+          forced: false,
+        },
+        ...(this.includeFullSeason ? [{
+          id: "subdl-season-pack",
+          provider: "subdl",
+          language: "pt-BR",
+          releaseName: "Example.Show.S03.1080p.WEB-DL.H264-GROUP",
+          mediaIds: window.item.ids,
+          season: 3,
+          fullSeason: true,
+          hearingImpaired: true,
+          forced: false,
+        }] : []),
+      ] : [],
     };
   }
 }
@@ -154,4 +169,21 @@ test("PEG-SEASONFLOW-003 Sonarr season failure remains classified and stops prov
     retryAfterSeconds: 30,
   }]);
   assert.equal(harness.subdl.calls.length, 0);
+});
+
+test("PEG-SEASONFLOW-004 individual episode evidence cannot satisfy a season release", async () => {
+  const harness = service();
+  harness.subdl.includeFullSeason = false;
+  const outcome = await harness.service.build(request);
+
+  assert.equal(outcome.status, "ready");
+  if (outcome.status !== "ready") return;
+  assert.equal(
+    outcome.report.releases[0]?.subtitle.languages[1]?.confidence,
+    "no_match_found",
+  );
+  assert.equal(
+    outcome.report.releases[0]?.subtitle.languages[1]?.providerCount,
+    0,
+  );
 });

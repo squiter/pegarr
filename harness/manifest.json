@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "phase": "phase-3-reliability-in-progress",
+  "phase": "phase-3-reliability-complete",
   "completion": {
-    "status": "in_progress",
+    "status": "complete",
     "criteria": "harness/phase-3.json",
     "affected": "npm run check:affected",
     "full": "npm run check"
@@ -597,6 +597,42 @@
       "boundary": "Pure deterministic matching over true, false, and missing pack evidence"
     },
     {
+      "id": "PEG-SUBDL-007",
+      "title": "Multi-episode ranges and frame rates remain bounded safe evidence",
+      "evidence": "src/adapters/subdl.test.ts",
+      "boundary": "Sanitized multi-episode provider fixture and injected transport; no network"
+    },
+    {
+      "id": "PEG-MATCH-012",
+      "title": "Multi-episode evidence covers only explicitly listed episodes",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching over identifier-free synthetic range evidence"
+    },
+    {
+      "id": "PEG-MATCH-013",
+      "title": "Episode ranges, anime groups, and frame rates normalize deterministically",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure normalization over synthetic release names"
+    },
+    {
+      "id": "PEG-MATCH-014",
+      "title": "Edition and frame-rate conflicts cannot become confirmed matches",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching over synthetic movie evidence"
+    },
+    {
+      "id": "PEG-MATCH-015",
+      "title": "Anime absolute, season, checksum, and multilingual syntax canonicalizes",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure normalization over synthetic release names"
+    },
+    {
+      "id": "PEG-MATCH-016",
+      "title": "Provider disagreement selects the strongest local evidence",
+      "evidence": "src/matching.test.ts",
+      "boundary": "Pure deterministic matching across synthetic provider results"
+    },
+    {
       "id": "PEG-SEASONFLOW-001",
       "title": "Season releases and full-season subtitle evidence produce one report",
       "evidence": "src/season-feasibility.test.ts",
@@ -613,6 +649,12 @@
       "title": "Sonarr season failure remains classified and stops provider work",
       "evidence": "src/season-feasibility.test.ts",
       "boundary": "Injected rate-limit error and deterministic request counters"
+    },
+    {
+      "id": "PEG-SEASONFLOW-004",
+      "title": "Individual episode evidence cannot satisfy a season release",
+      "evidence": "src/season-feasibility.test.ts",
+      "boundary": "Injected mixed season and episode provider evidence over sanitized fixtures"
     },
     {
       "id": "PEG-SEASONREPORT-001",
@@ -1204,7 +1246,7 @@
     },
     {
       "id": "PEG-HARNESS-007",
-      "title": "Phase 3 in-progress evidence preserves completed Phase 1 and Phase 2 baselines",
+      "title": "Phase 3 completion preserves completed Phase 1 and Phase 2 baselines",
       "evidence": "scripts/harness/phase-contract.mjs",
       "boundary": "Repository-owned phase ledgers, scenario manifest, and documentation only"
     },

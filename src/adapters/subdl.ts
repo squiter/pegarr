@@ -262,6 +262,8 @@ export function mapSubdlSearchResponse(
     );
     const season = optionalPositiveInteger(subtitle.season, `subtitles[${index}].season`);
     const episode = optionalPositiveInteger(subtitle.episode, `subtitles[${index}].episode`);
+    const episodeNumbers = episodeRange(subtitle, index);
+    const frameRate = optionalFrameRate(subtitle.fps, `subtitles[${index}].fps`);
     const rawId = optionalScalarString(subtitle.n_id) ?? optionalScalarString(subtitle.id) ?? String(index);
 
     return releases.map((releaseName, releaseIndex) => ({
@@ -272,14 +274,35 @@ export function mapSubdlSearchResponse(
       releaseName,
       mediaIds: window.mediaIds,
       ...(window.season === undefined ? {} : { season: season ?? window.season }),
-      ...(episode === undefined && window.episode === undefined
+      ...(episode === undefined && (window.episode === undefined || episodeNumbers !== undefined)
         ? {}
         : { episode: episode ?? window.episode }),
+      ...(episodeNumbers === undefined ? {} : { episodeNumbers }),
       ...(hearingImpaired === undefined ? {} : { hearingImpaired }),
       ...(forced === undefined ? {} : { forced }),
       ...(fullSeason === undefined ? {} : { fullSeason }),
+      ...(frameRate === undefined ? {} : { traits: { frameRate } }),
     }));
   });
+}
+
+function episodeRange(
+  subtitle: Readonly<Record<string, unknown>>,
+  index: number,
+): readonly number[] | undefined {
+  const from = optionalPositiveInteger(
+    subtitle.episode_from,
+    `subtitles[${index}].episode_from`,
+  );
+  const to = optionalPositiveInteger(
+    subtitle.episode_end,
+    `subtitles[${index}].episode_end`,
+  );
+  if (from === undefined && to === undefined) return undefined;
+  if (from === undefined || to === undefined || to < from || to - from > 999) {
+    throw new TypeError(`subtitles[${index}] contains an invalid episode range`);
+  }
+  return Array.from({ length: to - from + 1 }, (_, offset) => from + offset);
 }
 
 function normalizeSearchWindow(window: SubdlSearchWindow): NormalizedSearchWindow {
@@ -468,6 +491,15 @@ function optionalPositiveInteger(value: unknown, field: string): number | undefi
     throw new TypeError(`${field} must be a number`);
   }
   return boundedInteger(value, 1, 100_000, field);
+}
+
+function optionalFrameRate(value: unknown, field: string): number | undefined {
+  if (value === undefined || value === null || value === 0 || value === "0") return undefined;
+  const parsed = typeof value === "string" ? Number(value) : value;
+  if (typeof parsed !== "number" || !Number.isFinite(parsed) || parsed < 1 || parsed > 240) {
+    throw new TypeError(`${field} must be a frame rate between 1 and 240`);
+  }
+  return parsed;
 }
 
 function safeLanguageCode(value: string, field: string): string {

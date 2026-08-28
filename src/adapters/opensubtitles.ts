@@ -243,6 +243,7 @@ export function mapOpenSubtitlesResponse(
       attributes.foreign_parts_only,
       `data[${index}].attributes.foreign_parts_only`,
     );
+    const frameRate = optionalFrameRate(attributes.fps, `data[${index}].attributes.fps`);
     for (const releaseName of releaseNames) {
       candidates.push({
         id: stableId(window, releaseName),
@@ -255,6 +256,7 @@ export function mapOpenSubtitlesResponse(
         ...(window.item.episode === undefined ? {} : { episode: window.item.episode }),
         ...(hearingImpaired === undefined ? {} : { hearingImpaired }),
         ...(forced === undefined ? {} : { forced }),
+        ...(frameRate === undefined ? {} : { traits: { frameRate } }),
       });
     }
   }
@@ -397,6 +399,15 @@ function optionalBoolean(value: unknown, field: string): boolean | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "boolean") throw new TypeError(`${field} must be a boolean`);
   return value;
+}
+
+function optionalFrameRate(value: unknown, field: string): number | undefined {
+  if (value === undefined || value === null || value === 0 || value === "0") return undefined;
+  const parsed = typeof value === "string" ? Number(value) : value;
+  if (typeof parsed !== "number" || !Number.isFinite(parsed) || parsed < 1 || parsed > 240) {
+    throw new TypeError(`${field} must be a frame rate between 1 and 240`);
+  }
+  return parsed;
 }
 
 function safeHeader(value: string, field: string): string {

@@ -59,6 +59,7 @@ export interface ReleaseTraits {
   readonly codec?: string;
   readonly releaseGroup?: string;
   readonly edition?: string;
+  readonly frameRate?: number;
 }
 
 export interface ArrReleaseEvidence {
@@ -133,6 +134,7 @@ export interface SubtitleCandidate {
   readonly mediaIds: Readonly<Record<string, string>>;
   readonly season?: number;
   readonly episode?: number;
+  readonly episodeNumbers?: readonly number[];
   readonly hearingImpaired?: boolean;
   readonly forced?: boolean;
   readonly fullSeason?: boolean;

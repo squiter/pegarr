@@ -12,6 +12,7 @@ export const syntheticOpenSubtitlesEpisodeSearchResponse = {
         language: "en",
         hearing_impaired: false,
         foreign_parts_only: false,
+        fps: 23.976,
         release: "Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP",
         comments: "private comment",
         url: "https://www.opensubtitles.com/private/result/101",

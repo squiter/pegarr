@@ -282,3 +282,200 @@ test("PEG-MATCH-010 season matching requires explicit full-season coverage", () 
   ]);
   assert.equal(seasonPack.confidence, "confirmed");
 });
+
+test("PEG-MATCH-012 multi-episode coverage includes only explicitly listed episodes", () => {
+  const release = {
+    ...demoFeasibilityInput.releases[0]!,
+    title: "Example.Show.S03E05E06.1080p.WEB-DL.H264-GROUP",
+  };
+  const candidate = {
+    id: "multi-episode-pack",
+    provider: "subdl",
+    language: "pt-BR",
+    releaseName: "Example.Show.S03E05-E07.1080p.WEB-DL.H264-GROUP",
+    mediaIds: {},
+    season: 3,
+    episodeNumbers: [5, 6, 7],
+    fullSeason: false,
+    hearingImpaired: false,
+    forced: false,
+  } as const;
+  const result = {
+    provider: "subdl",
+    status: "success" as const,
+    subtitles: [candidate],
+  };
+
+  const included = assessLanguage(
+    demoFeasibilityInput.item,
+    release,
+    demoFeasibilityInput.policy.languages[0]!,
+    [result],
+  );
+  const excluded = assessLanguage(
+    { ...demoFeasibilityInput.item, episode: 8 },
+    release,
+    demoFeasibilityInput.policy.languages[0]!,
+    [result],
+  );
+
+  assert.equal(included.confidence, "likely");
+  assert.equal(excluded.confidence, "no_match_found");
+  assert.ok(included.evidence?.reasons.includes(
+    "Explicit multi-episode subtitle coverage includes the requested episode",
+  ));
+});
+
+test("PEG-MATCH-013 episode ranges, anime groups, and frame rates normalize deterministically", () => {
+  const ranged = normalizeRelease("[SubsPlease] Synthetic.Show.S03E05-E06.1080p.WEB-DL.x265.mkv");
+  const joined = normalizeRelease("[SubsPlease] Synthetic.Show.S03E05E06.1080p.WEB-DL.x265.mkv");
+  const frameRate = normalizeRelease("Synthetic.Show.S03E05.1080p.WEB-DL.23.976fps-GROUP");
+
+  assert.equal(ranged.canonical, joined.canonical);
+  assert.equal(ranged.releaseGroup, "subsplease");
+  assert.equal(ranged.source, "webdl");
+  assert.equal(ranged.codec, "h265");
+  assert.equal(frameRate.frameRate, 23.976);
+});
+
+test("PEG-MATCH-014 edition and frame-rate conflicts cannot become confirmed matches", () => {
+  const item = {
+    kind: "movie" as const,
+    title: "Synthetic Movie",
+    year: 2025,
+    ids: { tmdb: "84" },
+  };
+  const requirement = demoFeasibilityInput.policy.languages[0]!;
+  const release = {
+    ...demoFeasibilityInput.releases[0]!,
+    id: "synthetic-movie-release",
+    title: "Synthetic.Movie.2025.Directors.Cut.1080p.BluRay.x265-GROUP",
+    traits: { frameRate: 23.976 },
+  };
+  const baseCandidate = {
+    id: "synthetic-movie-subtitle",
+    provider: "subdl",
+    language: requirement.code,
+    mediaIds: item.ids,
+    hearingImpaired: false,
+    forced: false,
+  };
+
+  const wrongEdition = assessLanguage(item, release, requirement, [{
+    provider: "subdl",
+    status: "success",
+    subtitles: [{
+      ...baseCandidate,
+      releaseName: "Synthetic.Movie.2025.Theatrical.Cut.1080p.BluRay.x265-GROUP",
+      traits: { frameRate: 23.976 },
+    }],
+  }]);
+  const wrongFrameRate = assessLanguage(item, release, requirement, [{
+    provider: "subdl",
+    status: "success",
+    subtitles: [{
+      ...baseCandidate,
+      releaseName: release.title,
+      traits: { frameRate: 25 },
+    }],
+  }]);
+  const compatibleDifferentGroup = assessLanguage(item, release, requirement, [{
+    provider: "subdl",
+    status: "success",
+    subtitles: [{
+      ...baseCandidate,
+      releaseName: "Synthetic.Movie.2025.Directors.Cut.1080p.BluRay.x265-OTHER",
+      traits: { frameRate: 23.976 },
+    }],
+  }]);
+  const knownEditionMissingFromSubtitle = assessLanguage(
+    item,
+    {
+      ...release,
+      title: "Synthetic.Movie.2025.1080p.BluRay.x265-GROUP",
+      traits: { edition: "Director's Cut", frameRate: 23.976 },
+    },
+    requirement,
+    [{
+      provider: "subdl",
+      status: "success",
+      subtitles: [{
+        ...baseCandidate,
+        releaseName: "Synthetic.Movie.2025.1080p.BluRay.x265-GROUP",
+      }],
+    }],
+  );
+
+  assert.equal(wrongEdition.confidence, "possible");
+  assert.ok(wrongEdition.evidence?.reasons.includes("Movie edition or cut differs"));
+  assert.equal(wrongFrameRate.confidence, "likely");
+  assert.ok(wrongFrameRate.evidence?.reasons.includes("Frame rate differs"));
+  assert.equal(compatibleDifferentGroup.confidence, "likely");
+  assert.ok(compatibleDifferentGroup.evidence?.reasons.includes("Same frame rate"));
+  assert.equal(knownEditionMissingFromSubtitle.confidence, "likely");
+  assert.ok(knownEditionMissingFromSubtitle.evidence?.reasons.includes(
+    "Subtitle did not report movie edition or cut",
+  ));
+});
+
+test("PEG-MATCH-015 anime absolute, season, checksum, and multilingual syntax canonicalizes", () => {
+  const paddedAbsolute = normalizeRelease(
+    "[SubsPlease] Synthetic Show - 073 (1080p) [A1B2C3D4].mkv",
+  );
+  const plainAbsolute = normalizeRelease(
+    "[SubsPlease] Synthetic Show - 73 (1080p) [D4C3B2A1].mkv",
+  );
+  const seasonWord = normalizeRelease("Synthetic.Show.Season.3.1080p.WEB-DL.x265-GROUP");
+  const seasonToken = normalizeRelease("Synthetic.Show.S03.1080p.WEB-DL.x265-GROUP");
+  const multilingual = normalizeRelease("Synthetic.Movie.2025.MULTi.1080p.BluRay.x265-GROUP");
+  const dualAudio = normalizeRelease("Synthetic.Movie.2025.DUAL-AUDIO.1080p.BluRay.x265-GROUP");
+
+  assert.equal(paddedAbsolute.canonical, plainAbsolute.canonical);
+  assert.equal(paddedAbsolute.releaseGroup, "subsplease");
+  assert.equal(seasonWord.canonical, seasonToken.canonical);
+  assert.equal(multilingual.canonical, dualAudio.canonical);
+});
+
+test("PEG-MATCH-016 provider disagreement selects the strongest local evidence", () => {
+  const release = demoFeasibilityInput.releases[0]!;
+  const baseCandidate = {
+    language: "pt-BR",
+    mediaIds: demoFeasibilityInput.item.ids,
+    season: 3,
+    episode: 5,
+    hearingImpaired: false,
+    forced: false,
+  };
+  const assessment = assessLanguage(
+    demoFeasibilityInput.item,
+    release,
+    demoFeasibilityInput.policy.languages[0]!,
+    [
+      {
+        provider: "subdl",
+        status: "success",
+        subtitles: [{
+          ...baseCandidate,
+          id: "weaker-subdl",
+          provider: "subdl",
+          releaseName: "Example.Show.S03E05.720p.BluRay.H265-OTHER",
+        }],
+      },
+      {
+        provider: "opensubtitles",
+        status: "success",
+        subtitles: [{
+          ...baseCandidate,
+          id: "stronger-opensubtitles",
+          provider: "opensubtitles",
+          releaseName: release.title,
+        }],
+      },
+    ],
+  );
+
+  assert.equal(assessment.confidence, "confirmed");
+  assert.equal(assessment.providerCount, 2);
+  assert.equal(assessment.evidence?.provider, "opensubtitles");
+  assert.equal(assessment.evidence?.subtitleId, "stronger-opensubtitles");
+});

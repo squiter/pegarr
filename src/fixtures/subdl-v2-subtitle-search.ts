@@ -80,3 +80,23 @@ export const syntheticSubdlV2SeasonSearchResponse = {
     },
   ],
 };
+
+export const syntheticSubdlV2MultiEpisodeSearchResponse = {
+  status: true,
+  subtitles: [
+    {
+      n_id: "synthetic-subtitle-multi-episode",
+      release_name: "Synthetic.Show.S03E05-E07.1080p.WEB-DL.H264-GROUP",
+      language: "EN",
+      season: 3,
+      episode_from: 5,
+      episode_end: 7,
+      fps: "23.976",
+      hi: false,
+      forced: false,
+      full_season: false,
+      url: "/subtitle/private-multi-episode.zip",
+      unpack_files: [{ file_n_id: "private-file-handle", url: "/private/file.srt" }],
+    },
+  ],
+} as const;

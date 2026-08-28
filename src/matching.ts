@@ -208,14 +208,21 @@ function scoreCandidate(release: ArrReleaseCandidate, candidate: SubtitleCandida
   const subtitle = normalizeRelease(candidate.releaseName, candidate.traits);
   const reasons: string[] = [];
 
-  if (video.canonical === subtitle.canonical) {
+  if (
+    video.canonical === subtitle.canonical &&
+    (video.edition === undefined || sameDefined(video.edition, subtitle.edition)) &&
+    (video.frameRate === undefined || sameFrameRate(video.frameRate, subtitle.frameRate))
+  ) {
     return { candidate, score: 100, confidence: "confirmed", reasons: ["Exact normalized release name"] };
   }
 
-  let score = candidate.fullSeason === true ? 45 : 50;
+  const multiEpisode = (candidate.episodeNumbers?.length ?? 0) > 1;
+  let score = candidate.fullSeason === true ? 45 : multiEpisode ? 48 : 50;
   reasons.push(candidate.fullSeason === true
     ? "Full-season subtitle pack covers the requested season or episode"
-    : "Correct media item, episode, and language");
+    : multiEpisode
+      ? "Explicit multi-episode subtitle coverage includes the requested episode"
+      : "Correct media item, episode, and language");
 
   if (sameDefined(video.releaseGroup, subtitle.releaseGroup)) {
     score += 20;
@@ -249,6 +256,25 @@ function scoreCandidate(release: ArrReleaseCandidate, candidate: SubtitleCandida
     reasons.push("Video codec differs");
   }
 
+  if (sameDefined(video.edition, subtitle.edition)) {
+    score += 10;
+    reasons.push("Same movie edition or cut");
+  } else if (conflicting(video.edition, subtitle.edition)) {
+    score -= 40;
+    reasons.push("Movie edition or cut differs");
+  } else if (video.edition !== undefined) {
+    score -= 30;
+    reasons.push("Subtitle did not report movie edition or cut");
+  }
+
+  if (sameFrameRate(video.frameRate, subtitle.frameRate)) {
+    score += 5;
+    reasons.push("Same frame rate");
+  } else if (conflictingFrameRate(video.frameRate, subtitle.frameRate)) {
+    score -= 10;
+    reasons.push("Frame rate differs");
+  }
+
   const boundedScore = Math.max(1, Math.min(score, 99));
   return {
     candidate,
@@ -263,12 +289,16 @@ function mediaIdentityMatches(item: MediaIdentity, candidate: SubtitleCandidate)
     if (candidate.season !== undefined && candidate.season !== item.season) {
       return false;
     }
-    if (
-      candidate.fullSeason !== true &&
-      candidate.episode !== undefined &&
-      candidate.episode !== item.episode
-    ) {
-      return false;
+    if (candidate.fullSeason !== true) {
+      if (
+        candidate.episodeNumbers !== undefined &&
+        !candidate.episodeNumbers.includes(item.episode ?? 0)
+      ) {
+        return false;
+      }
+      if (candidate.episode !== undefined && candidate.episode !== item.episode) {
+        return false;
+      }
     }
   }
   if (item.kind === "season" && candidate.season !== undefined && candidate.season !== item.season) {
@@ -280,7 +310,11 @@ function mediaIdentityMatches(item: MediaIdentity, candidate: SubtitleCandidate)
     return (
       item.kind === "episode" &&
       candidate.season === item.season &&
-      (candidate.fullSeason === true || candidate.episode === item.episode)
+      (
+        candidate.fullSeason === true ||
+        candidate.episode === item.episode ||
+        candidate.episodeNumbers?.includes(item.episode ?? 0) === true
+      )
     ) || (
       item.kind === "season" && candidate.season === item.season
     );
@@ -327,6 +361,14 @@ function sameDefined(left: string | undefined, right: string | undefined): boole
 
 function conflicting(left: string | undefined, right: string | undefined): boolean {
   return left !== undefined && right !== undefined && left !== right;
+}
+
+function sameFrameRate(left: number | undefined, right: number | undefined): boolean {
+  return left !== undefined && right !== undefined && Math.abs(left - right) < 0.001;
+}
+
+function conflictingFrameRate(left: number | undefined, right: number | undefined): boolean {
+  return left !== undefined && right !== undefined && !sameFrameRate(left, right);
 }
 
 function describeProviderFailure(status: ProviderSearchResult["status"]): string {

@@ -117,6 +117,18 @@ for (const contract of ['status: "hit"', 'status: "miss"', 'value.status !== "su
     issues.push(`The SubDL memory cache must retain ${contract}`);
   }
 }
+for (const contract of ["episodeRange", "episode_from", "episode_end", "episodeNumbers", "optionalFrameRate"]) {
+  if (!subdlAdapter.includes(contract)) {
+    issues.push(`The SubDL evidence mapper must retain ${contract}`);
+  }
+}
+
+const normalization = readFileSync(resolve(repoRoot, "src/normalization.ts"), "utf8");
+for (const contract of ["canonicalEpisodeNotation", "inferEdition", "inferFrameRate"]) {
+  if (!normalization.includes(contract)) {
+    issues.push(`Release normalization must retain ${contract}`);
+  }
+}
 
 const providerCache = readFileSync(resolve(repoRoot, "src/provider-search-cache.ts"), "utf8");
 for (const contract of [

@@ -1,6 +1,6 @@
 # Phase 3 supporting backlog
 
-This backlog supports the active Phase 3 reliability and provider-expansion work. Entries are product intentions, not shipped behavior. Each implementation slice must receive stable harness scenarios before its status changes; authoritative progress lives in `harness/phase-3.json` and `docs/phase-3.md`.
+This record preserves supporting work identified during the now-complete Phase 3 reliability and provider-expansion cycle. Entries state their own shipped or proposed status; proposed entries are not implied product behavior. Completed Phase 3 authority lives in `harness/phase-3.json` and `docs/phase-3.md`.
 
 ## Portainer example for a combined media stack
 

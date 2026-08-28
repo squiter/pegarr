@@ -20,6 +20,11 @@
 | PEG-MATCH-006 | Forced and hearing-impaired requirements filter candidates locally | `src/matching.test.ts` |
 | PEG-MATCH-007 | Missing required subtitle-type metadata remains Unknown | `src/matching.test.ts` |
 | PEG-MATCH-008 | Provider results apply only to the language window actually searched | `src/matching.test.ts` |
+| PEG-MATCH-012 | Multi-episode evidence covers only explicitly listed episodes | `src/matching.test.ts` |
+| PEG-MATCH-013 | Episode ranges, anime groups, and frame rates normalize deterministically | `src/matching.test.ts` |
+| PEG-MATCH-014 | Edition and frame-rate conflicts cannot become confirmed matches | `src/matching.test.ts` |
+| PEG-MATCH-015 | Anime absolute, season, checksum, and multilingual syntax canonicalizes | `src/matching.test.ts` |
+| PEG-MATCH-016 | Provider disagreement selects the strongest local evidence | `src/matching.test.ts` |
 | PEG-HARNESS-001 | Changed paths select the intended sensors | `scripts/harness/run-checks.test.mjs` |
 | PEG-HARNESS-002 | Noisy failures become compact signals | `scripts/harness/run-checks.test.mjs` |
 | PEG-HARNESS-003 | Docker frontend timeouts use one bounded fallback | `scripts/harness/run-checks.test.mjs` |
@@ -102,11 +107,13 @@
 | PEG-INVENTORY-003 | Disabled and invalid inventory configuration fails before network access | `src/inventory-missing.test.ts` |
 | PEG-SONARR-009 | Season search preserves full-season and episode coverage evidence | `src/adapters/sonarr.test.ts` |
 | PEG-SUBDL-006 | Season searches omit episode and retain explicit pack coverage | `src/adapters/subdl.test.ts` |
+| PEG-SUBDL-007 | Multi-episode ranges and frame rates remain bounded safe evidence | `src/adapters/subdl.test.ts` |
 | PEG-MATCH-009 | Full-season subtitle packs cover episodes with explicit evidence | `src/matching.test.ts` |
 | PEG-MATCH-010 | Season matching requires explicit full-season coverage | `src/matching.test.ts` |
 | PEG-SEASONFLOW-001 | Season releases and full-season subtitle evidence produce one report | `src/season-feasibility.test.ts` |
 | PEG-SEASONFLOW-002 | Unresolved series policy stops season provider work | `src/season-feasibility.test.ts` |
 | PEG-SEASONFLOW-003 | Sonarr season failure remains classified and stops provider work | `src/season-feasibility.test.ts` |
+| PEG-SEASONFLOW-004 | Individual episode evidence cannot satisfy a season release | `src/season-feasibility.test.ts` |
 | PEG-SEASONREPORT-001 | Packaged season report composes all three read-only integrations | `src/report-sonarr-season.test.ts` |
 | PEG-SEASONREPORT-002 | Incomplete season report configuration fails before network access | `src/report-sonarr-season.test.ts` |
 | PEG-CACHE-001 | Successful provider results survive cache reopen | `src/provider-search-cache.test.ts` |
@@ -206,7 +213,7 @@
 | PEG-INSTANCE-003 | Grab duplicate protection is isolated by Arr instance | `src/grab-audit.test.ts` |
 | PEG-INSTANCE-004 | Per-instance Arr status is authenticated, bounded, and read-only | `src/app.test.ts` |
 | PEG-DASH-040 | Dashboard inventory keys remain unique across Arr instances | `src/dashboard-model.test.ts` |
-| PEG-HARNESS-007 | Phase 3 progress preserves completed Phase 1 and Phase 2 evidence | `scripts/harness/phase-contract.mjs` |
+| PEG-HARNESS-007 | Phase 3 completion preserves completed Phase 1 and Phase 2 evidence | `scripts/harness/phase-contract.mjs` |
 | PEG-CONFIG-009 | Multiple Arr instances load from bounded secret-reference files | `src/config.test.ts` |
 | PEG-INVENTORY-005 | Missing inventory fans out across bounded Arr instances | `src/inventory-missing.test.ts` |
 | PEG-RUNTIME-009 | Scoped analysis selects the exact Arr client | `src/runtime.test.ts` |

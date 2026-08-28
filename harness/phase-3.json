@@ -1,8 +1,9 @@
 {
   "schemaVersion": 1,
   "phase": "phase-3-reliability-and-providers",
-  "status": "in_progress",
+  "status": "complete",
   "startedOn": "2026-08-28",
+  "completedOn": "2026-08-28",
   "completionRule": "Every Phase 3 criterion must be complete with deterministic evidence while live service and NAS compatibility remain explicit manual gaps.",
   "criteria": [
     {
@@ -26,8 +27,8 @@
     {
       "id": "P3-SEASON-PACKS",
       "title": "Season-pack matching",
-      "status": "in_progress",
-      "scenarioIds": ["PEG-SUBDL-006", "PEG-MATCH-009", "PEG-MATCH-010", "PEG-SEASONFLOW-001"]
+      "status": "complete",
+      "scenarioIds": ["PEG-SUBDL-006", "PEG-SUBDL-007", "PEG-MATCH-009", "PEG-MATCH-010", "PEG-MATCH-012", "PEG-SEASONFLOW-001", "PEG-SEASONFLOW-004"]
     },
     {
       "id": "P3-SUBTITLE-PREFERENCES",
@@ -38,8 +39,8 @@
     {
       "id": "P3-RELEASE-PARSING",
       "title": "Expanded release parsing and matching fixtures",
-      "status": "pending",
-      "scenarioIds": []
+      "status": "complete",
+      "scenarioIds": ["PEG-MATCH-012", "PEG-MATCH-013", "PEG-MATCH-014", "PEG-MATCH-015", "PEG-MATCH-016"]
     }
   ],
   "manualGapIds": ["PEG-MANUAL-001", "PEG-MANUAL-002", "PEG-MANUAL-003", "PEG-MANUAL-004", "PEG-MANUAL-005", "PEG-MANUAL-006"]
