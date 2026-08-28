@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 
 export function shouldRetryWithClassicBuilder(output) {
@@ -795,6 +797,7 @@ async function packagedMissingInventorySmokeTest() {
   const triageScenario = "PEG-DOCKER-021";
   const comparisonScenario = "PEG-DOCKER-022";
   const controlledGrabScenario = "PEG-DOCKER-024";
+  const reconciliationScenario = "PEG-DOCKER-025";
   const suffix = `${process.pid}`;
   const networkName = `pegarr-harness-inventory-internal-${suffix}`;
   const fixtureName = `pegarr-harness-inventory-${suffix}`;
@@ -802,6 +805,10 @@ async function packagedMissingInventorySmokeTest() {
   const artifactsDirectory = resolve(".artifacts");
   mkdirSync(artifactsDirectory, { recursive: true });
   const fixtureDirectory = mkdtempSync(join(artifactsDirectory, "pegarr-synthetic-inventory-docker-"));
+  const auditDirectory = join(fixtureDirectory, "audit");
+  mkdirSync(auditDirectory, { mode: 0o777 });
+  chmodSync(auditDirectory, 0o777);
+  const auditPath = join(auditDirectory, "grab-audit.sqlite");
   const keys = {
     sonarr: "synthetic-inventory-sonarr-key",
     radarr: "synthetic-inventory-radarr-key",
@@ -824,6 +831,46 @@ async function packagedMissingInventorySmokeTest() {
   writeFileSync(paths.subdl, keys.subdl, { mode: 0o444 });
   writeFileSync(paths.access, keys.access, { mode: 0o444 });
   writeFileSync(paths.admin, keys.admin, { mode: 0o444 });
+  const recoveredReleaseId = `sonarr-${createHash("sha256")
+    .update("sonarr\0" + 11 + "\0synthetic-release-guid")
+    .digest("hex")
+    .slice(0, 24)}`;
+  const legacyAudit = new DatabaseSync(auditPath);
+  legacyAudit.exec(`
+    CREATE TABLE grab_audit (
+      event_id TEXT PRIMARY KEY,
+      idempotency_key TEXT NOT NULL UNIQUE,
+      application TEXT NOT NULL CHECK (application IN ('sonarr', 'radarr')),
+      kind TEXT NOT NULL CHECK (kind IN ('episode', 'movie')),
+      item_id INTEGER NOT NULL CHECK (item_id > 0),
+      target_label TEXT NOT NULL,
+      release_id TEXT NOT NULL,
+      release_title TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('in_progress', 'grabbed', 'revalidation_failed', 'timeout_unknown', 'upstream_failure')),
+      detail_code TEXT,
+      requested_at_ms INTEGER NOT NULL CHECK (requested_at_ms >= 0),
+      completed_at_ms INTEGER
+    ) STRICT;
+    CREATE INDEX grab_audit_target_recent
+      ON grab_audit(application, kind, item_id, release_id, requested_at_ms DESC);
+    CREATE INDEX grab_audit_recent
+      ON grab_audit(requested_at_ms DESC, event_id DESC);
+  `);
+  legacyAudit.prepare(`
+    INSERT INTO grab_audit(
+      event_id, idempotency_key, application, kind, item_id, target_label,
+      release_id, release_title, status, requested_at_ms
+    ) VALUES (?, ?, 'sonarr', 'episode', 305, ?, ?, ?, 'in_progress', ?)
+  `).run(
+    "docker_recovery_event_00000001",
+    "docker_recovery_idempotency_0001",
+    "Synthetic Show S03E05 · Synthetic Episode Five",
+    recoveredReleaseId,
+    "Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP",
+    1_000,
+  );
+  legacyAudit.close();
+  chmodSync(auditPath, 0o666);
 
   const network = docker([
     "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
@@ -950,7 +997,8 @@ async function packagedMissingInventorySmokeTest() {
       "--mount", `type=bind,source=${paths.subdl},target=/run/secrets/subdl_api_key,readonly`,
       "--mount", `type=bind,source=${paths.access},target=/run/secrets/pegarr_access_token,readonly`,
       "--mount", `type=bind,source=${paths.admin},target=/run/secrets/pegarr_admin_token,readonly`,
-      "--env", "DATA_DIR=/tmp",
+      "--mount", `type=bind,source=${auditDirectory},target=/data`,
+      "--env", "DATA_DIR=/data",
       "--env", "PEGARR_SONARR_URL=http://sonarr-fixture:8082",
       "--env", "PEGARR_SONARR_ALLOWED_HOSTS=sonarr-fixture",
       "--env", "PEGARR_SONARR_API_KEY_FILE=/run/secrets/sonarr_api_key",
@@ -971,7 +1019,7 @@ async function packagedMissingInventorySmokeTest() {
       "--env", "PEGARR_ACCESS_TOKEN_FILE=/run/secrets/pegarr_access_token",
       "--env", "PEGARR_GRAB_ENABLED=true",
       "--env", "PEGARR_ADMIN_TOKEN_FILE=/run/secrets/pegarr_admin_token",
-      "--env", "PEGARR_GRAB_AUDIT_FILE=/tmp/grab-audit.sqlite",
+      "--env", "PEGARR_GRAB_AUDIT_FILE=/data/grab-audit.sqlite",
       "--env", "PEGARR_MISSING_PAGE_SIZE=2",
       "pegarr:harness",
     ]);
@@ -1043,11 +1091,24 @@ async function packagedMissingInventorySmokeTest() {
       "  const finalCount = Number(await (await fetch(countUrl)).text());",
       "  if (rows.length !== 4 || movies.length !== 2 || after !== 4) throw new Error('packaged local dashboard controls mismatch');",
       "  if (itemResponse.status !== 200 || cachedItem.status !== 200 || itemBody.status !== 'ready' || itemBody.capabilities?.controlledGrab !== true || itemBody.analysis?.source !== 'computed' || cachedItemBody.analysis?.source !== 'memory_cache' || itemView.state !== 'ready' || itemView.controlledGrab !== true || itemView.policySource !== 'bazarr' || itemView.languages[0]?.code !== 'pt-BR' || itemView.languages[0]?.required !== true || itemView.languages[0]?.forced !== false || itemView.languages[0]?.hearingImpaired !== 'either' || itemView.languages[0]?.applicability !== 'always' || itemView.languages[0]?.cutoff !== true || itemView.releases.length !== 1 || itemView.releases[0].confidence !== 'confirmed' || itemView.releases[0].requiredFit !== 'strong' || itemView.releases[0].sizeBytes !== 2400000000 || itemView.releases[0].ageHours !== 3 || itemView.releases[0].seeders !== 42 || itemView.releases[0].leechers !== 6 || itemView.releases[0].releaseGroup !== 'GROUP' || itemView.releases[0].customFormats?.[0] !== 'Subtitle preference' || acceptedReleases.length !== 1 || rejectedReleases.length !== 0 || richReleaseRows.length !== 1 || subtitleDecisionRows.length !== 1 || leading?.id !== itemView.releases[0].id || shortlistRows.length !== 1 || comparison.candidates.length !== 2 || comparison.languages[0]?.assessments.length !== 2 || comparison.candidates[0]?.strengths.subtitleConfidence !== true || comparison.candidates[1]?.strengths.subtitleConfidence !== false || itemSummary.state !== 'ready' || itemSummary.bestConfidence !== 'confirmed' || itemSummary.acceptedCount !== 1 || itemSummary.requiredCoverage !== 'strong' || itemSummary.requiredLanguages?.[0]?.confidence !== 'confirmed' || itemSummary.providerEvidence !== 'available' || itemSummary.providerResultCount !== 1 || itemSummary.availableProviderResultCount !== 1 || analyzedItems.length !== 1 || notAnalyzedItems.length !== 3 || matchingPolicy.length !== 1 || matchingEvidence.length !== 1 || sonarrItems.length !== 2 || matchingProfile.length !== 1 || matchingLanguage.length !== 1 || recentAnalysis.length !== 1 || triageFilterCount !== 5 || itemView.analysis.providerRequests !== 1 || finalCount !== 8) throw new Error('packaged item feasibility or local dashboard controls mismatch');",
+      "  const recoveredHistory = await fetch(app + '/api/v1/grabs/history?limit=10', { headers: { authorization: 'Bearer ' + adminToken } });",
+      "  const recoveredHistoryBody = await recoveredHistory.json();",
+      "  const recoveredEvent = recoveredHistoryBody.events?.find((event) => event.eventId === 'docker_recovery_event_00000001');",
+      "  const libraryHistory = await fetch(app + '/api/v1/grabs/history?limit=10', { headers: { authorization: 'Bearer ' + token } });",
+      "  if (recoveredHistory.status !== 200 || recoveredHistoryBody.events?.length !== 1 || libraryHistory.status !== 401 || recoveredEvent?.status !== 'timeout_unknown' || recoveredEvent?.detailCode !== 'process_restart_reconciliation_required' || !recoveredEvent?.reconciliationConfirmations?.notGrabbed || recoveredEvent?.reconciliationOutcome !== undefined) throw new Error('packaged interrupted Grab recovery or history mismatch');",
       "  const grabBase = app + '/api/v1/library/items/sonarr/episode/305/grab';",
       "  const libraryCannotGrab = await fetch(grabBase + '/prepare', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ releaseId: itemView.releases[0].id }) });",
       "  const prepared = await fetch(grabBase + '/prepare', { method: 'POST', headers: { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' }, body: JSON.stringify({ releaseId: itemView.releases[0].id }) });",
       "  const preparedBody = await prepared.json();",
       "  if (libraryCannotGrab.status !== 401 || prepared.status !== 200 || preparedBody.status !== 'confirmation_required' || !preparedBody.confirmation.includes(itemView.releases[0].title) || JSON.stringify(preparedBody).includes('synthetic-release-guid')) throw new Error('packaged controlled Grab preparation mismatch');",
+      "  const blocked = await fetch(grabBase + '/execute', { method: 'POST', headers: { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' }, body: JSON.stringify({ challengeId: preparedBody.challengeId, confirmation: preparedBody.confirmation, idempotencyKey: 'docker_blocked_idempotency_0001' }) });",
+      "  const blockedBody = await blocked.json();",
+      "  const reconcileUrl = app + '/api/v1/grabs/' + encodeURIComponent(recoveredEvent.eventId) + '/reconcile';",
+      "  const libraryCannotReconcile = await fetch(reconcileUrl, { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ outcome: 'not_grabbed', confirmation: recoveredEvent.reconciliationConfirmations.notGrabbed }) });",
+      "  const mismatch = await fetch(reconcileUrl, { method: 'POST', headers: { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' }, body: JSON.stringify({ outcome: 'not_grabbed', confirmation: 'not exact' }) });",
+      "  const reconciled = await fetch(reconcileUrl, { method: 'POST', headers: { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' }, body: JSON.stringify({ outcome: 'not_grabbed', confirmation: recoveredEvent.reconciliationConfirmations.notGrabbed }) });",
+      "  const reconciledBody = await reconciled.json();",
+      "  if (blocked.status !== 409 || blockedBody.status !== 'duplicate_blocked' || blockedBody.detailCode !== 'reconciliation_required' || libraryCannotReconcile.status !== 401 || mismatch.status !== 409 || reconciled.status !== 200 || reconciledBody.status !== 'reconciled' || reconciledBody.event?.status !== 'timeout_unknown' || reconciledBody.event?.reconciliationOutcome !== 'not_grabbed' || reconciledBody.event?.reconciliationConfirmations !== undefined) throw new Error('packaged exact reconciliation boundary mismatch');",
       "  const executeBody = { challengeId: preparedBody.challengeId, confirmation: preparedBody.confirmation, idempotencyKey: 'docker_idempotency_00000001' };",
       "  const executed = await fetch(grabBase + '/execute', { method: 'POST', headers: { authorization: 'Bearer ' + adminToken, 'content-type': 'application/json' }, body: JSON.stringify(executeBody) });",
       "  const executedBody = await executed.json();",
@@ -1057,7 +1118,7 @@ async function packagedMissingInventorySmokeTest() {
       "  const historyBody = await history.json();",
       "  const grabCount = Number(await (await fetch('http://sonarr-fixture:8082/__grabs')).text());",
       "  const postGrabCount = Number(await (await fetch(countUrl)).text());",
-      "  if (executed.status !== 200 || executedBody.status !== 'grabbed' || replay.status !== 200 || replayBody.status !== 'grabbed' || replayBody.replayed !== true || history.status !== 200 || historyBody.events?.length !== 1 || grabCount !== 1 || postGrabCount !== 11 || /idempotency|guid|indexerId|api.?key|authorization/i.test(JSON.stringify(historyBody))) throw new Error('packaged controlled Grab execution, audit, or idempotency mismatch');",
+      "  if (executed.status !== 200 || executedBody.status !== 'grabbed' || replay.status !== 200 || replayBody.status !== 'grabbed' || replayBody.replayed !== true || history.status !== 200 || historyBody.events?.length !== 2 || historyBody.events?.find((event) => event.eventId === recoveredEvent.eventId)?.reconciliationOutcome !== 'not_grabbed' || grabCount !== 1 || postGrabCount !== 11 || /idempotency|guid|indexerId|api.?key|authorization/i.test(JSON.stringify(historyBody))) throw new Error('packaged controlled Grab execution, audit, or idempotency mismatch');",
       "  const refreshedItem = await fetch(itemEndpoint + '?refresh=1', { headers: { authorization: 'Bearer ' + token } });",
       "  const refreshedItemBody = await refreshedItem.json();",
       "  const refreshedView = dashboardModel.feasibilityView(refreshedItemBody);",
@@ -1096,6 +1157,7 @@ async function packagedMissingInventorySmokeTest() {
     process.stdout.write(`${triageScenario} packaged item triage=local (application, profile, language, age, clear-state, zero extra upstream requests)\n`);
     process.stdout.write(`${comparisonScenario} packaged release comparison=local (Arr decisions, language evidence, strengths, navigation assets, zero extra upstream requests)\n`);
     process.stdout.write(`${controlledGrabScenario} packaged controlled Grab=accepted (independent admin, two revalidations, exact confirmation, one POST, audit, idempotent replay)\n`);
+    process.stdout.write(`${reconciliationScenario} packaged interrupted Grab=reconciled (legacy migration, restart recovery, duplicate block, exact attestation, one later POST)\n`);
   } finally {
     docker(["rm", "--force", appName]);
     docker(["rm", "--force", fixtureName]);

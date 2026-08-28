@@ -76,7 +76,7 @@ export function classifyAffectedFiles(files) {
     /^(?:src\/|scripts\/harness\/|harness\/)|^(?:package(?:-lock)?\.json|tsconfig\.json)$/u.test(file),
   );
   const container = normalized.some((file) =>
-    /^(?:src\/|deploy\/)|^(?:Dockerfile|compose\.yaml|package(?:-lock)?\.json|tsconfig\.json)$/u.test(file),
+    /^(?:src\/|deploy\/)|^scripts\/harness\/docker-build\.mjs$|^(?:Dockerfile|compose\.yaml|package(?:-lock)?\.json|tsconfig\.json)$/u.test(file),
   );
 
   return { compiled, container };

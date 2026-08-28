@@ -198,8 +198,9 @@
 | PEG-DASH-037 | Controlled Grab UI is confirmation-bound and page-memory-only | `src/app.test.ts` |
 | PEG-DASH-038 | Controlled Grab capability is explicit and defaults off | `src/dashboard-model.test.ts` |
 | PEG-DASH-039 | Audit history preserves Unknown and exact page-memory reconciliation | `src/app.test.ts` |
-| PEG-HARNESS-006 | Phase 2 progress preserves Phase 1 and maps active evidence | `scripts/harness/phase-contract.mjs` |
+| PEG-HARNESS-006 | Phase 2 completion preserves Phase 1 and maps completed evidence | `scripts/harness/phase-contract.mjs` |
 | PEG-DOCKER-024 | Packaged controlled Grab performs one confirmed synthetic Arr mutation | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-025 | Packaged restart recovery migrates and reconciles an interrupted Grab | `scripts/harness/docker-build.mjs` |
 
 ## Explicit manual gaps
 

@@ -47,6 +47,8 @@ The audit database is stored at `/data/grab-audit.sqlite` in the private persist
 
 Run only one Pegarr instance against an audit database. On startup, any event left `in_progress` by an interrupted process is conservatively recovered as `timeout_unknown` with reconciliation required; Pegarr never assumes an interrupted POST failed.
 
+Before upgrading Pegarr, stop the running instance and back up the private data volume, including `grab-audit.sqlite`. Startup migrates an older supported audit schema in place. If startup follows an interrupted Grab, open **Grab history** before attempting that release again: the recovered event remains Unknown until an administrator verifies Arr and records the exact attestation.
+
 ## API flow
 
 All endpoints use `Authorization: Bearer <administrator token>`. The regular library token cannot authorize them.
@@ -64,4 +66,12 @@ An Arr timeout is not a failure and is not permission to retry. The result is `t
 
 Reconciliation never rewrites the original Unknown result. It appends a durable `grabbed` or `not_grabbed` operator attestation with its own timestamp and requires an exact release-and-target phrase. A verified `not_grabbed` outcome releases duplicate protection; a verified `grabbed` outcome keeps it. This is an operational assertion, so do not use it until the exact release has been checked in Arr.
 
-The harness proves this behavior with synthetic services only. Live Grab compatibility and operational reconciliation remain `PEG-MANUAL-004`; automated tests must never mutate local services or the NAS.
+The retry sequence is deliberately strict:
+
+1. inspect the exact release in Sonarr or Radarr activity and in the download client;
+2. open Pegarr's Grab history with the independent administrator token;
+3. choose the observed outcome and type the exact event-specific phrase;
+4. refresh the missing item before preparing another Grab;
+5. if the item is still missing and the attestation was `not_grabbed`, prepare a new explicit Grab.
+
+`PEG-DOCKER-025` boots the packaged image from a legacy synthetic audit database containing an interrupted Grab, verifies recovery as Unknown, proves the duplicate remains blocked, requires exact reconciliation, and permits exactly one later synthetic Arr mutation. Live Grab compatibility and operational reconciliation remain `PEG-MANUAL-004`; automated tests must never mutate local services or the NAS.

@@ -46,7 +46,7 @@
       "id": "P2-TIMEOUT-RECONCILIATION",
       "title": "Operator reconciliation after unknown mutation outcomes",
       "status": "complete",
-      "scenarioIds": ["PEG-GRAB-004", "PEG-GRAB-006", "PEG-GRAB-007", "PEG-GRAB-008", "PEG-GRABAPI-003", "PEG-DASH-039"]
+      "scenarioIds": ["PEG-GRAB-004", "PEG-GRAB-006", "PEG-GRAB-007", "PEG-GRAB-008", "PEG-GRABAPI-003", "PEG-DASH-039", "PEG-DOCKER-025"]
     }
   ],
   "manualGapIds": ["PEG-MANUAL-001", "PEG-MANUAL-002", "PEG-MANUAL-003", "PEG-MANUAL-004", "PEG-MANUAL-005"]

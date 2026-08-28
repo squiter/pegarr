@@ -13,6 +13,10 @@ test("PEG-HARNESS-001 affected paths select the narrow deterministic sensor set"
     compiled: true,
     container: true,
   });
+  assert.deepEqual(classifyAffectedFiles(["scripts/harness/docker-build.mjs"]), {
+    compiled: true,
+    container: true,
+  });
   assert.deepEqual(selectCheckIds("affected", ["docs/harness.md"]), [
     "PEG-SCENARIOS",
     "PEG-PHASE",
@@ -21,6 +25,7 @@ test("PEG-HARNESS-001 affected paths select the narrow deterministic sensor set"
     "PEG-SECRETS",
   ]);
   assert.ok(selectCheckIds("affected", ["src/matching.ts"]).includes("PEG-DOCKER"));
+  assert.ok(selectCheckIds("affected", ["scripts/harness/docker-build.mjs"]).includes("PEG-DOCKER"));
 });
 
 test("PEG-HARNESS-005 harness reports retain machine-readable phase completion evidence", () => {

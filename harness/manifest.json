@@ -1171,6 +1171,12 @@
       "title": "Packaged controlled Grab performs one confirmed synthetic Arr mutation",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Disposable fixture containers on an internal-only Docker network; no live service or NAS mutation"
+    },
+    {
+      "id": "PEG-DOCKER-025",
+      "title": "Packaged restart recovery migrates and reconciles an interrupted Grab before one later mutation",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Legacy synthetic SQLite fixture and disposable internal-only containers; no live service or NAS mutation"
     }
   ],
   "manualGaps": [
