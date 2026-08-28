@@ -194,3 +194,92 @@ test("PEG-CACHE-008 corrupt provider rows are discarded and fetched again", asyn
     await rm(directory, { recursive: true });
   }
 });
+
+test("PEG-CACHE-009 positive and empty provider evidence use independent expiry windows", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-provider-cache-asymmetric-"));
+  try {
+    let now = 1_000;
+    const source = new Source();
+    const cache = new ProviderSearchCache({
+      databasePath: join(directory, "provider.sqlite"),
+      source,
+      positiveTtlMs: 5_000,
+      emptyTtlMs: 1_000,
+      now: () => now,
+    });
+    const positiveWindow = window;
+    await cache.search(positiveWindow);
+
+    const emptyWindow = {
+      ...window,
+      item: { ...window.item, ids: { imdb: "tt9000006", tmdb: "900006" } },
+    };
+    source.result = { provider: "subdl", status: "success", subtitles: [] };
+    await cache.search(emptyWindow);
+    now = 2_001;
+    const positiveHit = await cache.search(positiveWindow);
+    const emptyMiss = await cache.search(emptyWindow);
+    cache.close();
+
+    assert.equal(source.calls, 3);
+    assert.equal(positiveHit.cache?.status, "hit");
+    assert.equal(emptyMiss.cache?.status, "miss");
+    assert.equal(emptyMiss.subtitles.length, 0);
+  } finally {
+    await rm(directory, { recursive: true });
+  }
+});
+
+test("PEG-CACHE-010 provider namespaces cannot reuse another provider's evidence", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-provider-cache-namespace-"));
+  try {
+    const path = join(directory, "provider.sqlite");
+    const subdlSource = new Source();
+    const subdl = new ProviderSearchCache({
+      databasePath: path,
+      provider: "subdl",
+      source: subdlSource,
+      now: () => 1_000,
+    });
+    await subdl.search(window);
+    subdl.close();
+
+    const opensubtitlesSource = new Source();
+    opensubtitlesSource.result = {
+      provider: "opensubtitles",
+      status: "success",
+      subtitles: [{
+        ...opensubtitlesSource.result.subtitles[0]!,
+        id: "opensubtitles-cached-subtitle",
+        provider: "opensubtitles",
+      }],
+    };
+    const opensubtitles = new ProviderSearchCache({
+      databasePath: path,
+      provider: "opensubtitles",
+      source: opensubtitlesSource,
+      now: () => 2_000,
+    });
+    const miss = await opensubtitles.search(window);
+    opensubtitles.close();
+
+    const reopenedSource = new Source();
+    const reopenedSubdl = new ProviderSearchCache({
+      databasePath: path,
+      provider: "subdl",
+      source: reopenedSource,
+      now: () => 3_000,
+    });
+    const hit = await reopenedSubdl.search(window);
+    reopenedSubdl.close();
+
+    assert.equal(opensubtitlesSource.calls, 1);
+    assert.equal(miss.cache?.status, "miss");
+    assert.equal(miss.provider, "opensubtitles");
+    assert.equal(reopenedSource.calls, 0);
+    assert.equal(hit.cache?.status, "hit");
+    assert.equal(hit.provider, "subdl");
+  } finally {
+    await rm(directory, { recursive: true });
+  }
+});

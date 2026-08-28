@@ -125,9 +125,25 @@ for (const contract of [
   "maximumPayloadBytes",
   'status: "hit"',
   'status: "miss"',
+  "#positiveTtlMs",
+  "#emptyTtlMs",
+  "result.subtitles.length > 0",
 ]) {
   if (!providerCache.includes(contract)) {
     issues.push(`The provider cache must retain ${contract}`);
+  }
+}
+
+const providerPlanner = readFileSync(resolve(repoRoot, "src/provider-policy-search.ts"), "utf8");
+for (const contract of [
+  'tier === "fallback"',
+  "release.downloadAllowed",
+  "assessLanguage",
+  'minimumConfidence ?? "likely"',
+  'result.cache?.status !== "hit"',
+]) {
+  if (!providerPlanner.includes(contract)) {
+    issues.push(`The provider planner must retain ${contract}`);
   }
 }
 if (/\b(?:apiKey|authorization|downloadUrl)\b/u.test(providerCache)) {
@@ -191,6 +207,7 @@ for (const contract of [
   'return "[redacted]"',
   "PEGARR_ACCESS_TOKEN_FILE",
   "PEGARR_SUBDL_LANGUAGE_MAPPINGS",
+  "PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS",
   "PEGARR_GRAB_ENABLED",
   "PEGARR_ADMIN_TOKEN_FILE",
   "PEGARR_GRAB_AUDIT_FILE",
@@ -283,6 +300,14 @@ if (/PEGARR_SUBDL_API_KEY\s*:/u.test(subdlCompose)) {
 }
 if (/PEGARR_RADARR_API_KEY\s*:/u.test(radarrCompose)) {
   issues.push("The Radarr Compose overlay may not pass the API key as an environment value");
+}
+
+const nasCompose = readFileSync(resolve(repoRoot, "deploy/compose.nas.yaml"), "utf8");
+for (const contract of [
+  "PEGARR_PROVIDER_CACHE_POSITIVE_TTL_SECONDS",
+  "PEGARR_PROVIDER_CACHE_EMPTY_TTL_SECONDS",
+]) {
+  if (!nasCompose.includes(contract)) issues.push(`The NAS provider cache must retain ${contract}`);
 }
 
 for (const [integration, file] of [["Sonarr", "deploy/compose.sonarr-instances.yaml"], ["Radarr", "deploy/compose.radarr-instances.yaml"]]) {

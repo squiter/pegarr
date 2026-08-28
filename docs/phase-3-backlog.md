@@ -12,7 +12,7 @@ This is documentation and deployment composition only. Pegarr must remain indepe
 
 ## Quota-aware provider scheduling and cache retention
 
-**Status:** proposed
+**Status:** implemented in the Phase 3 provider planner
 
 **Priority:** active now that the second subtitle-provider adapter is available
 
@@ -52,9 +52,9 @@ Pegarr already has a bounded SQLite provider cache and single-flight request sha
 - Provider ordering never changes Arr acceptance or rejection decisions.
 - Diagnostics expose only safe quota, provenance, and freshness metadata; credentials and provider download handles remain server-side.
 
-### Decisions to make during implementation
+### Decisions made
 
-- Whether the sufficiency threshold is fixed by policy semantics or configurable per Bazarr profile.
-- Provider-specific positive and empty TTL defaults, informed by current terms and measured catalog behavior.
-- Whether stale positive evidence should be shown while a background refresh is permitted.
-- How quota reset timestamps and circuit state survive process restarts without turning failures into negative evidence.
+- The current sufficiency threshold is fixed at Likely for every required Bazarr-policy language on at least one Arr-accepted release. Exact Confirmed evidence also satisfies it; Possible does not.
+- Candidate-bearing successes default to 24 hours and empty successes to 15 minutes. Both are independently configurable and always expire.
+- Expired provider evidence is refreshed synchronously inside the already bounded item-analysis flow. The existing labeled item-level stale fallback remains separate.
+- Quota failures are not persisted as subtitle evidence. Measured safe quota headers remain attached to the current result; persistent circuit state is deferred until provider behavior demonstrates that it is needed.

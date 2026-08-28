@@ -370,3 +370,20 @@ test("PEG-CONFIG-010 OpenSubtitles credentials use an independent bounded secret
     },
   );
 });
+
+test("PEG-CONFIG-011 OpenSubtitles language mappings are explicit and independent", async () => {
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS: "en:en, pt-BR:pt-br, es:es",
+  });
+  assert.deepEqual(configuration.opensubtitlesLanguageMappings, [
+    { policyCode: "en", providerCode: "en" },
+    { policyCode: "pt-BR", providerCode: "pt-br" },
+    { policyCode: "es", providerCode: "es" },
+  ]);
+  await assert.rejects(
+    loadRuntimeConfiguration({
+      PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS: "pt-BR:pt-br,pb:pb",
+    }),
+    /PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS contains an invalid or duplicate pair/u,
+  );
+});

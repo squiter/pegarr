@@ -12,6 +12,7 @@ import {
   type SonarrSystemStatus,
 } from "./adapters/sonarr.js";
 import { createConfiguredSubdlSource } from "./configured-subdl-source.js";
+import { createConfiguredOpenSubtitlesSource } from "./configured-opensubtitles-source.js";
 import {
   configuredRadarrInstances,
   configuredSonarrInstances,
@@ -267,6 +268,18 @@ export function createRuntimeServices(
         }),
         environment: options.environment ?? {},
       });
+  const managedOpenSubtitles = configuration.opensubtitles === undefined
+    ? undefined
+    : createConfiguredOpenSubtitlesSource({
+        configuration: configuration.opensubtitles,
+        transport: new FetchJsonTransport({
+          baseUrl: configuration.opensubtitles.baseUrl,
+          allowedHosts: configuration.opensubtitles.allowedHosts,
+          allowInsecureHttp: configuration.opensubtitles.allowInsecureHttp,
+          ...fetchOption,
+        }),
+        environment: options.environment ?? {},
+      });
   const missingIntegrations = {
     episode: [
       ...(sonarrClients.size === 0 ? ["sonarr" as const] : []),
@@ -290,6 +303,9 @@ export function createRuntimeServices(
               sonarr,
               bazarr: bazarrClient,
               subdl: managedSubdl.source,
+              ...(managedOpenSubtitles === undefined
+                ? {}
+                : { opensubtitles: managedOpenSubtitles.source }),
               now,
             });
           },
@@ -303,11 +319,15 @@ export function createRuntimeServices(
               radarr,
               bazarr: bazarrClient,
               subdl: managedSubdl.source,
+              ...(managedOpenSubtitles === undefined
+                ? {}
+                : { opensubtitles: managedOpenSubtitles.source }),
               now,
             });
           },
         }),
     subdlLanguages: configuration.subdlLanguageMappings ?? [],
+    opensubtitlesLanguages: configuration.opensubtitlesLanguageMappings ?? [],
     missingIntegrations,
     now,
     ttlMs: boundedCacheTtl(
@@ -388,6 +408,7 @@ export function createRuntimeServices(
     close: () => {
       controlledGrab?.close();
       managedSubdl?.close();
+      managedOpenSubtitles?.close();
     },
   };
 }

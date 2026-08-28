@@ -78,8 +78,9 @@ The Phase 3 OpenSubtitles boundary is search-only. It does not log in as a user 
 | `PEGARR_OPENSUBTITLES_API_KEY_FILE` | Yes | Absolute in-container path to one OpenSubtitles application API key |
 | `PEGARR_OPENSUBTITLES_INSTANCE_ID` | No | Safe non-secret label; defaults to `opensubtitles` |
 | `PEGARR_OPENSUBTITLES_ALLOW_INSECURE_HTTP` | No | Test fixtures only; production access should remain HTTPS |
+| `PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS` | For release evidence | Comma-separated Bazarr-policy-to-OpenSubtitles pairs such as `en:en,pt-BR:pt-br`; no language is assumed |
 
-Following the [official OpenSubtitles REST search contract](https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles), the adapter uses the fixed application identity `Pegarr v0.1.0`, exact IMDb or TMDB identifiers, lowercase provider language codes, and sorted query fields. OpenSubtitles is not yet added to the runtime provider schedule; that ordering and Bazarr language mapping are the next `P3-PROVIDER-QUOTA` slice.
+Following the [official OpenSubtitles REST search contract](https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles), the adapter uses the fixed application identity `Pegarr v0.1.0`, exact IMDb or TMDB identifiers, lowercase provider language codes, and sorted query fields. When both providers are configured, Pegarr searches SubDL as the compatibility-preserving preferred source, evaluates candidates against Arr-accepted releases, and calls OpenSubtitles as a fallback only while required-language coverage remains below Likely. This ordering is a Pegarr policy, not a claim that either provider is unlimited: [SubDL documents daily search quotas](https://subdl.com/at/developers), while OpenSubtitles reports its own rate-window evidence.
 
 Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, `PEGARR_BAZARR_API_KEY`, `PEGARR_SUBDL_API_KEY`, or `PEGARR_OPENSUBTITLES_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
 
@@ -87,12 +88,14 @@ The base URL may use a Sonarr URL base, such as `https://media.example.invalid/s
 
 ## Provider cache settings
 
-The packaged feasibility reports can reuse successful SubDL results from a private local SQLite file. NAS Compose enables this inside the persistent `/data` volume. Provider failures, timeouts, malformed responses, authentication failures, and quota responses are never cached.
+The packaged runtime can reuse successful SubDL and OpenSubtitles results from a private local SQLite file. NAS Compose enables this inside the persistent `/data` volume. Provider failures, timeouts, malformed responses, authentication failures, and quota responses are never cached.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PEGARR_PROVIDER_CACHE_FILE` | Disabled unless set | Absolute SQLite direct child file path inside the absolute `DATA_DIR` |
-| `PEGARR_PROVIDER_CACHE_TTL_SECONDS` | `900` | Successful-result lifetime from 1 through 86,400 seconds |
+| `PEGARR_PROVIDER_CACHE_POSITIVE_TTL_SECONDS` | `86400` | Candidate-bearing success lifetime from 1 through 2,592,000 seconds |
+| `PEGARR_PROVIDER_CACHE_EMPTY_TTL_SECONDS` | `900` | Empty success lifetime from 1 through 86,400 seconds |
+| `PEGARR_PROVIDER_CACHE_TTL_SECONDS` | Disabled compatibility alias | Supplies both lifetimes unless the corresponding asymmetric variable overrides it |
 | `PEGARR_PROVIDER_CACHE_MAX_ENTRIES` | `5000` | Oldest-entry pruning limit from 1 through 100,000 |
 
 The database contains private normalized matching evidence such as media identifiers and release names, but never API keys, authorization headers, provider download handles, or upstream URLs. Keep the data volume private. See the [provider search cache guide](provider-search-cache.md) for result and deletion semantics.
@@ -164,7 +167,9 @@ PEGARR_SUBDL_PROBE_PROVIDER_LANGUAGE=EN
 PEGARR_SUBDL_PROBE_SEASON=1
 PEGARR_SUBDL_PROBE_EPISODE=1
 PEGARR_OPENSUBTITLES_API_KEY_HOST_FILE=/absolute/private/path/opensubtitles_api_key
-PEGARR_PROVIDER_CACHE_TTL_SECONDS=900
+PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS=en:en,pt-BR:pt-br
+PEGARR_PROVIDER_CACHE_POSITIVE_TTL_SECONDS=86400
+PEGARR_PROVIDER_CACHE_EMPTY_TTL_SECONDS=900
 PEGARR_PROVIDER_CACHE_MAX_ENTRIES=5000
 PEGARR_ACCESS_TOKEN_HOST_FILE=/absolute/private/path/pegarr_access_token
 PEGARR_ADMIN_TOKEN_HOST_FILE=/absolute/private/path/pegarr_admin_token

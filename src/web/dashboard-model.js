@@ -506,6 +506,7 @@ function providerView(value) {
       ...(safeOptionalCount(quota.remaining) === undefined ? {} : { remaining: safeOptionalCount(quota.remaining) }),
       ...(safeOptionalCount(quota.limit) === undefined ? {} : { limit: safeOptionalCount(quota.limit) }),
       ...(safeEpochSeconds(quota.resetAtEpochSeconds) === undefined ? {} : { resetAtEpochSeconds: safeEpochSeconds(quota.resetAtEpochSeconds) }),
+      ...(safeQuotaWindow(quota.windowSeconds) === undefined ? {} : { windowSeconds: safeQuotaWindow(quota.windowSeconds) }),
     },
   }];
 }
@@ -526,6 +527,10 @@ function safeEpochSeconds(value) {
   return Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000
     ? Math.round(value)
     : undefined;
+}
+
+function safeQuotaWindow(value) {
+  return Number.isSafeInteger(value) && value >= 1 && value <= 86_400 ? value : undefined;
 }
 
 function safeTimestamp(value) {

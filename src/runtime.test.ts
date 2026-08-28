@@ -16,6 +16,7 @@ import {
   syntheticBazarrSeriesAssignmentResponse,
 } from "./fixtures/bazarr-language-policy.js";
 import { syntheticSubdlV2EpisodeSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
+import { syntheticOpenSubtitlesEpisodeSearchResponse } from "./fixtures/opensubtitles-subtitle-search.js";
 import { createRuntimeServices } from "./runtime.js";
 
 test("PEG-RUNTIME-001 configured Sonarr status returns only safe read-only evidence", async (context) => {
@@ -377,6 +378,101 @@ test("PEG-ITEM-004 runtime selection composes inventory, Arr, Bazarr, and one sc
   assert.equal(requests.filter((entry) => entry.endsWith("/api/v2/subtitles/search")).length, 1);
   assert.equal(requests.length, 9);
   assert.doesNotMatch(JSON.stringify(first), /synthetic-(?:sonarr|radarr|bazarr|subdl)-key|example\.invalid/iu);
+});
+
+test("PEG-RUNTIME-012 runtime planner calls OpenSubtitles only after insufficient preferred evidence", async () => {
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+    bazarr: {
+      instanceId: "synthetic-bazarr",
+      baseUrl: "https://bazarr.example.invalid",
+      allowedHosts: ["bazarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-bazarr-key-value"),
+    },
+    subdl: {
+      instanceId: "synthetic-subdl",
+      baseUrl: "https://subdl.example.invalid",
+      allowedHosts: ["subdl.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-subdl-key-value"),
+    },
+    opensubtitles: {
+      instanceId: "synthetic-opensubtitles",
+      baseUrl: "https://opensubtitles.example.invalid/api/v1",
+      allowedHosts: ["opensubtitles.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-opensubtitles-key-value"),
+    },
+    subdlLanguageMappings: [{ policyCode: "en", providerCode: "EN" }],
+    opensubtitlesLanguageMappings: [{ policyCode: "en", providerCode: "en" }],
+  };
+  const providerRequests: { readonly host: string; readonly headers: Headers }[] = [];
+  const services = createRuntimeServices(configuration, {
+    fetchImplementation: async (input, init) => {
+      const url = new URL(input);
+      let body: unknown;
+      if (url.pathname === "/api/v3/wanted/missing") {
+        body = syntheticSonarrMissingItemsResponse;
+      } else if (url.pathname === "/api/v3/release") {
+        body = syntheticSonarrEpisodeReleaseResponse;
+      } else if (url.pathname === "/api/system/languages/profiles") {
+        body = syntheticBazarrLanguageProfilesResponse;
+      } else if (url.pathname === "/api/series") {
+        body = syntheticBazarrSeriesAssignmentResponse;
+      } else if (url.pathname === "/api/v2/subtitles/search") {
+        providerRequests.push({ host: url.hostname, headers: new Headers(init?.headers) });
+        body = { status: true, results: [], subtitles: [] };
+      } else if (url.pathname === "/api/v1/subtitles") {
+        providerRequests.push({ host: url.hostname, headers: new Headers(init?.headers) });
+        body = syntheticOpenSubtitlesEpisodeSearchResponse;
+      } else {
+        return new Response("{}", { status: 404 });
+      }
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+    now: () => 1_000,
+    missingInventoryPageSize: 2,
+  });
+
+  const result = await services.readItemFeasibility({
+    application: "sonarr",
+    kind: "episode",
+    itemId: 305,
+  });
+  services.close();
+
+  assert.equal(result.status, "ready");
+  if (result.status !== "ready") return;
+  assert.deepEqual(providerRequests.map(({ host }) => host), [
+    "subdl.example.invalid",
+    "opensubtitles.example.invalid",
+  ]);
+  assert.equal(providerRequests[0]?.headers.get("authorization"), "Bearer synthetic-subdl-key-value");
+  assert.equal(providerRequests[1]?.headers.get("api-key"), "synthetic-opensubtitles-key-value");
+  assert.equal(providerRequests[1]?.headers.get("user-agent"), "Pegarr v0.1.0");
+  assert.deepEqual(result.report.providerStatus.map(({ provider, status }) => ({ provider, status })), [
+    { provider: "subdl", status: "success" },
+    { provider: "subdl", status: "unsupported" },
+    { provider: "subdl", status: "unsupported" },
+    { provider: "opensubtitles", status: "success" },
+    { provider: "opensubtitles", status: "unsupported" },
+    { provider: "opensubtitles", status: "unsupported" },
+  ]);
+  assert.equal(result.metrics.providerRequests, 2);
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /synthetic-(?:sonarr|bazarr|subdl|opensubtitles)-key|example\.invalid/iu,
+  );
 });
 
 test("PEG-RUNTIME-009 scoped analysis selects the exact Arr client", async () => {

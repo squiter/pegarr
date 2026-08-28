@@ -9,19 +9,25 @@ import type { SubdlWindowSource } from "./provider-policy-search.js";
 export interface ProviderSearchCacheOptions {
   readonly databasePath: string;
   readonly source: SubdlWindowSource;
+  readonly provider?: string;
   readonly ttlMs?: number;
+  readonly positiveTtlMs?: number;
+  readonly emptyTtlMs?: number;
   readonly maxEntries?: number;
   readonly now?: () => number;
 }
 
-const defaultTtlMs = 15 * 60_000;
+const defaultPositiveTtlMs = 24 * 60 * 60_000;
+const defaultEmptyTtlMs = 15 * 60_000;
 const defaultMaxEntries = 5_000;
 const maximumPayloadBytes = 5 * 1024 * 1024;
 
 export class ProviderSearchCache implements SubdlWindowSource {
   readonly #database: DatabaseSync;
   readonly #source: SubdlWindowSource;
-  readonly #ttlMs: number;
+  readonly #provider: string;
+  readonly #positiveTtlMs: number;
+  readonly #emptyTtlMs: number;
   readonly #maxEntries: number;
   readonly #now: () => number;
   readonly #inFlight = new Map<string, Promise<ProviderSearchResult>>();
@@ -31,7 +37,20 @@ export class ProviderSearchCache implements SubdlWindowSource {
       throw new TypeError("Provider cache database path must be absolute");
     }
     this.#source = options.source;
-    this.#ttlMs = boundedInteger(options.ttlMs ?? defaultTtlMs, 1_000, 24 * 60 * 60_000, "ttlMs");
+    this.#provider = safeProvider(options.provider ?? "subdl");
+    const legacyTtl = options.ttlMs;
+    this.#positiveTtlMs = boundedInteger(
+      options.positiveTtlMs ?? legacyTtl ?? defaultPositiveTtlMs,
+      1_000,
+      30 * 24 * 60 * 60_000,
+      "positiveTtlMs",
+    );
+    this.#emptyTtlMs = boundedInteger(
+      options.emptyTtlMs ?? legacyTtl ?? defaultEmptyTtlMs,
+      1_000,
+      24 * 60 * 60_000,
+      "emptyTtlMs",
+    );
     this.#maxEntries = boundedInteger(options.maxEntries ?? defaultMaxEntries, 1, 100_000, "maxEntries");
     this.#now = options.now ?? Date.now;
     this.#database = new DatabaseSync(options.databasePath);
@@ -49,7 +68,7 @@ export class ProviderSearchCache implements SubdlWindowSource {
   }
 
   async search(window: SubdlSearchWindow): Promise<ProviderSearchResult> {
-    const key = cacheKey(window);
+    const key = cacheKey(this.#provider, window);
     const now = safeNow(this.#now());
     const cached = this.#read(key, now);
     if (cached !== undefined) return cached;
@@ -81,9 +100,13 @@ export class ProviderSearchCache implements SubdlWindowSource {
   ): Promise<ProviderSearchResult> {
     const result = await this.#source.search(window);
     if (result.status !== "success") return result;
+    if (result.provider !== this.#provider) {
+      throw new TypeError("Provider cache source returned an unexpected provider");
+    }
 
     const storedAt = safeNow(this.#now());
-    const expiresAt = Math.min(8.64e15, storedAt + this.#ttlMs);
+    const ttlMs = result.subtitles.length > 0 ? this.#positiveTtlMs : this.#emptyTtlMs;
+    const expiresAt = Math.min(8.64e15, storedAt + ttlMs);
     const payload = JSON.stringify(withoutCache(result));
     if (Buffer.byteLength(payload, "utf8") > maximumPayloadBytes) {
       return result;
@@ -119,7 +142,7 @@ export class ProviderSearchCache implements SubdlWindowSource {
       return undefined;
     }
     try {
-      const result = parseCachedResult(row.payload_json);
+      const result = parseCachedResult(row.payload_json, this.#provider);
       return {
         ...result,
         cache: {
@@ -147,12 +170,12 @@ export class ProviderSearchCache implements SubdlWindowSource {
   }
 }
 
-function cacheKey(window: SubdlSearchWindow): string {
+function cacheKey(provider: string, window: SubdlSearchWindow): string {
   const ids = Object.fromEntries(Object.entries(window.item.ids).sort(([left], [right]) =>
     left.localeCompare(right),
   ));
   const stable = JSON.stringify({
-    provider: "subdl",
+    provider,
     kind: window.item.kind,
     ids,
     season: window.item.season,
@@ -168,7 +191,7 @@ function withoutCache(result: ProviderSearchResult): ProviderSearchResult {
   return persisted;
 }
 
-function parseCachedResult(payload: string): ProviderSearchResult {
+function parseCachedResult(payload: string, provider: string): ProviderSearchResult {
   if (Buffer.byteLength(payload, "utf8") > maximumPayloadBytes) {
     throw new TypeError("Cached provider result is too large");
   }
@@ -178,7 +201,7 @@ function parseCachedResult(payload: string): ProviderSearchResult {
   }
   const result = value as Partial<ProviderSearchResult>;
   if (
-    result.provider !== "subdl" ||
+    result.provider !== provider ||
     result.status !== "success" ||
     !Array.isArray(result.subtitles) ||
     (result.searchedLanguages !== undefined &&
@@ -188,6 +211,13 @@ function parseCachedResult(payload: string): ProviderSearchResult {
     throw new TypeError("Cached provider result is invalid");
   }
   return result as ProviderSearchResult;
+}
+
+function safeProvider(value: string): string {
+  if (!/^[a-z][a-z0-9_-]{0,31}$/u.test(value)) {
+    throw new TypeError("Provider cache requires a safe provider ID");
+  }
+  return value;
 }
 
 function boundedInteger(value: number, minimum: number, maximum: number, field: string): number {

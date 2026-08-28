@@ -93,6 +93,7 @@ export interface ItemFeasibilityServiceOptions {
   readonly episodeForInstance?: (instanceId: string) => EpisodeFeasibilityBuilder | undefined;
   readonly movieForInstance?: (instanceId: string) => MovieFeasibilityBuilder | undefined;
   readonly subdlLanguages: readonly ProviderLanguageMapping[];
+  readonly opensubtitlesLanguages?: readonly ProviderLanguageMapping[];
   readonly missingIntegrations: Readonly<{
     episode: readonly ("sonarr" | "bazarr" | "subdl")[];
     movie: readonly ("radarr" | "bazarr" | "subdl")[];
@@ -268,7 +269,11 @@ export class ItemFeasibilityService {
     if (selection.kind === "episode") {
       const builder = this.#options.episodeForInstance?.(item.instanceId) ?? this.#options.episode;
       if (builder === undefined) return disabled(canonicalSelection, ["sonarr", "bazarr", "subdl"]);
-      const outcome = await builder.build(episodeRequest(item, this.#options.subdlLanguages));
+      const outcome = await builder.build(episodeRequest(
+        item,
+        this.#options.subdlLanguages,
+        this.#options.opensubtitlesLanguages,
+      ));
       const canonicalEpisodeSelection: Extract<ItemFeasibilitySelection, { readonly kind: "episode" }> = {
         application: "sonarr",
         instanceId: item.instanceId,
@@ -279,7 +284,11 @@ export class ItemFeasibilityService {
     }
     const builder = this.#options.movieForInstance?.(item.instanceId) ?? this.#options.movie;
     if (builder === undefined) return disabled(canonicalSelection, ["radarr", "bazarr", "subdl"]);
-    const outcome = await builder.build(movieRequest(item, this.#options.subdlLanguages));
+    const outcome = await builder.build(movieRequest(
+      item,
+      this.#options.subdlLanguages,
+      this.#options.opensubtitlesLanguages,
+    ));
     const canonicalMovieSelection: Extract<ItemFeasibilitySelection, { readonly kind: "movie" }> = {
       application: "radarr",
       instanceId: item.instanceId,
@@ -333,6 +342,7 @@ function staleResult(
 function episodeRequest(
   item: MissingMediaItem,
   subdlLanguages: readonly ProviderLanguageMapping[],
+  opensubtitlesLanguages?: readonly ProviderLanguageMapping[],
 ): SonarrEpisodeFeasibilityRequest {
   if (item.kind !== "episode" || item.parentId === undefined || item.season === undefined || item.episode === undefined) {
     throw new TypeError("Missing episode inventory evidence is incomplete");
@@ -348,12 +358,14 @@ function episodeRequest(
       ids: item.ids,
     },
     subdlLanguages,
+    ...(opensubtitlesLanguages === undefined ? {} : { opensubtitlesLanguages }),
   };
 }
 
 function movieRequest(
   item: MissingMediaItem,
   subdlLanguages: readonly ProviderLanguageMapping[],
+  opensubtitlesLanguages?: readonly ProviderLanguageMapping[],
 ): RadarrMovieFeasibilityRequest {
   if (item.kind !== "movie") throw new TypeError("Missing movie inventory evidence is incomplete");
   return {
@@ -365,6 +377,7 @@ function movieRequest(
       ids: item.ids,
     },
     subdlLanguages,
+    ...(opensubtitlesLanguages === undefined ? {} : { opensubtitlesLanguages }),
   };
 }
 

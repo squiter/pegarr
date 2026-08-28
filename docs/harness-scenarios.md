@@ -218,6 +218,15 @@
 | PEG-OPENSUBTITLES-003 | OpenSubtitles empty, irrelevant, and malformed responses stay distinct | `src/adapters/opensubtitles.test.ts` |
 | PEG-OPENSUBTITLES-004 | OpenSubtitles failures and measured per-second quotas remain honest | `src/adapters/opensubtitles.test.ts` |
 | PEG-OPENSUBTITLES-005 | OpenSubtitles stable search windows are single-flight and cached | `src/adapters/opensubtitles.test.ts` |
+| PEG-CONFIG-011 | OpenSubtitles language mappings are explicit and independent | `src/config.test.ts` |
+| PEG-CONFIG-012 | Provider cache TTLs are bounded, asymmetric, and legacy-compatible | `src/provider-cache-configuration.test.ts` |
+| PEG-PROVIDER-001 | Sufficient preferred evidence prevents fallback provider requests | `src/provider-policy-search.test.ts` |
+| PEG-PROVIDER-002 | Partial preferred evidence calls fallback only until coverage is sufficient | `src/provider-policy-search.test.ts` |
+| PEG-PROVIDER-003 | Preferred-provider quota failures remain Unknown and allow bounded fallback | `src/provider-policy-search.test.ts` |
+| PEG-PROVIDER-004 | Rejected-release evidence cannot suppress fallback or alter Arr decisions | `src/provider-policy-search.test.ts` |
+| PEG-CACHE-009 | Positive and empty evidence use independent expiry windows | `src/provider-search-cache.test.ts` |
+| PEG-CACHE-010 | Provider cache namespaces cannot reuse another provider's evidence | `src/provider-search-cache.test.ts` |
+| PEG-RUNTIME-012 | Runtime planner calls OpenSubtitles only after insufficient preferred evidence | `src/runtime.test.ts` |
 
 ## Explicit manual gaps
 

@@ -13,8 +13,10 @@ import type {
 import { buildFeasibilityReport } from "./matching.js";
 import {
   searchSubdlPolicy,
+  searchProviderPolicy,
   validateLanguageMappings,
   type ProviderLanguageMapping,
+  type SubtitleWindowSource,
   type SubdlWindowSource,
 } from "./provider-policy-search.js";
 
@@ -34,6 +36,7 @@ export interface SonarrEpisodeFeasibilityRequest {
   readonly sonarrSeriesId: number;
   readonly item: MediaIdentity;
   readonly subdlLanguages: readonly ProviderLanguageMapping[];
+  readonly opensubtitlesLanguages?: readonly ProviderLanguageMapping[];
 }
 
 export interface EpisodeFeasibilityMetrics {
@@ -83,6 +86,7 @@ export interface SonarrEpisodeFeasibilityServiceOptions {
   readonly sonarr: SonarrEpisodeReleaseSource;
   readonly bazarr: BazarrEpisodePolicySource;
   readonly subdl: SubdlWindowSource;
+  readonly opensubtitles?: SubtitleWindowSource;
   readonly now?: () => number;
 }
 
@@ -90,12 +94,14 @@ export class SonarrEpisodeFeasibilityService {
   readonly #sonarr: SonarrEpisodeReleaseSource;
   readonly #bazarr: BazarrEpisodePolicySource;
   readonly #subdl: SubdlWindowSource;
+  readonly #opensubtitles: SubtitleWindowSource | undefined;
   readonly #now: () => number;
 
   constructor(options: SonarrEpisodeFeasibilityServiceOptions) {
     this.#sonarr = options.sonarr;
     this.#bazarr = options.bazarr;
     this.#subdl = options.subdl;
+    this.#opensubtitles = options.opensubtitles;
     this.#now = options.now ?? Date.now;
   }
 
@@ -139,12 +145,32 @@ export class SonarrEpisodeFeasibilityService {
       };
     }
 
-    const providerSearch = await searchSubdlPolicy({
-      item: validated.item,
-      policy: resolution.policy,
-      mappings: validated.subdlLanguages,
-      subdl: this.#subdl,
-    });
+    const providerSearch = this.#opensubtitles === undefined
+      ? await searchSubdlPolicy({
+          item: validated.item,
+          policy: resolution.policy,
+          mappings: validated.subdlLanguages,
+          subdl: this.#subdl,
+        })
+      : await searchProviderPolicy({
+          item: validated.item,
+          policy: resolution.policy,
+          releases,
+          providers: [
+            {
+              provider: "subdl",
+              tier: "preferred",
+              mappings: validated.subdlLanguages,
+              source: this.#subdl,
+            },
+            {
+              provider: "opensubtitles",
+              tier: "fallback",
+              mappings: validated.opensubtitlesLanguages ?? [],
+              source: this.#opensubtitles,
+            },
+          ],
+        });
 
     return {
       status: "ready",
@@ -175,6 +201,9 @@ function validateRequest(
     throw new TypeError("item.title must be a non-empty bounded string");
   }
   validateLanguageMappings(request.subdlLanguages);
+  if (request.opensubtitlesLanguages !== undefined) {
+    validateLanguageMappings(request.opensubtitlesLanguages);
+  }
   return request;
 }
 

@@ -8,8 +8,8 @@ The first slices establish instance-safe identity and bounded multiple-instance 
 
 - `P3-MULTI-ARR` is complete. Instance-scoped identity, configuration, client registries, inventory and status fan-out, analysis, controlled Grab, and Compose overlays have deterministic evidence. Live service and NAS compatibility remain explicitly manual under `PEG-MANUAL-001` and `PEG-MANUAL-003`; they do not weaken the completed code contract.
 - `P3-OPENSUBTITLES` is complete at the provider-adapter boundary. Exact movie and episode searches use the official REST search route, API key and required application identity stay in headers, responses are bounded, download handles are discarded, and failures remain distinct from a successful empty result. Runtime provider scheduling is intentionally owned by `P3-PROVIDER-QUOTA`; live credential and language compatibility remains `PEG-MANUAL-006`.
-- `P3-PROVIDER-QUOTA` is in progress. The OpenSubtitles adapter now preserves measured per-second limit evidence, and the next slice owns quota-aware ordering plus asymmetric cache windows.
-- `P3-SEASON-PACKS` is pending.
+- `P3-PROVIDER-QUOTA` is complete. Provider windows are namespaced, single-flight, and successful-only; positive and empty evidence have independently bounded lifetimes; fallback calls stop only after an Arr-accepted release reaches Likely or Confirmed coverage for every required language; quota failures remain Unknown; and the dashboard preserves measured reset or rate-window evidence.
+- `P3-SEASON-PACKS` is in progress. SubDL full-season evidence and local matching are already deterministic; provider-expanded pack discovery and mixed episode/pack fixtures remain.
 - `P3-SUBTITLE-PREFERENCES` is complete because forced and hearing-impaired semantics already have deterministic evidence.
 - `P3-RELEASE-PARSING` is pending.
 

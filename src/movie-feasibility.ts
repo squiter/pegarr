@@ -9,8 +9,10 @@ import type { ArrReleaseCandidate, FeasibilityReport, MediaIdentity } from "./do
 import { buildFeasibilityReport } from "./matching.js";
 import {
   searchSubdlPolicy,
+  searchProviderPolicy,
   validateLanguageMappings,
   type ProviderLanguageMapping,
+  type SubtitleWindowSource,
   type SubdlWindowSource,
 } from "./provider-policy-search.js";
 
@@ -27,6 +29,7 @@ export interface RadarrMovieFeasibilityRequest {
   readonly movieId: number;
   readonly item: MediaIdentity;
   readonly subdlLanguages: readonly ProviderLanguageMapping[];
+  readonly opensubtitlesLanguages?: readonly ProviderLanguageMapping[];
 }
 
 export interface MovieFeasibilityMetrics {
@@ -76,6 +79,7 @@ export interface RadarrMovieFeasibilityServiceOptions {
   readonly radarr: RadarrMovieReleaseSource;
   readonly bazarr: BazarrMoviePolicySource;
   readonly subdl: SubdlWindowSource;
+  readonly opensubtitles?: SubtitleWindowSource;
   readonly now?: () => number;
 }
 
@@ -83,12 +87,14 @@ export class RadarrMovieFeasibilityService {
   readonly #radarr: RadarrMovieReleaseSource;
   readonly #bazarr: BazarrMoviePolicySource;
   readonly #subdl: SubdlWindowSource;
+  readonly #opensubtitles: SubtitleWindowSource | undefined;
   readonly #now: () => number;
 
   constructor(options: RadarrMovieFeasibilityServiceOptions) {
     this.#radarr = options.radarr;
     this.#bazarr = options.bazarr;
     this.#subdl = options.subdl;
+    this.#opensubtitles = options.opensubtitles;
     this.#now = options.now ?? Date.now;
   }
 
@@ -130,12 +136,32 @@ export class RadarrMovieFeasibilityService {
       };
     }
 
-    const providerSearch = await searchSubdlPolicy({
-      item: validated.item,
-      policy: resolution.policy,
-      mappings: validated.subdlLanguages,
-      subdl: this.#subdl,
-    });
+    const providerSearch = this.#opensubtitles === undefined
+      ? await searchSubdlPolicy({
+          item: validated.item,
+          policy: resolution.policy,
+          mappings: validated.subdlLanguages,
+          subdl: this.#subdl,
+        })
+      : await searchProviderPolicy({
+          item: validated.item,
+          policy: resolution.policy,
+          releases,
+          providers: [
+            {
+              provider: "subdl",
+              tier: "preferred",
+              mappings: validated.subdlLanguages,
+              source: this.#subdl,
+            },
+            {
+              provider: "opensubtitles",
+              tier: "fallback",
+              mappings: validated.opensubtitlesLanguages ?? [],
+              source: this.#opensubtitles,
+            },
+          ],
+        });
     return {
       status: "ready",
       mode: "read_only",
@@ -163,6 +189,9 @@ function validateRequest(request: RadarrMovieFeasibilityRequest): RadarrMovieFea
     positiveInteger(request.item.year, "item.year");
   }
   validateLanguageMappings(request.subdlLanguages);
+  if (request.opensubtitlesLanguages !== undefined) {
+    validateLanguageMappings(request.opensubtitlesLanguages);
+  }
   return request;
 }
 

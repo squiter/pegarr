@@ -1,21 +1,21 @@
 import type { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
-import { SubdlClient } from "./adapters/subdl.js";
-import type { SubdlRuntimeConfiguration } from "./config.js";
+import { OpenSubtitlesClient } from "./adapters/opensubtitles.js";
+import type { OpenSubtitlesRuntimeConfiguration } from "./config.js";
 import { readProviderCacheRuntimeOptions } from "./provider-cache-configuration.js";
 import { ProviderSearchCache } from "./provider-search-cache.js";
-import type { SubdlWindowSource } from "./provider-policy-search.js";
+import type { SubtitleWindowSource } from "./provider-policy-search.js";
 
-export interface ManagedSubdlSource {
-  readonly source: SubdlWindowSource;
+export interface ManagedOpenSubtitlesSource {
+  readonly source: SubtitleWindowSource;
   close(): void;
 }
 
-export function createConfiguredSubdlSource(options: {
-  readonly configuration: SubdlRuntimeConfiguration;
+export function createConfiguredOpenSubtitlesSource(options: {
+  readonly configuration: OpenSubtitlesRuntimeConfiguration;
   readonly transport: FetchJsonTransport;
   readonly environment: Readonly<Record<string, string | undefined>>;
-}): ManagedSubdlSource {
-  const client = new SubdlClient(
+}): ManagedOpenSubtitlesSource {
+  const client = new OpenSubtitlesClient(
     { apiKey: options.configuration.apiKey.reveal() },
     options.transport,
   );
@@ -23,10 +23,9 @@ export function createConfiguredSubdlSource(options: {
   if (cacheOptions === undefined) {
     return { source: client, close: () => undefined };
   }
-
   const cache = new ProviderSearchCache({
     ...cacheOptions,
-    provider: "subdl",
+    provider: "opensubtitles",
     source: client,
   });
   return { source: cache, close: () => cache.close() };

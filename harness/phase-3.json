@@ -20,14 +20,14 @@
     {
       "id": "P3-PROVIDER-QUOTA",
       "title": "Provider-specific rate limits, quota display, ordering, and asymmetric caching",
-      "status": "in_progress",
-      "scenarioIds": ["PEG-OPENSUBTITLES-004", "PEG-OPENSUBTITLES-005"]
+      "status": "complete",
+      "scenarioIds": ["PEG-OPENSUBTITLES-004", "PEG-OPENSUBTITLES-005", "PEG-PROVIDER-001", "PEG-PROVIDER-002", "PEG-PROVIDER-003", "PEG-PROVIDER-004", "PEG-CACHE-009", "PEG-CACHE-010", "PEG-CONFIG-011", "PEG-CONFIG-012", "PEG-DASH-005", "PEG-RUNTIME-012"]
     },
     {
       "id": "P3-SEASON-PACKS",
       "title": "Season-pack matching",
-      "status": "pending",
-      "scenarioIds": []
+      "status": "in_progress",
+      "scenarioIds": ["PEG-SUBDL-006", "PEG-MATCH-009", "PEG-MATCH-010", "PEG-SEASONFLOW-001"]
     },
     {
       "id": "P3-SUBTITLE-PREFERENCES",

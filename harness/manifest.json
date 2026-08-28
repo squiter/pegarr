@@ -1279,6 +1279,60 @@
       "title": "OpenSubtitles credentials load only from a bounded secret file",
       "evidence": "src/config.test.ts",
       "boundary": "Temporary secret files; no process environment mutation or network"
+    },
+    {
+      "id": "PEG-CONFIG-011",
+      "title": "OpenSubtitles language mappings are explicit and independent",
+      "evidence": "src/config.test.ts",
+      "boundary": "Pure configuration parsing; no secret, process environment mutation, or network"
+    },
+    {
+      "id": "PEG-CONFIG-012",
+      "title": "Provider cache TTLs are bounded, asymmetric, and legacy-compatible",
+      "evidence": "src/provider-cache-configuration.test.ts",
+      "boundary": "Temporary paths and pure configuration parsing; no provider network"
+    },
+    {
+      "id": "PEG-PROVIDER-001",
+      "title": "Sufficient preferred evidence prevents fallback provider requests",
+      "evidence": "src/provider-policy-search.test.ts",
+      "boundary": "Injected providers, synthetic Arr releases, and local matching only"
+    },
+    {
+      "id": "PEG-PROVIDER-002",
+      "title": "Partial preferred evidence calls fallback only until coverage is sufficient",
+      "evidence": "src/provider-policy-search.test.ts",
+      "boundary": "Injected providers, synthetic Arr releases, and local matching only"
+    },
+    {
+      "id": "PEG-PROVIDER-003",
+      "title": "Preferred-provider quota failures remain Unknown and allow bounded fallback",
+      "evidence": "src/provider-policy-search.test.ts",
+      "boundary": "Injected provider results and synthetic quota evidence; no network"
+    },
+    {
+      "id": "PEG-PROVIDER-004",
+      "title": "Rejected-release evidence cannot suppress fallback or alter Arr decisions",
+      "evidence": "src/provider-policy-search.test.ts",
+      "boundary": "Injected cached evidence and synthetic Arr rejections; no network or mutation"
+    },
+    {
+      "id": "PEG-CACHE-009",
+      "title": "Positive and empty provider evidence use independent expiry windows",
+      "evidence": "src/provider-search-cache.test.ts",
+      "boundary": "Temporary SQLite database, injected clock, and synthetic source"
+    },
+    {
+      "id": "PEG-CACHE-010",
+      "title": "Provider cache namespaces cannot reuse another provider's evidence",
+      "evidence": "src/provider-search-cache.test.ts",
+      "boundary": "Temporary SQLite database and synthetic provider sources"
+    },
+    {
+      "id": "PEG-RUNTIME-012",
+      "title": "Runtime planner calls OpenSubtitles only after insufficient preferred evidence",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected multi-provider transports and sanitized synthetic responses; no network"
     }
   ],
   "manualGaps": [

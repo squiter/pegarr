@@ -63,6 +63,7 @@ export interface RuntimeConfiguration {
   readonly controlledGrab?: ControlledGrabRuntimeConfiguration;
   readonly missingPageSize?: number;
   readonly subdlLanguageMappings?: readonly ProviderLanguageMapping[];
+  readonly opensubtitlesLanguageMappings?: readonly ProviderLanguageMapping[];
 }
 
 const maximumSecretBytes = 4_096;
@@ -134,6 +135,10 @@ export async function loadRuntimeConfiguration(
   const subdlLanguageMappings = parseSubdlLanguageMappings(
     environment.PEGARR_SUBDL_LANGUAGE_MAPPINGS,
   );
+  const opensubtitlesLanguageMappings = parseProviderLanguageMappings(
+    environment.PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS,
+    "PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS",
+  );
 
   return {
     ...(sonarr === undefined ? {} : { sonarr }),
@@ -147,6 +152,7 @@ export async function loadRuntimeConfiguration(
     ...(controlledGrab === undefined ? {} : { controlledGrab }),
     ...(missingPageSize === undefined ? {} : { missingPageSize }),
     ...(subdlLanguageMappings === undefined ? {} : { subdlLanguageMappings }),
+    ...(opensubtitlesLanguageMappings === undefined ? {} : { opensubtitlesLanguageMappings }),
   };
 }
 
@@ -269,24 +275,31 @@ async function loadControlledGrabConfiguration(
 function parseSubdlLanguageMappings(
   value: string | undefined,
 ): readonly ProviderLanguageMapping[] | undefined {
+  return parseProviderLanguageMappings(value, "PEGARR_SUBDL_LANGUAGE_MAPPINGS");
+}
+
+function parseProviderLanguageMappings(
+  value: string | undefined,
+  variableName: "PEGARR_SUBDL_LANGUAGE_MAPPINGS" | "PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS",
+): readonly ProviderLanguageMapping[] | undefined {
   const normalized = optional(value);
   if (normalized === undefined) return undefined;
   const mappings = normalized.split(",").map((entry) => {
     const parts = entry.split(":").map((part) => part.trim());
     if (parts.length !== 2 || !parts[0] || !parts[1]) {
       throw new ConfigurationError(
-        "PEGARR_SUBDL_LANGUAGE_MAPPINGS must use policy:provider comma-separated pairs",
+        `${variableName} must use policy:provider comma-separated pairs`,
       );
     }
     return { policyCode: parts[0], providerCode: parts[1] };
   });
   if (mappings.length > 64) {
-    throw new ConfigurationError("PEGARR_SUBDL_LANGUAGE_MAPPINGS may contain at most 64 pairs");
+    throw new ConfigurationError(`${variableName} may contain at most 64 pairs`);
   }
   try {
     validateLanguageMappings(mappings);
   } catch {
-    throw new ConfigurationError("PEGARR_SUBDL_LANGUAGE_MAPPINGS contains an invalid or duplicate pair");
+    throw new ConfigurationError(`${variableName} contains an invalid or duplicate pair`);
   }
   return mappings;
 }

@@ -533,6 +533,11 @@ function renderFeasibility(view) {
       quota.textContent = provider.quota.remaining !== undefined && provider.quota.limit !== undefined
         ? `${provider.quota.remaining.toLocaleString()} of ${provider.quota.limit.toLocaleString()} provider requests remaining`
         : `${(provider.quota.remaining ?? provider.quota.limit)?.toLocaleString()} provider requests ${provider.quota.remaining !== undefined ? "remaining" : "in quota"}`;
+      if (provider.quota.windowSeconds !== undefined) {
+        quota.textContent += provider.quota.windowSeconds === 1
+          ? " per second"
+          : ` per ${provider.quota.windowSeconds.toLocaleString()} seconds`;
+      }
       card.append(quota);
     }
     if (provider.quota.resetAtEpochSeconds !== undefined) {
