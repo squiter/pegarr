@@ -5,6 +5,8 @@ import type {
   ArrReleaseEvidence,
   ArrGrabReceipt,
   ArrReleaseHandle,
+  ArrCatalogAddOptions,
+  ArrCatalogAddReceipt,
   CatalogMediaItem,
   MissingItemPage,
   MissingItemQuery,
@@ -12,6 +14,19 @@ import type {
   ReleaseTraits,
   RevalidatedArrRelease,
 } from "../domain.js";
+import {
+  addedArrId,
+  catalogTemplate,
+  exactLookupRecord,
+  existingArrId,
+  parseArrQualityProfiles,
+  parseArrRootFolders,
+  positiveInteger,
+  publicArrAddOptions,
+  safeCatalogTitle,
+  selectedQualityProfile,
+  selectedRootFolder,
+} from "./arr-add.js";
 import {
   JsonTransportError,
   type JsonResponse,
@@ -60,6 +75,24 @@ export class RadarrGrabError extends Error {
     this.name = "RadarrGrabError";
     this.code = code;
   }
+}
+
+export class RadarrAddError extends Error {
+  readonly code: "timeout_unknown" | "unauthorized" | "rate_limited" | "already_exists" | "upstream_failure" | "invalid_response";
+
+  constructor(code: RadarrAddError["code"], message: string) {
+    super(message);
+    this.name = "RadarrAddError";
+    this.code = code;
+  }
+}
+
+export interface RadarrCatalogAddInput {
+  readonly tmdbId: number;
+  readonly rootFolderId: number;
+  readonly qualityProfileId: number;
+  readonly monitored: boolean;
+  readonly minimumAvailability: "announced" | "inCinemas" | "released";
 }
 
 export interface RadarrClientOptions {
@@ -148,6 +181,98 @@ export class RadarrClient {
         status: response.status,
       });
     }
+  }
+
+  async readCatalogAddOptions(): Promise<ArrCatalogAddOptions> {
+    const [rootFolders, qualityProfiles] = await Promise.all([
+      this.#readRootFolders(),
+      this.#readQualityProfiles(),
+    ]);
+    return publicArrAddOptions(rootFolders, qualityProfiles);
+  }
+
+  async addCatalogMovie(input: RadarrCatalogAddInput): Promise<ArrCatalogAddReceipt> {
+    const tmdbId = positiveInteger(input.tmdbId, "tmdbId");
+    const minimumAvailability = radarrAvailability(input.minimumAvailability);
+    if (typeof input.monitored !== "boolean") throw new TypeError("monitored must be a boolean");
+    const [lookupResponse, rootFolders, qualityProfiles] = await Promise.all([
+      this.#requestJson({
+        method: "GET",
+        path: "/api/v3/movie/lookup",
+        query: { term: `tmdb:${tmdbId}` },
+        headers: { accept: "application/json", "x-api-key": this.#apiKey },
+        timeoutMs: this.#timeoutMs,
+        maxResponseBytes: this.#maxResponseBytes,
+      }),
+      this.#readRootFolders(),
+      this.#readQualityProfiles(),
+    ]);
+    assertSuccessfulStatus(lookupResponse, "movie catalog lookup");
+    const lookup = exactLookupRecord(lookupResponse.body, "tmdbId", tmdbId);
+    if (lookup === undefined) throw new TypeError("Movie is no longer present in the Radarr catalog");
+    const title = safeCatalogTitle(lookup);
+    const existingId = existingArrId(lookup);
+    if (existingId !== undefined) {
+      return { status: "already_added", application: "radarr", instanceId: this.#instanceId, itemId: existingId, title, automaticSearch: false };
+    }
+    const rootFolder = selectedRootFolder(rootFolders, input.rootFolderId);
+    selectedQualityProfile(qualityProfiles, input.qualityProfileId);
+    const body = {
+      ...catalogTemplate(lookup, radarrCatalogFields),
+      qualityProfileId: input.qualityProfileId,
+      rootFolderPath: rootFolder.path,
+      monitored: input.monitored,
+      minimumAvailability,
+      addOptions: {
+        monitor: "movieOnly",
+        searchForMovie: false,
+        addMethod: "manual",
+      },
+    };
+    let response: JsonResponse;
+    try {
+      response = await this.#transport.requestJson({
+        method: "POST",
+        path: "/api/v3/movie",
+        query: {},
+        headers: { accept: "application/json", "x-api-key": this.#apiKey },
+        body,
+        timeoutMs: this.#timeoutMs,
+        maxResponseBytes: Math.min(this.#maxResponseBytes, 512 * 1024),
+      });
+    } catch (error) {
+      if (error instanceof JsonTransportError && error.code === "timeout") throw new RadarrAddError("timeout_unknown", "Radarr add outcome is unknown after a timeout");
+      if (error instanceof JsonTransportError && (error.code === "invalid_json" || error.code === "response_too_large")) throw new RadarrAddError("invalid_response", "Radarr returned an invalid add response");
+      throw new RadarrAddError("upstream_failure", "Radarr add request failed");
+    }
+    assertAddStatus(response, "Radarr");
+    let itemId: number;
+    try {
+      itemId = addedArrId(response.body);
+    } catch {
+      throw new RadarrAddError("invalid_response", "Radarr returned an invalid add response");
+    }
+    return { status: "added", application: "radarr", instanceId: this.#instanceId, itemId, title, automaticSearch: false };
+  }
+
+  async #readRootFolders(): Promise<ReturnType<typeof parseArrRootFolders>> {
+    const response = await this.#requestJson({
+      method: "GET", path: "/api/v3/rootfolder", query: {},
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs, maxResponseBytes: Math.min(this.#maxResponseBytes, 512 * 1024),
+    });
+    assertSuccessfulStatus(response, "root folder list");
+    try { return parseArrRootFolders(response.body); } catch { throw new RadarrAdapterError("invalid_response", "Radarr returned invalid root folders", { status: response.status }); }
+  }
+
+  async #readQualityProfiles(): Promise<ReturnType<typeof parseArrQualityProfiles>> {
+    const response = await this.#requestJson({
+      method: "GET", path: "/api/v3/qualityprofile", query: {},
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs, maxResponseBytes: Math.min(this.#maxResponseBytes, 1024 * 1024),
+    });
+    assertSuccessfulStatus(response, "quality profile list");
+    try { return parseArrQualityProfiles(response.body); } catch { throw new RadarrAdapterError("invalid_response", "Radarr returned invalid quality profiles", { status: response.status }); }
   }
 
   async revalidateMovieRelease(
@@ -486,6 +611,27 @@ function assertGrabStatus(response: JsonResponse, application: "Radarr"): void {
   if (response.status === 404 || response.status === 409) throw new RadarrGrabError("release_unavailable", `${application} could not Grab the revalidated release`);
   if (response.status === 429) throw new RadarrGrabError("rate_limited", `${application} rate limited the Grab`);
   throw new RadarrGrabError("upstream_failure", `${application} rejected the Grab request`);
+}
+
+function assertAddStatus(response: JsonResponse, application: "Radarr"): void {
+  if (response.status === 200 || response.status === 201) return;
+  if (response.status === 401 || response.status === 403) throw new RadarrAddError("unauthorized", `${application} rejected the configured credentials`);
+  if (response.status === 409) throw new RadarrAddError("already_exists", `${application} reports that the movie already exists`);
+  if (response.status === 429) throw new RadarrAddError("rate_limited", `${application} rate limited the add request`);
+  throw new RadarrAddError("upstream_failure", `${application} rejected the add request`);
+}
+
+const radarrCatalogFields = [
+  "title", "originalTitle", "originalLanguage", "alternateTitles", "secondaryYear", "sortTitle", "status",
+  "overview", "inCinemas", "physicalRelease", "digitalRelease", "releaseDate", "images", "website", "remotePoster",
+  "year", "youTubeTrailerId", "studio", "runtime", "cleanTitle", "imdbId", "tmdbId", "titleSlug", "certification",
+  "genres", "keywords", "ratings", "collection",
+] as const;
+
+function radarrAvailability(value: RadarrCatalogAddInput["minimumAvailability"]): RadarrCatalogAddInput["minimumAvailability"] {
+  const allowed: readonly RadarrCatalogAddInput["minimumAvailability"][] = ["announced", "inCinemas", "released"];
+  if (!allowed.includes(value)) throw new TypeError("minimumAvailability is invalid");
+  return value;
 }
 
 function validateGrabHandle(handle: ArrReleaseHandle): Readonly<Record<string, unknown>> {

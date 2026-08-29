@@ -56,6 +56,10 @@ export interface LoginRuntimeConfiguration {
   readonly password: SecretValue;
 }
 
+export interface CatalogAddRuntimeConfiguration {
+  readonly enabled: true;
+}
+
 export interface RuntimeConfiguration {
   readonly sonarr?: SonarrRuntimeConfiguration;
   readonly radarr?: RadarrRuntimeConfiguration;
@@ -66,6 +70,7 @@ export interface RuntimeConfiguration {
   readonly opensubtitles?: OpenSubtitlesRuntimeConfiguration;
   readonly accessToken?: SecretValue;
   readonly login?: LoginRuntimeConfiguration;
+  readonly catalogAdd?: CatalogAddRuntimeConfiguration;
   readonly controlledGrab?: ControlledGrabRuntimeConfiguration;
   readonly missingPageSize?: number;
   readonly subdlLanguageMappings?: readonly ProviderLanguageMapping[];
@@ -127,7 +132,11 @@ export async function loadRuntimeConfiguration(
   });
   const accessToken = await loadAccessToken(environment);
   const login = await loadLoginConfiguration(environment);
+  const catalogAdd = loadCatalogAddConfiguration(environment);
   const controlledGrab = await loadControlledGrabConfiguration(environment);
+  if (catalogAdd !== undefined && login === undefined) {
+    throw new ConfigurationError("Catalog add requires Pegarr username/password login");
+  }
   if (controlledGrab !== undefined && accessToken === undefined && login === undefined) {
     throw new ConfigurationError(
       "Controlled Grab requires PEGARR_ACCESS_TOKEN_FILE or Pegarr username/password login for the library boundary",
@@ -162,11 +171,20 @@ export async function loadRuntimeConfiguration(
     ...(opensubtitles === undefined ? {} : { opensubtitles }),
     ...(accessToken === undefined ? {} : { accessToken }),
     ...(login === undefined ? {} : { login }),
+    ...(catalogAdd === undefined ? {} : { catalogAdd }),
     ...(controlledGrab === undefined ? {} : { controlledGrab }),
     ...(missingPageSize === undefined ? {} : { missingPageSize }),
     ...(subdlLanguageMappings === undefined ? {} : { subdlLanguageMappings }),
     ...(opensubtitlesLanguageMappings === undefined ? {} : { opensubtitlesLanguageMappings }),
   };
+}
+
+function loadCatalogAddConfiguration(
+  environment: Readonly<Record<string, string | undefined>>,
+): CatalogAddRuntimeConfiguration | undefined {
+  return parseBoolean(environment.PEGARR_ADD_ENABLED, "PEGARR_ADD_ENABLED")
+    ? { enabled: true }
+    : undefined;
 }
 
 export function configuredSonarrInstances(configuration: RuntimeConfiguration): readonly SonarrRuntimeConfiguration[] {

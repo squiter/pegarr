@@ -1,12 +1,14 @@
 # Portainer Jellyfin-stack deployment
 
-The [`compose.portainer-jellyfin.yaml`](../deploy/compose.portainer-jellyfin.yaml) overlay adds Pegarr to an existing Compose stack whose Sonarr, Radarr, and Bazarr services share the `jellyfin_net` network. It keeps Pegarr read-only, does not enable controlled Grab, and does not configure a subtitle provider.
+The [`compose.portainer-jellyfin.yaml`](../deploy/compose.portainer-jellyfin.yaml) overlay adds Pegarr to an existing Compose stack whose Sonarr, Radarr, and Bazarr services share the `jellyfin_net` network. Catalog add and controlled Grab both remain disabled by default, and the overlay does not configure a subtitle provider.
 
 The checked-in overlay matches the live `jellyfin` stack deployment validated on 2026-08-28. Port `8080` was already occupied on that NAS, so Pegarr is published on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
 
 ## Environment variables and credentials
 
 Portainer environment variables are appropriate for non-secret topology and behavior settings such as service URLs, allowed hosts, the published port, cache limits, time zone, and Pegarr username. They are not an appropriate place for API keys, the Pegarr password, or the legacy access token because container metadata, process inspection, support bundles, and diagnostics can expose them.
+
+`PEGARR_ADD_ENABLED` is a non-secret behavior switch and may be set in Portainer. Leave it `false` for a read-only deployment. Set it to `true` only after deploying an image that includes `PEG-CONFIG-015` and the add scenarios, and only when the username/password login is active. This enables the explicit add button; it never enables automatic Arr search or controlled Grab.
 
 The current published image predates Pegarr's native application-config support. To keep the live deployment secret-safe without publishing a new image, the overlay mounts only these existing files read-only:
 
@@ -44,7 +46,7 @@ Do not combine an `APP_CONFIG_FILE` setting with the corresponding `API_KEY_FILE
 4. Update the stack and confirm `jellyfin-pegarr-1` becomes healthy while the existing containers remain running.
 5. Open `http://NAS_ADDRESS:8088/health/ready`. A successful response proves Pegarr itself is ready. Validate live upstream status separately because browser automation and repository tests do not cross the NAS boundary.
 
-The live dashboard boundary is enabled by credentials stored in `pegarr-data`; they are never printed during startup or placed in Portainer. The pinned image currently uses the legacy bearer token; the next compatible image uses the generated username/password while retaining token compatibility. Provider evidence remains `Unknown` until a supported subtitle-provider key is mounted separately. Controlled Grab remains disabled unless it is explicitly configured and separately confirmed.
+The live dashboard boundary is enabled by credentials stored in `pegarr-data`; they are never printed during startup or placed in Portainer. The pinned image currently uses the legacy bearer token; the next compatible image uses the generated username/password while retaining token compatibility. Provider evidence remains `Unknown` until a supported subtitle-provider key is mounted separately. Catalog add remains disabled unless `PEGARR_ADD_ENABLED=true`, and controlled Grab remains disabled unless it is independently configured and separately confirmed.
 
 ## Roll back
 

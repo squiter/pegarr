@@ -297,6 +297,99 @@ test("PEG-CATALOG-005 a UI-configured provider is usable immediately for pre-add
   services.close();
 });
 
+test("PEG-CATALOG-008 explicit catalog add returns a safe Arr identity and Pegarr continuation", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-catalog-add-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  const configuration = {
+    radarr: {
+      instanceId: "synthetic-radarr",
+      baseUrl: "https://radarr.example.invalid",
+      allowedHosts: ["radarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-radarr-key-value"),
+    },
+    catalogAdd: { enabled: true as const },
+  };
+  const requests: Array<{ method: string; url: URL; body?: unknown }> = [];
+  const services = createRuntimeServices(configuration, {
+    dataDirectory: directory,
+    fetchImplementation: async (input, init) => {
+      const url = new URL(input);
+      const method = init?.method ?? "GET";
+      requests.push({
+        method,
+        url,
+        ...(typeof init?.body === "string" ? { body: JSON.parse(init.body) as unknown } : {}),
+      });
+      if (url.pathname === "/api/v3/movie/lookup") {
+        return new Response(JSON.stringify([{
+          title: "Synthetic Add Movie",
+          year: 2026,
+          tmdbId: 42,
+          id: 0,
+          images: [{ coverType: "poster", remoteUrl: "https://private.example.invalid/poster.jpg" }],
+        }]), { status: 200 });
+      }
+      if (url.pathname === "/api/v3/rootfolder") {
+        return new Response(JSON.stringify([{ id: 4, path: "/private/media/Movies", accessible: true, freeSpace: 123 }]), { status: 200 });
+      }
+      if (url.pathname === "/api/v3/qualityprofile") {
+        return new Response(JSON.stringify([{ id: 8, name: "Synthetic UHD", items: ["private"] }]), { status: 200 });
+      }
+      if (url.pathname === "/api/v3/movie" && method === "POST") {
+        return new Response(JSON.stringify({ id: 93 }), { status: 201 });
+      }
+      return new Response("not found", { status: 404 });
+    },
+  });
+
+  const selection = { application: "radarr" as const, instanceId: "synthetic-radarr", providerId: "tmdb" as const, value: "42" };
+  assert.ok(services.catalogAdd);
+  const options = await services.catalogAdd.readOptions(selection);
+  assert.deepEqual(options, {
+    kind: "catalog-add-options",
+    mode: "catalog_add",
+    title: "Synthetic Add Movie",
+    confirmation: "ADD Synthetic Add Movie TO RADARR",
+    rootFolders: [{ id: 4, label: "Movies", accessible: true }],
+    qualityProfiles: [{ id: 8, name: "Synthetic UHD" }],
+    defaults: { monitored: true, minimumAvailability: "released" },
+  });
+  assert.doesNotMatch(JSON.stringify(options), /private|rootFolderPath|freeSpace|items|api.?key/iu);
+
+  const input = { rootFolderId: 4, qualityProfileId: 8, monitored: true, minimumAvailability: "released" as const };
+  const postsBeforeConfirmation = requests.filter(({ method }) => method === "POST").length;
+  await assert.rejects(
+    services.catalogAdd.add(selection, { ...input, confirmation: "wrong" }),
+    /confirmation does not match/u,
+  );
+  assert.equal(requests.filter(({ method }) => method === "POST").length, postsBeforeConfirmation);
+
+  const result = await services.catalogAdd.add(selection, { ...input, confirmation: options.confirmation });
+  assert.deepEqual(result, {
+    kind: "catalog-add",
+    mode: "catalog_add",
+    status: "added",
+    receipt: {
+      status: "added",
+      application: "radarr",
+      instanceId: "synthetic-radarr",
+      itemId: 93,
+      title: "Synthetic Add Movie",
+      automaticSearch: false,
+    },
+    next: { action: "exact_movie_release_analysis", movieId: 93 },
+  });
+  const post = requests.find(({ method }) => method === "POST");
+  assert.deepEqual((post?.body as { addOptions?: unknown } | undefined)?.addOptions, {
+    monitor: "movieOnly",
+    searchForMovie: false,
+    addMethod: "manual",
+  });
+  assert.doesNotMatch(JSON.stringify(result), /private|rootFolder|qualityProfile|confirmation|api.?key/iu);
+  services.close();
+});
+
 test("PEG-RUNTIME-005 configured Radarr status returns measured browser-safe evidence", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-radarr-runtime-"));
   context.after(async () => rm(directory, { recursive: true }));

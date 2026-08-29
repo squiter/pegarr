@@ -12,8 +12,9 @@ const coreImports = {
 const adapterImports = {
   "src/adapters/http.ts": [],
   "src/adapters/fetch-json-transport.ts": ["./http.js"],
-  "src/adapters/sonarr.ts": ["node:crypto", "../domain.js", "./http.js"],
-  "src/adapters/radarr.ts": ["node:crypto", "../domain.js", "./http.js"],
+  "src/adapters/arr-add.ts": ["../domain.js"],
+  "src/adapters/sonarr.ts": ["node:crypto", "../domain.js", "./arr-add.js", "./http.js"],
+  "src/adapters/radarr.ts": ["node:crypto", "../domain.js", "./arr-add.js", "./http.js"],
   "src/adapters/bazarr.ts": ["../domain.js", "./http.js"],
   "src/adapters/subdl.ts": ["node:crypto", "../domain.js", "./http.js"],
   "src/adapters/opensubtitles.ts": ["node:crypto", "../domain.js", "./http.js"],
@@ -52,12 +53,16 @@ if (
   !sonarrAdapter.includes('method: "GET"') ||
   !sonarrAdapter.includes("revalidateEpisodeRelease") ||
   !sonarrAdapter.includes("grabRelease(handle: ArrReleaseHandle)") ||
+  !sonarrAdapter.includes("addCatalogSeries") ||
+  !sonarrAdapter.includes('path: "/api/v3/series"') ||
+  !sonarrAdapter.includes("searchForMissingEpisodes: false") ||
+  !sonarrAdapter.includes("searchForCutoffUnmetEpisodes: false") ||
   !sonarrAdapter.includes('method: "POST"') ||
   !sonarrAdapter.includes("body: normalized") ||
-  (sonarrAdapter.match(/method: "POST"/gu) ?? []).length !== 1 ||
+  (sonarrAdapter.match(/method: "POST"/gu) ?? []).length !== 2 ||
   /method: "(?:PUT|PATCH|DELETE)"/u.test(sonarrAdapter)
 ) {
-  issues.push("The Sonarr adapter must retain one narrow revalidated release Grab boundary");
+  issues.push("The Sonarr adapter must retain only the explicit no-search catalog add and revalidated Grab boundaries");
 }
 
 const radarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/radarr.ts"), "utf8");
@@ -65,12 +70,16 @@ if (
   !radarrAdapter.includes('method: "GET"') ||
   !radarrAdapter.includes("revalidateMovieRelease") ||
   !radarrAdapter.includes("grabRelease(handle: ArrReleaseHandle)") ||
+  !radarrAdapter.includes("addCatalogMovie") ||
+  !radarrAdapter.includes('path: "/api/v3/movie"') ||
+  !radarrAdapter.includes("searchForMovie: false") ||
+  !radarrAdapter.includes('addMethod: "manual"') ||
   !radarrAdapter.includes('method: "POST"') ||
   !radarrAdapter.includes("body: normalized") ||
-  (radarrAdapter.match(/method: "POST"/gu) ?? []).length !== 1 ||
+  (radarrAdapter.match(/method: "POST"/gu) ?? []).length !== 2 ||
   /method: "(?:PUT|PATCH|DELETE)"/u.test(radarrAdapter)
 ) {
-  issues.push("The Radarr adapter must retain one narrow revalidated release Grab boundary");
+  issues.push("The Radarr adapter must retain only the explicit no-search catalog add and revalidated Grab boundaries");
 }
 
 const bazarrAdapter = readFileSync(resolve(repoRoot, "src/adapters/bazarr.ts"), "utf8");

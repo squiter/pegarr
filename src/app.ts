@@ -12,6 +12,8 @@ import type {
   RuntimeServices,
   SonarrIntegrationStatus,
 } from "./runtime.js";
+import { SonarrAddError } from "./adapters/sonarr.js";
+import { RadarrAddError } from "./adapters/radarr.js";
 import type { ItemFeasibilitySelection } from "./item-feasibility.js";
 
 export interface RouteResult {
@@ -37,7 +39,7 @@ export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "catalog_coverage" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -93,13 +95,17 @@ export async function resolveRoute(
   const grabReconciliation = parseGrabReconciliationPath(pathname);
   const catalogSearch = pathname === "/api/v1/catalog/search";
   const catalogCoverage = parseCatalogCoveragePath(pathname);
+  const catalogAdd = parseCatalogAddPath(pathname);
   const subtitleSettings = pathname === "/api/v1/settings/subtitles";
   const providerSettings = parseProviderSettingsPath(pathname);
-  const protectedLibraryRoute = catalogSearch || catalogCoverage !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
+  const protectedLibraryRoute = catalogSearch || catalogCoverage !== undefined || catalogAdd !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   const controlledGrabAvailable = services?.controlledGrab !== undefined && access?.adminControl?.configured === true;
+  if (catalogAdd !== undefined && services?.catalogAdd === undefined) {
+    return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+  }
   if ((grabSelection !== undefined || grabHistory || grabReconciliation !== undefined) && !controlledGrabAvailable) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
@@ -140,6 +146,12 @@ export async function resolveRoute(
   }
   if (catalogCoverage !== undefined && method !== "GET") {
     return { statusCode: 405, headers: { allow: "GET" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (catalogAdd?.action === "options" && method !== "GET") {
+    return { statusCode: 405, headers: { allow: "GET" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (catalogAdd?.action === "add" && method !== "POST") {
+    return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
   }
 
   if (pathname === "/health") {
@@ -264,6 +276,7 @@ export async function resolveRoute(
           query: query.trim(),
           items: [],
           sources: [],
+          capabilities: { catalogAdd: false },
         })),
       };
     } catch (error) {
@@ -284,6 +297,38 @@ export async function resolveRoute(
       return error instanceof TypeError
         ? { statusCode: 400, body: { service: "pegarr", mode: "read_only", status: "invalid_request" } }
         : { statusCode: 503, body: { service: "pegarr", mode: "read_only", status: "unavailable" } };
+    }
+  }
+
+  if (catalogAdd !== undefined) {
+    if (catalogAdd.action === "options") {
+      const rejection = authorizeLibraryRoute(access);
+      if (rejection !== undefined) return rejection;
+      try {
+        return { statusCode: 200, body: await services?.catalogAdd?.readOptions(catalogAdd.selection) };
+      } catch (error) {
+        return error instanceof TypeError
+          ? { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } }
+          : { statusCode: 503, body: { service: "pegarr", status: "catalog_add_options_unavailable" } };
+      }
+    }
+    const rejection = authorizeSettingsMutation(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      const body = parseCatalogAddBody(catalogAdd.selection.application, requestBody);
+      const result = await services?.catalogAdd?.add(catalogAdd.selection, body);
+      return { statusCode: 200, body: result };
+    } catch (error) {
+      if (error instanceof InvalidRequestBodyError || error instanceof TypeError) {
+        return { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } };
+      }
+      if ((error instanceof SonarrAddError || error instanceof RadarrAddError) && error.code === "timeout_unknown") {
+        return { statusCode: 202, body: { service: "pegarr", mode: "catalog_add", status: "timeout_unknown" } };
+      }
+      if ((error instanceof SonarrAddError || error instanceof RadarrAddError) && error.code === "already_exists") {
+        return { statusCode: 409, body: { service: "pegarr", mode: "catalog_add", status: "already_exists" } };
+      }
+      return { statusCode: 503, body: { service: "pegarr", mode: "catalog_add", status: "unavailable" } };
     }
   }
 
@@ -514,6 +559,20 @@ function parseProviderSettingsPath(pathname: string): { readonly provider: impor
     : { provider: match[1] as import("./provider-settings.js").ConfigurableProviderId };
 }
 
+function parseCatalogAddPath(pathname: string): { readonly selection: import("./runtime.js").CatalogAddSelection; readonly action: "options" | "add" } | undefined {
+  const match = /^\/api\/v1\/catalog\/(sonarr|radarr)\/([a-z0-9][a-z0-9_-]{0,63})\/(tvdb|tmdb)\/(\d{1,16})\/(add-options|add)$/iu.exec(pathname);
+  if (match === null) return undefined;
+  const application = match[1];
+  const instanceId = match[2];
+  const providerId = match[3];
+  const value = match[4];
+  const action = match[5] === "add-options" ? "options" : "add";
+  if ((application === "sonarr" && providerId === "tvdb") || (application === "radarr" && providerId === "tmdb")) {
+    return { selection: { application, instanceId: instanceId as string, providerId, value: value as string }, action };
+  }
+  return undefined;
+}
+
 class InvalidRequestBodyError extends Error {}
 
 function parsePrepareGrabBody(value: unknown): { readonly releaseId: string } {
@@ -567,6 +626,30 @@ function parseProviderSettingsBody(value: unknown): import("./provider-settings.
   };
 }
 
+function parseCatalogAddBody(
+  application: "sonarr" | "radarr",
+  value: unknown,
+): import("./runtime.js").CatalogAddInput {
+  const expected = application === "sonarr"
+    ? ["rootFolderId", "qualityProfileId", "monitored", "monitor", "confirmation"]
+    : ["rootFolderId", "qualityProfileId", "monitored", "minimumAvailability", "confirmation"];
+  const body = requestRecord(value, expected);
+  const rootFolderId = requestPositiveInteger(body.rootFolderId, "rootFolderId");
+  const qualityProfileId = requestPositiveInteger(body.qualityProfileId, "qualityProfileId");
+  if (typeof body.monitored !== "boolean") throw new InvalidRequestBodyError("monitored is invalid");
+  const confirmation = requestString(body.confirmation, "confirmation", 2_048);
+  if (application === "sonarr") {
+    const monitor = requestString(body.monitor, "monitor", 32);
+    if (!["all", "future", "missing", "existing", "firstSeason", "lastSeason", "pilot", "recent", "none"].includes(monitor)) {
+      throw new InvalidRequestBodyError("monitor is invalid");
+    }
+    return { rootFolderId, qualityProfileId, monitored: body.monitored, monitor: monitor as NonNullable<import("./runtime.js").CatalogAddInput["monitor"]>, confirmation };
+  }
+  const minimumAvailability = requestString(body.minimumAvailability, "minimumAvailability", 32);
+  if (!["announced", "inCinemas", "released"].includes(minimumAvailability)) throw new InvalidRequestBodyError("minimumAvailability is invalid");
+  return { rootFolderId, qualityProfileId, monitored: body.monitored, minimumAvailability: minimumAvailability as NonNullable<import("./runtime.js").CatalogAddInput["minimumAvailability"]>, confirmation };
+}
+
 function requestRecord(value: unknown, expectedKeys: readonly string[]): Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new InvalidRequestBodyError();
   const body = value as Readonly<Record<string, unknown>>;
@@ -579,6 +662,11 @@ function requestString(value: unknown, field: string, maximum: number): string {
   if (typeof value !== "string" || !value.trim() || value.length > maximum || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)) {
     throw new InvalidRequestBodyError(`${field} is invalid`);
   }
+  return value;
+}
+
+function requestPositiveInteger(value: unknown, field: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) throw new InvalidRequestBodyError(`${field} is invalid`);
   return value;
 }
 
@@ -638,7 +726,7 @@ export function createRequestHandler(
     let result: RouteResult;
     try {
       const safeRoute = safeRequestRoute(request.url);
-      const requestBody = (request.method === "POST" && safeRoute.startsWith("grab_")) || (request.method === "PUT" && (safeRoute === "subtitle_settings" || safeRoute === "provider_settings"))
+      const requestBody = (request.method === "POST" && (safeRoute.startsWith("grab_") || safeRoute === "catalog_add")) || (request.method === "PUT" && (safeRoute === "subtitle_settings" || safeRoute === "provider_settings"))
         ? await readBoundedJsonBody(request)
         : undefined;
       result = await resolveRoute(
@@ -756,6 +844,8 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (pathname === "/api/v1/feasibility/demo") return "demo_feasibility";
   if (pathname === "/api/v1/integrations/sonarr/status") return "sonarr_status";
   if (pathname === "/api/v1/integrations/radarr/status") return "radarr_status";
+  if (/^\/api\/v1\/catalog\/(?:sonarr|radarr)\/[a-z0-9][a-z0-9_-]{0,63}\/(?:tvdb|tmdb)\/\d{1,16}\/add-options$/iu.test(pathname)) return "catalog_add_options";
+  if (/^\/api\/v1\/catalog\/(?:sonarr|radarr)\/[a-z0-9][a-z0-9_-]{0,63}\/(?:tvdb|tmdb)\/\d{1,16}\/add$/iu.test(pathname)) return "catalog_add";
   if (/^\/api\/v1\/settings\/providers\/(?:subdl|opensubtitles)$/u.test(pathname)) return "provider_settings";
   if (pathname === "/api/v1/library/instances") return "arr_instances";
   if (pathname === "/api/v1/catalog/search") return "catalog_search";

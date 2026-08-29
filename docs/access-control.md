@@ -12,6 +12,12 @@ GET /api/v1/catalog/<application>/<instance-id>/<provider-id>/<value>/coverage
 GET /api/v1/settings/subtitles
 Authorization: Basic <Pegarr username and password>
 
+GET /api/v1/catalog/<application>/<instance-id>/<provider-id>/<value>/add-options
+Authorization: Basic <Pegarr username and password>
+
+POST /api/v1/catalog/<application>/<instance-id>/<provider-id>/<value>/add
+Authorization: Basic <Pegarr username and password only>
+
 PUT /api/v1/settings/subtitles
 PUT /api/v1/settings/providers/subdl
 PUT /api/v1/settings/providers/opensubtitles
@@ -28,7 +34,7 @@ GET /api/v1/library/items/radarr/<instance-id>/movie/<movie-id>/feasibility
 Authorization: Basic <Pegarr username and password>
 ```
 
-Legacy API clients may continue to send `Authorization: Bearer <access token>` when `PEGARR_ACCESS_TOKEN_FILE` is configured. Bearer access remains read-only: subtitle-policy and provider settings PUT routes return `403 login_required` even when the bearer token is valid.
+Legacy API clients may continue to send `Authorization: Bearer <access token>` when `PEGARR_ACCESS_TOKEN_FILE` is configured. Bearer access remains read-only: catalog add and subtitle-policy/provider settings mutations return `403 login_required` even when the bearer token is valid. Catalog add routes are absent unless `PEGARR_ADD_ENABLED=true`.
 
 A missing, malformed, query-string, or incorrect token returns `401` before any upstream request. Mutation methods return `405`. Successful responses use `Cache-Control: no-store`, contain an explicit `read_only` mode, and retain only the private library evidence required by the current dashboard.
 
@@ -97,4 +103,4 @@ Authorized inventory reads request at most one configured page from each Arr ins
 
 Authorized item reads resolve the requested instance and ID from that server-owned inventory before starting release, Bazarr, or provider work. Legacy unscoped URLs remain available only when the item identity is unambiguous. Successful item reports share a 30-second bounded in-memory window. See [item feasibility API](item-feasibility-api.md).
 
-`PEG-ACCESS-001` through `PEG-ACCESS-005`, `PEG-CONFIG-006`, `PEG-CONFIG-014`, `PEG-CATALOG-001`, `PEG-CATALOG-002`, `PEG-SONARR-011`, `PEG-RADARR-010`, `PEG-INVENTORY-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-011`, and `PEG-DOCKER-013` are the deterministic evidence for this boundary.
+`PEG-ACCESS-001` through `PEG-ACCESS-005`, `PEG-CONFIG-006`, `PEG-CONFIG-014`, `PEG-CONFIG-015`, `PEG-CATALOG-001`, `PEG-CATALOG-002`, `PEG-CATALOG-006`, `PEG-CATALOG-007`, `PEG-SONARR-011`, `PEG-RADARR-010`, `PEG-INVENTORY-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-011`, and `PEG-DOCKER-013` are the deterministic evidence for this boundary.

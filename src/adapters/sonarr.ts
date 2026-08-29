@@ -5,6 +5,8 @@ import type {
   ArrReleaseEvidence,
   ArrGrabReceipt,
   ArrReleaseHandle,
+  ArrCatalogAddOptions,
+  ArrCatalogAddReceipt,
   CatalogMediaItem,
   MissingItemPage,
   MissingItemQuery,
@@ -12,6 +14,19 @@ import type {
   ReleaseTraits,
   RevalidatedArrRelease,
 } from "../domain.js";
+import {
+  addedArrId,
+  catalogTemplate,
+  exactLookupRecord,
+  existingArrId,
+  parseArrQualityProfiles,
+  parseArrRootFolders,
+  positiveInteger,
+  publicArrAddOptions,
+  safeCatalogTitle,
+  selectedQualityProfile,
+  selectedRootFolder,
+} from "./arr-add.js";
 import {
   JsonTransportError,
   type JsonResponse,
@@ -60,6 +75,24 @@ export class SonarrGrabError extends Error {
     this.name = "SonarrGrabError";
     this.code = code;
   }
+}
+
+export class SonarrAddError extends Error {
+  readonly code: "timeout_unknown" | "unauthorized" | "rate_limited" | "already_exists" | "upstream_failure" | "invalid_response";
+
+  constructor(code: SonarrAddError["code"], message: string) {
+    super(message);
+    this.name = "SonarrAddError";
+    this.code = code;
+  }
+}
+
+export interface SonarrCatalogAddInput {
+  readonly tvdbId: number;
+  readonly rootFolderId: number;
+  readonly qualityProfileId: number;
+  readonly monitored: boolean;
+  readonly monitor: "all" | "future" | "missing" | "existing" | "firstSeason" | "lastSeason" | "pilot" | "recent" | "none";
 }
 
 export interface SonarrClientOptions {
@@ -148,6 +181,98 @@ export class SonarrClient {
         status: response.status,
       });
     }
+  }
+
+  async readCatalogAddOptions(): Promise<ArrCatalogAddOptions> {
+    const [rootFolders, qualityProfiles] = await Promise.all([
+      this.#readRootFolders(),
+      this.#readQualityProfiles(),
+    ]);
+    return publicArrAddOptions(rootFolders, qualityProfiles);
+  }
+
+  async addCatalogSeries(input: SonarrCatalogAddInput): Promise<ArrCatalogAddReceipt> {
+    const tvdbId = positiveInteger(input.tvdbId, "tvdbId");
+    const monitor = sonarrMonitor(input.monitor);
+    if (typeof input.monitored !== "boolean") throw new TypeError("monitored must be a boolean");
+    const [lookupResponse, rootFolders, qualityProfiles] = await Promise.all([
+      this.#requestJson({
+        method: "GET",
+        path: "/api/v3/series/lookup",
+        query: { term: `tvdb:${tvdbId}` },
+        headers: { accept: "application/json", "x-api-key": this.#apiKey },
+        timeoutMs: this.#timeoutMs,
+        maxResponseBytes: this.#maxResponseBytes,
+      }),
+      this.#readRootFolders(),
+      this.#readQualityProfiles(),
+    ]);
+    assertSuccessfulStatus(lookupResponse, "series catalog lookup");
+    const lookup = exactLookupRecord(lookupResponse.body, "tvdbId", tvdbId);
+    if (lookup === undefined) throw new TypeError("Series is no longer present in the Sonarr catalog");
+    const title = safeCatalogTitle(lookup);
+    const existingId = existingArrId(lookup);
+    if (existingId !== undefined) {
+      return { status: "already_added", application: "sonarr", instanceId: this.#instanceId, itemId: existingId, title, automaticSearch: false };
+    }
+    const rootFolder = selectedRootFolder(rootFolders, input.rootFolderId);
+    selectedQualityProfile(qualityProfiles, input.qualityProfileId);
+    const body = {
+      ...catalogTemplate(lookup, sonarrCatalogFields),
+      qualityProfileId: input.qualityProfileId,
+      rootFolderPath: rootFolder.path,
+      monitored: input.monitored,
+      seasonFolder: true,
+      addOptions: {
+        monitor,
+        searchForMissingEpisodes: false,
+        searchForCutoffUnmetEpisodes: false,
+      },
+    };
+    let response: JsonResponse;
+    try {
+      response = await this.#transport.requestJson({
+        method: "POST",
+        path: "/api/v3/series",
+        query: {},
+        headers: { accept: "application/json", "x-api-key": this.#apiKey },
+        body,
+        timeoutMs: this.#timeoutMs,
+        maxResponseBytes: Math.min(this.#maxResponseBytes, 512 * 1024),
+      });
+    } catch (error) {
+      if (error instanceof JsonTransportError && error.code === "timeout") throw new SonarrAddError("timeout_unknown", "Sonarr add outcome is unknown after a timeout");
+      if (error instanceof JsonTransportError && (error.code === "invalid_json" || error.code === "response_too_large")) throw new SonarrAddError("invalid_response", "Sonarr returned an invalid add response");
+      throw new SonarrAddError("upstream_failure", "Sonarr add request failed");
+    }
+    assertAddStatus(response, "Sonarr");
+    let itemId: number;
+    try {
+      itemId = addedArrId(response.body);
+    } catch {
+      throw new SonarrAddError("invalid_response", "Sonarr returned an invalid add response");
+    }
+    return { status: "added", application: "sonarr", instanceId: this.#instanceId, itemId, title, automaticSearch: false };
+  }
+
+  async #readRootFolders(): Promise<ReturnType<typeof parseArrRootFolders>> {
+    const response = await this.#requestJson({
+      method: "GET", path: "/api/v3/rootfolder", query: {},
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs, maxResponseBytes: Math.min(this.#maxResponseBytes, 512 * 1024),
+    });
+    assertSuccessfulStatus(response, "root folder list");
+    try { return parseArrRootFolders(response.body); } catch { throw new SonarrAdapterError("invalid_response", "Sonarr returned invalid root folders", { status: response.status }); }
+  }
+
+  async #readQualityProfiles(): Promise<ReturnType<typeof parseArrQualityProfiles>> {
+    const response = await this.#requestJson({
+      method: "GET", path: "/api/v3/qualityprofile", query: {},
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs, maxResponseBytes: Math.min(this.#maxResponseBytes, 1024 * 1024),
+    });
+    assertSuccessfulStatus(response, "quality profile list");
+    try { return parseArrQualityProfiles(response.body); } catch { throw new SonarrAdapterError("invalid_response", "Sonarr returned invalid quality profiles", { status: response.status }); }
   }
 
   async revalidateEpisodeRelease(
@@ -527,6 +652,27 @@ function assertGrabStatus(response: JsonResponse, application: "Sonarr"): void {
   if (response.status === 404 || response.status === 409) throw new SonarrGrabError("release_unavailable", `${application} could not Grab the revalidated release`);
   if (response.status === 429) throw new SonarrGrabError("rate_limited", `${application} rate limited the Grab`);
   throw new SonarrGrabError("upstream_failure", `${application} rejected the Grab request`);
+}
+
+function assertAddStatus(response: JsonResponse, application: "Sonarr"): void {
+  if (response.status === 200 || response.status === 201) return;
+  if (response.status === 401 || response.status === 403) throw new SonarrAddError("unauthorized", `${application} rejected the configured credentials`);
+  if (response.status === 409) throw new SonarrAddError("already_exists", `${application} reports that the series already exists`);
+  if (response.status === 429) throw new SonarrAddError("rate_limited", `${application} rate limited the add request`);
+  throw new SonarrAddError("upstream_failure", `${application} rejected the add request`);
+}
+
+const sonarrCatalogFields = [
+  "title", "alternateTitles", "sortTitle", "status", "overview", "network", "airTime", "images",
+  "originalLanguage", "remotePoster", "seasons", "year", "runtime", "tvdbId", "tvRageId", "tvMazeId",
+  "tmdbId", "firstAired", "lastAired", "seriesType", "cleanTitle", "imdbId", "titleSlug", "certification",
+  "genres", "ratings",
+] as const;
+
+function sonarrMonitor(value: SonarrCatalogAddInput["monitor"]): SonarrCatalogAddInput["monitor"] {
+  const allowed: readonly SonarrCatalogAddInput["monitor"][] = ["all", "future", "missing", "existing", "firstSeason", "lastSeason", "pilot", "recent", "none"];
+  if (!allowed.includes(value)) throw new TypeError("monitor is invalid");
+  return value;
 }
 
 function validateGrabHandle(handle: ArrReleaseHandle): Readonly<Record<string, unknown>> {

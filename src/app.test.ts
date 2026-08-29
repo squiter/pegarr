@@ -347,6 +347,77 @@ test("PEG-CATALOG-004 catalog coverage authenticates before provider work and re
   assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: `Bearer ${token}` })).statusCode, 405);
 });
 
+test("PEG-CATALOG-006 catalog add-option reads authenticate before upstream work", async () => {
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  const control = new AccessControl(undefined, { username, password: new SecretValue(password) });
+  const basic = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  let reads = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  Object.assign(services, { catalogAdd: {
+    readOptions: async () => {
+      reads += 1;
+      return {
+        kind: "catalog-add-options",
+        mode: "catalog_add",
+        title: "Synthetic Add",
+        confirmation: "ADD Synthetic Add TO SONARR",
+        rootFolders: [{ id: 1, label: "TV", accessible: true }],
+        qualityProfiles: [{ id: 2, name: "HD" }],
+        defaults: { monitored: true, monitor: "all" },
+      };
+    },
+    add: async () => { throw new Error("not expected"); },
+  } });
+  const path = "/api/v1/catalog/sonarr/main/tvdb/42/add-options";
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control, authorization: "Basic invalid" })).statusCode, 401);
+  assert.equal(reads, 0);
+  const response = await resolveRoute("GET", path, tmpdir(), services, { control, authorization: basic });
+  assert.equal(response.statusCode, 200);
+  assert.equal(reads, 1);
+  assert.doesNotMatch(JSON.stringify(response), /\/private|api.?key/iu);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: basic })).statusCode, 405);
+});
+
+test("PEG-CATALOG-007 catalog add requires feature flag, login, and exact bounded input", async () => {
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  const token = "synthetic-access-token-value-0000000001";
+  const control = new AccessControl(new SecretValue(token), { username, password: new SecretValue(password) });
+  const basic = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  const bearer = `Bearer ${token}`;
+  const path = "/api/v1/catalog/radarr/main/tmdb/42/add";
+  const body = { rootFolderId: 1, qualityProfileId: 2, monitored: true, minimumAvailability: "released", confirmation: "ADD Synthetic Add TO RADARR" };
+  const disabled = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  assert.equal((await resolveRoute("POST", path, tmpdir(), disabled, { control, authorization: basic }, body)).statusCode, 404);
+
+  let adds = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  Object.assign(services, { catalogAdd: {
+    readOptions: async () => { throw new Error("not expected"); },
+    add: async (_selection: import("./runtime.js").CatalogAddSelection, input: import("./runtime.js").CatalogAddInput) => {
+      adds += 1;
+      assert.equal(input.confirmation, body.confirmation);
+      return {
+        kind: "catalog-add",
+        mode: "catalog_add",
+        status: "added",
+        receipt: { status: "added", application: "radarr", instanceId: "main", itemId: 93, title: "Synthetic Add", automaticSearch: false },
+        next: { action: "exact_movie_release_analysis", movieId: 93 },
+      };
+    },
+  } });
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: bearer }, body)).statusCode, 403);
+  assert.equal(adds, 0);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: basic }, { ...body, automaticSearch: true })).statusCode, 400);
+  assert.equal(adds, 0);
+  const response = await resolveRoute("POST", path, tmpdir(), services, { control, authorization: basic }, body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(adds, 1);
+  assert.match(JSON.stringify(response.body), /exact_movie_release_analysis/u);
+  assert.doesNotMatch(JSON.stringify(response.body), /rootFolder|qualityProfile|confirmation/u);
+});
+
 test("PEG-INSTANCE-004 instance status is authenticated, bounded, and read-only", async () => {
   const token = "synthetic-access-token-value-0000000001";
   let reads = 0;
@@ -494,6 +565,20 @@ test("PEG-DASH-043 provider onboarding clears credentials and keeps them page-me
   assert.match(String(page.body), /connect SubDL or OpenSubtitles|private server-side files/u);
   assert.match(String(client.body), /saveProviderSettings|parseProviderMappings|new-password|keyInput\.value = ""|\/api\/v1\/settings\/providers\//u);
   assert.match(String(styles.body), /provider-settings-form/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-044 catalog add is an explicit login-only mutation and never offers automatic search", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, styles.body].join("\n");
+  assert.match(String(page.body), /explicitly add with automatic search disabled|never downloads a release/u);
+  assert.match(String(client.body), /catalogAddEnabled|startsWith\("Basic "\)|loadCatalogAddOptions|renderCatalogAddForm|submitCatalogAdd/u);
+  assert.match(String(client.body), /Automatic search stays off|no release will be downloaded|timeout.*Unknown/iu);
+  assert.match(String(client.body), /\/add-options|\/add`|exact release analysis/u);
+  assert.match(String(styles.body), /catalog-add-panel|catalog-add-form|catalog-add-warning/u);
+  assert.doesNotMatch(assets, /searchForMovie|searchForMissingEpisodes|automaticSearch\s*:/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 

@@ -34,6 +34,27 @@ class FakeTransport implements JsonTransport {
   }
 }
 
+class AddTransport implements JsonTransport {
+  readonly requests: JsonRequest[] = [];
+
+  async requestJson(request: JsonRequest): Promise<JsonResponse> {
+    this.requests.push(request);
+    if (request.method === "GET" && request.path === "/api/v3/rootfolder") {
+      return { status: 200, headers: {}, body: [{ id: 4, path: "/private/media/Movies", accessible: true, freeSpace: 42 }] };
+    }
+    if (request.method === "GET" && request.path === "/api/v3/qualityprofile") {
+      return { status: 200, headers: {}, body: [{ id: 8, name: "Synthetic UHD", items: [{ private: true }] }] };
+    }
+    if (request.method === "GET" && request.path === "/api/v3/movie/lookup") {
+      return { status: 200, headers: {}, body: [{ title: "Synthetic Add Movie", tmdbId: 54321, id: 0, titleSlug: "54321", images: [], privateField: "must-not-forward" }] };
+    }
+    if (request.method === "POST" && request.path === "/api/v3/movie") {
+      return { status: 201, headers: {}, body: { id: 92, title: "Synthetic Add Movie", path: "/private/media/Movies/Synthetic Add Movie" } };
+    }
+    return { status: 404, headers: {}, body: {} };
+  }
+}
+
 function client(transport: JsonTransport): RadarrClient {
   return new RadarrClient(
     {
@@ -107,6 +128,44 @@ test("PEG-RADARR-010 catalog lookup finds unadded movies and discards private me
   assert.doesNotMatch(JSON.stringify(items), /private|overview|folder|image|remoteUrl/iu);
   await assert.rejects(client(transport).lookupMovies("x"), /2 through 200/u);
   assert.equal(mapRadarrCatalogResponse([{ title: "Existing", tmdbId: 42, id: 9 }])[0]?.alreadyAdded, true);
+});
+
+test("PEG-RADARR-011 add options are sanitized and movie add always disables automatic search", async () => {
+  const transport = new AddTransport();
+  const radarr = client(transport);
+  const options = await radarr.readCatalogAddOptions();
+  assert.deepEqual(options, {
+    rootFolders: [{ id: 4, label: "Movies", accessible: true }],
+    qualityProfiles: [{ id: 8, name: "Synthetic UHD" }],
+  });
+  assert.doesNotMatch(JSON.stringify(options), /private|\/media|freeSpace|items/iu);
+
+  const receipt = await radarr.addCatalogMovie({
+    tmdbId: 54321,
+    rootFolderId: 4,
+    qualityProfileId: 8,
+    monitored: true,
+    minimumAvailability: "released",
+  });
+  assert.deepEqual(receipt, {
+    status: "added",
+    application: "radarr",
+    instanceId: "synthetic-radarr",
+    itemId: 92,
+    title: "Synthetic Add Movie",
+    automaticSearch: false,
+  });
+  const post = transport.requests.find((request) => request.method === "POST");
+  assert.equal(post?.method, "POST");
+  if (post?.method !== "POST") return;
+  assert.deepEqual(post.body.addOptions, {
+    monitor: "movieOnly",
+    searchForMovie: false,
+    addMethod: "manual",
+  });
+  assert.equal(post.body.rootFolderPath, "/private/media/Movies");
+  assert.equal(post.body.privateField, undefined);
+  assert.doesNotMatch(JSON.stringify(receipt), /private|rootFolderPath|qualityProfile/u);
 });
 
 test("PEG-RADARR-002 movie releases preserve Arr decisions, editions, and safe evidence", () => {

@@ -9,6 +9,7 @@ services:
       PEGARR_ACCESS_TOKEN_FILE: /data/access_token
       PEGARR_USERNAME: ${PEGARR_USERNAME:-pegarr}
       PEGARR_PASSWORD_FILE: /data/password
+      PEGARR_ADD_ENABLED: ${PEGARR_ADD_ENABLED:-false}
       PEGARR_MISSING_PAGE_SIZE: 50
       PEGARR_PROVIDER_CACHE_FILE: /data/provider-search-cache.sqlite
       PEGARR_PROVIDER_CACHE_POSITIVE_TTL_SECONDS: 86400

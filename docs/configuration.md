@@ -109,7 +109,7 @@ The database contains private normalized matching evidence such as media identif
 
 The server writes one JSON record for startup, shutdown, and each completed HTTP request. Request records contain only `event`, `service`, a bounded method, a safe route category, status code, and bounded duration. They never contain the raw URL, query string, item ID, title, authorization header, API key, access token, configured hostname, or upstream error detail. Logging failures cannot change the HTTP response.
 
-Safe route categories include health, readiness, dashboard, dashboard asset, integration status, catalog search, missing inventory, item feasibility, synthetic demo, and not found. This keeps container logs useful for operations without turning them into library or discovery history.
+Safe route categories include health, readiness, dashboard, dashboard asset, integration status, catalog search, catalog add options, catalog add, missing inventory, item feasibility, synthetic demo, and not found. This keeps container logs useful for operations without turning them into library or discovery history.
 
 ## Browser login and API access
 
@@ -118,9 +118,12 @@ Safe route categories include health, readiness, dashboard, dashboard asset, int
 | `PEGARR_ACCESS_TOKEN_FILE` | Yes | Absolute in-container path to one random bearer token of 32 through 4096 characters |
 | `PEGARR_USERNAME` | With password login | Safe Pegarr login name of 1 through 64 characters |
 | `PEGARR_PASSWORD_FILE` | With password login | Absolute in-container path to one password of 32 through 4096 characters |
+| `PEGARR_ADD_ENABLED` | No | Must be exactly `true` to expose catalog add; requires username/password login and remains disabled by default |
 | `PEGARR_MISSING_PAGE_SIZE` | No | Missing items requested from each Arr instance; defaults to 50, maximum 100 |
 
 The live library and catalog routes are absent unless either username/password login or the legacy access token is configured. Pegarr rejects direct `PEGARR_PASSWORD` and `PEGARR_ACCESS_TOKEN` values. The current login foundation uses HTTP Basic credentials held only in page memory; use HTTPS or a trusted private network. A short-lived `HttpOnly` session is still required by the discovery-first roadmap before the login migration is complete.
+
+Catalog add is a separate opt-in capability. Set `PEGARR_ADD_ENABLED=true` only with `PEGARR_USERNAME` and `PEGARR_PASSWORD_FILE`; Pegarr refuses to start if add is enabled with bearer-only access. Every add re-resolves the exact catalog identity and server-owned root-folder and quality-profile IDs immediately before POSTing to the selected Arr instance. Sonarr `searchForMissingEpisodes` and Radarr `searchForMovie` are always false. See [catalog add and continue](catalog-add-and-continue.md).
 
 The dashboard's explicit default subtitle policy is written to `DATA_DIR/subtitle-settings.json`. Pegarr creates it atomically with mode `0600`, bounds it to 64 KiB and 16 unique languages, and stores no credentials or media evidence there.
 

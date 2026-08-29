@@ -1489,6 +1489,48 @@
       "title": "Provider onboarding clears credentials and remains page-memory-only",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
+    },
+    {
+      "id": "PEG-CONFIG-015",
+      "title": "Catalog add is opt-in and requires username-password login",
+      "evidence": "src/config.test.ts",
+      "boundary": "Temporary synthetic password file and configuration values; no network or mutation"
+    },
+    {
+      "id": "PEG-SONARR-012",
+      "title": "Sonarr add options are sanitized and automatic search is always disabled",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Injected transport and synthetic catalog, root-folder, profile, and add responses; no network or live mutation"
+    },
+    {
+      "id": "PEG-RADARR-011",
+      "title": "Radarr add options are sanitized and automatic search is always disabled",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Injected transport and synthetic catalog, root-folder, profile, and add responses; no network or live mutation"
+    },
+    {
+      "id": "PEG-CATALOG-006",
+      "title": "Catalog add-option reads authenticate before upstream work",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with synthetic login and upstream-call spy; no network or mutation"
+    },
+    {
+      "id": "PEG-CATALOG-007",
+      "title": "Catalog add requires login, feature opt-in, and exact bounded input",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with synthetic login, legacy token, and fake add service; no network or live mutation"
+    },
+    {
+      "id": "PEG-CATALOG-008",
+      "title": "Explicit catalog add returns a safe Arr identity and Pegarr continuation",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary data directory and injected synthetic Radarr responses; no network or live mutation"
+    },
+    {
+      "id": "PEG-DASH-044",
+      "title": "Catalog add is an explicit login-only UI mutation with automatic search off",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
     }
   ],
   "manualGaps": [
@@ -1521,6 +1563,11 @@
       "id": "PEG-MANUAL-006",
       "title": "Live OpenSubtitles REST search and language-code compatibility",
       "reason": "The official search contract and deterministic adapter are pinned, but an operator-owned API key, sanitized live response, measured rate headers, and Bazarr-to-OpenSubtitles language mappings have not been verified"
+    },
+    {
+      "id": "PEG-MANUAL-007",
+      "title": "Live Sonarr and Radarr catalog-add compatibility and automatic-search suppression",
+      "reason": "Synthetic tests prove the exact add bodies and safe continuation; a separately authorized harmless live add must confirm installed-version compatibility and that no automatic search starts"
     }
   ]
 }

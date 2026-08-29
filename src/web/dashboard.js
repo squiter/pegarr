@@ -110,6 +110,7 @@ let grabContext;
 let administratorToken;
 let historyAdministratorToken;
 let reconciliationContext;
+let catalogAddEnabled = false;
 const feasibilityCache = new Map();
 const analysisByItem = new Map();
 const shortlistedReleaseIds = new Set();
@@ -267,6 +268,7 @@ async function searchCatalog(event) {
     }
     if (!response.ok) throw new Error("catalog_unavailable");
     const result = await response.json();
+    catalogAddEnabled = result?.capabilities?.catalogAdd === true;
     const items = Array.isArray(result?.items) ? result.items : [];
     elements.catalogResults.replaceChildren(...items.map(renderCatalogItem));
     setCatalogStatus(
@@ -307,8 +309,195 @@ function renderCatalogItem(item) {
   coverage.hidden = true;
   preview.addEventListener("click", () => previewCatalogCoverage(item, preview, coverage));
   actions.append(state, preview);
-  row.append(copy, actions, coverage);
+  const addPanel = document.createElement("div");
+  addPanel.className = "catalog-add-panel";
+  addPanel.hidden = true;
+  if (!item?.alreadyAdded && catalogAddEnabled && libraryAuthorization?.startsWith("Basic ")) {
+    const add = document.createElement("button");
+    add.className = "primary-button catalog-add-button";
+    add.type = "button";
+    add.textContent = `Add to ${item?.application === "sonarr" ? "Sonarr" : "Radarr"}`;
+    add.addEventListener("click", () => loadCatalogAddOptions(item, add, addPanel));
+    actions.append(add);
+  }
+  row.append(copy, actions, coverage, addPanel);
   return row;
+}
+
+async function loadCatalogAddOptions(item, button, panel) {
+  const identity = catalogIdentity(item);
+  if (identity === undefined) {
+    panel.hidden = false;
+    panel.textContent = "This result has no safe Arr catalog identity.";
+    return;
+  }
+  button.disabled = true;
+  panel.hidden = false;
+  panel.textContent = "Loading server-owned add options…";
+  try {
+    const response = await fetch(`${catalogItemEndpoint(item, identity)}/add-options`, {
+      method: "GET",
+      headers: { authorization: libraryAuthorization },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) throw new Error("catalog_add_options_unavailable");
+    renderCatalogAddForm(item, identity, await response.json(), panel, button);
+  } catch {
+    panel.textContent = "Pegarr could not load the add options. Nothing was added.";
+    button.disabled = false;
+  }
+}
+
+function renderCatalogAddForm(item, identity, options, panel, openButton) {
+  const form = document.createElement("form");
+  form.className = "catalog-add-form";
+  const warning = document.createElement("p");
+  warning.className = "catalog-add-warning";
+  warning.textContent = "This adds only the title. Automatic search stays off and no release will be downloaded.";
+  const root = catalogAddSelect("Root folder", options?.rootFolders, "label");
+  const profile = catalogAddSelect("Quality profile", options?.qualityProfiles, "name");
+  const monitoredLabel = document.createElement("label");
+  monitoredLabel.className = "catalog-add-check";
+  const monitored = document.createElement("input");
+  monitored.type = "checkbox";
+  monitored.checked = options?.defaults?.monitored === true;
+  monitoredLabel.append(monitored, document.createTextNode(" Monitor this title"));
+  const applicationOption = item?.application === "sonarr"
+    ? catalogAddChoice("Episodes to monitor", [
+        ["all", "All episodes"], ["future", "Future episodes"], ["missing", "Missing episodes"],
+        ["existing", "Existing episodes"], ["firstSeason", "First season"], ["lastSeason", "Last season"],
+        ["pilot", "Pilot"], ["recent", "Recent episodes"], ["none", "None"],
+      ], options?.defaults?.monitor ?? "all")
+    : catalogAddChoice("Minimum availability", [
+        ["announced", "Announced"], ["inCinemas", "In cinemas"], ["released", "Released"],
+      ], options?.defaults?.minimumAvailability ?? "released");
+  const confirmationLabel = document.createElement("label");
+  confirmationLabel.textContent = "Type this confirmation phrase";
+  const phrase = document.createElement("code");
+  phrase.textContent = typeof options?.confirmation === "string" ? options.confirmation : "";
+  const confirmation = document.createElement("input");
+  confirmation.type = "text";
+  confirmation.maxLength = 2048;
+  confirmation.autocomplete = "off";
+  confirmation.spellcheck = false;
+  confirmationLabel.append(phrase, confirmation);
+  const submit = document.createElement("button");
+  submit.className = "primary-button";
+  submit.type = "submit";
+  submit.disabled = true;
+  submit.textContent = `Confirm add to ${item.application === "sonarr" ? "Sonarr" : "Radarr"}`;
+  const cancel = document.createElement("button");
+  cancel.className = "secondary-button";
+  cancel.type = "button";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => {
+    panel.replaceChildren();
+    panel.hidden = true;
+    openButton.disabled = false;
+  });
+  confirmation.addEventListener("input", () => {
+    submit.disabled = confirmation.value !== options?.confirmation;
+  });
+  const status = document.createElement("p");
+  status.className = "status-message catalog-add-status";
+  form.addEventListener("submit", (event) => submitCatalogAdd(event, {
+    item, identity, options, root: root.select, profile: profile.select,
+    monitored, applicationOption: applicationOption.select, confirmation, submit, status,
+  }));
+  const actions = document.createElement("div");
+  actions.className = "catalog-add-form-actions";
+  actions.append(submit, cancel);
+  form.append(warning, root.label, profile.label, applicationOption.label, monitoredLabel, confirmationLabel, actions, status);
+  panel.replaceChildren(form);
+}
+
+async function submitCatalogAdd(event, context) {
+  event.preventDefault();
+  context.submit.disabled = true;
+  context.status.textContent = "Adding the title with automatic search disabled…";
+  context.status.dataset.state = "loading";
+  const common = {
+    rootFolderId: Number(context.root.value),
+    qualityProfileId: Number(context.profile.value),
+    monitored: context.monitored.checked,
+    confirmation: context.confirmation.value,
+  };
+  const body = context.item.application === "sonarr"
+    ? { ...common, monitor: context.applicationOption.value }
+    : { ...common, minimumAvailability: context.applicationOption.value };
+  try {
+    const response = await fetch(`${catalogItemEndpoint(context.item, context.identity)}/add`, {
+      method: "POST",
+      headers: { authorization: libraryAuthorization, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    const result = await response.json();
+    if (response.status === 202 && result?.status === "timeout_unknown") {
+      context.status.textContent = "The add timed out, so its outcome is Unknown. Check the Arr library before trying again.";
+      context.status.dataset.state = "warning";
+      return;
+    }
+    if (!response.ok) throw new Error("catalog_add_failed");
+    const next = result?.next?.action === "choose_series_scope"
+      ? "Choose a season or episode next for exact release analysis."
+      : "The movie is ready for exact release analysis in Pegarr.";
+    context.status.textContent = `Added to ${context.item.application === "sonarr" ? "Sonarr" : "Radarr"}. Automatic search remained off. ${next}`;
+    context.status.dataset.state = "success";
+    context.confirmation.disabled = true;
+  } catch {
+    context.status.textContent = "Pegarr could not confirm the add. Nothing else was started.";
+    context.status.dataset.state = "error";
+    context.submit.disabled = context.confirmation.value !== context.options?.confirmation;
+  }
+}
+
+function catalogAddSelect(name, values, textKey) {
+  const entries = Array.isArray(values) ? values : [];
+  const label = document.createElement("label");
+  label.textContent = name;
+  const select = document.createElement("select");
+  for (const entry of entries) {
+    if (!Number.isSafeInteger(entry?.id) || typeof entry?.[textKey] !== "string") continue;
+    const option = document.createElement("option");
+    option.value = String(entry.id);
+    option.textContent = entry[textKey];
+    option.disabled = entry?.accessible === false;
+    select.append(option);
+  }
+  label.append(select);
+  return { label, select };
+}
+
+function catalogAddChoice(name, values, selectedValue) {
+  const label = document.createElement("label");
+  label.textContent = name;
+  const select = document.createElement("select");
+  for (const [value, text] of values) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    option.selected = value === selectedValue;
+    select.append(option);
+  }
+  label.append(select);
+  return { label, select };
+}
+
+function catalogIdentity(item) {
+  const providerId = item?.application === "sonarr" ? "tvdb" : item?.application === "radarr" ? "tmdb" : undefined;
+  const value = providerId === undefined ? undefined : item?.ids?.[providerId];
+  return providerId !== undefined && typeof value === "string" ? { providerId, value } : undefined;
+}
+
+function catalogItemEndpoint(item, identity) {
+  return `/api/v1/catalog/${item.application}/${encodeURIComponent(item.instanceId)}/${identity.providerId}/${encodeURIComponent(identity.value)}`;
 }
 
 async function loadSubtitleSettings() {

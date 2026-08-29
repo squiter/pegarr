@@ -42,6 +42,7 @@ import {
 import type { GrabReconciliationOutcome } from "./grab-audit.js";
 import { GrabAuditStore } from "./grab-audit.js";
 import type { CatalogMediaItem } from "./domain.js";
+import type { ArrCatalogAddOptions, ArrCatalogAddReceipt } from "./domain.js";
 import type { MediaIdentity, ProviderSearchResult } from "./domain.js";
 import { searchProviderPolicy } from "./provider-policy-search.js";
 import type { ProviderLanguageMapping } from "./provider-policy-search.js";
@@ -100,6 +101,7 @@ export interface CatalogSearchResult {
     readonly instanceId: string;
     readonly status: "available" | "unavailable";
   }[];
+  readonly capabilities?: { readonly catalogAdd: boolean };
 }
 
 export interface SubtitleSettingsView extends SubtitleSettingsSnapshot {
@@ -118,6 +120,39 @@ export interface CatalogCoverageSelection {
   readonly instanceId: string;
   readonly providerId: "tvdb" | "tmdb";
   readonly value: string;
+}
+
+export type CatalogAddSelection = CatalogCoverageSelection;
+
+export interface CatalogAddInput {
+  readonly rootFolderId: number;
+  readonly qualityProfileId: number;
+  readonly monitored: boolean;
+  readonly monitor?: "all" | "future" | "missing" | "existing" | "firstSeason" | "lastSeason" | "pilot" | "recent" | "none";
+  readonly minimumAvailability?: "announced" | "inCinemas" | "released";
+  readonly confirmation: string;
+}
+
+export interface CatalogAddOptionsResult extends ArrCatalogAddOptions {
+  readonly kind: "catalog-add-options";
+  readonly mode: "catalog_add";
+  readonly title: string;
+  readonly confirmation: string;
+  readonly defaults: {
+    readonly monitored: true;
+    readonly monitor?: "all";
+    readonly minimumAvailability?: "released";
+  };
+}
+
+export interface CatalogAddResult {
+  readonly kind: "catalog-add";
+  readonly mode: "catalog_add";
+  readonly status: ArrCatalogAddReceipt["status"];
+  readonly receipt: ArrCatalogAddReceipt;
+  readonly next:
+    | { readonly action: "exact_movie_release_analysis"; readonly movieId: number }
+    | { readonly action: "choose_series_scope"; readonly seriesId: number };
 }
 
 export type CatalogCoverageResult =
@@ -150,6 +185,10 @@ export interface RuntimeServices {
   updateSubtitleSettings(input: SubtitleSettingsInput): Promise<SubtitleSettingsView>;
   updateProviderSettings(provider: ConfigurableProviderId, input: ProviderSettingsInput): Promise<SubtitleSettingsView>;
   previewCatalogCoverage(selection: CatalogCoverageSelection): Promise<CatalogCoverageResult>;
+  readonly catalogAdd?: {
+    readOptions(selection: CatalogAddSelection): Promise<CatalogAddOptionsResult>;
+    add(selection: CatalogAddSelection, input: CatalogAddInput): Promise<CatalogAddResult>;
+  };
   readMissingInventory(): Promise<MissingInventoryResult>;
   readItemFeasibility(
     selection: ItemFeasibilitySelection,
@@ -216,6 +255,7 @@ export function createRuntimeServices(
     accessToken: _accessToken,
     login: _login,
     controlledGrab: _controlledGrab,
+    catalogAdd: _catalogAdd,
     ...inventoryConfiguration
   } = configuration;
   const now = options.now ?? Date.now;
@@ -545,6 +585,59 @@ export function createRuntimeServices(
     };
   };
 
+  const catalogAdd = configuration.catalogAdd === undefined
+    ? undefined
+    : {
+        readOptions: async (selection: CatalogAddSelection): Promise<CatalogAddOptionsResult> => {
+          const item = await resolveCatalogCoverageItem(selection, sonarrClients, radarrClients);
+          if (item === undefined) throw new TypeError("Catalog item is no longer available");
+          const client = selection.application === "sonarr"
+            ? sonarrClients.get(selection.instanceId)
+            : radarrClients.get(selection.instanceId);
+          if (client === undefined) throw new TypeError("Catalog instance is unavailable");
+          const options = await client.readCatalogAddOptions();
+          return {
+            kind: "catalog-add-options",
+            mode: "catalog_add",
+            title: item.title,
+            confirmation: catalogAddConfirmation(item),
+            ...options,
+            defaults: selection.application === "sonarr"
+              ? { monitored: true, monitor: "all" }
+              : { monitored: true, minimumAvailability: "released" },
+          };
+        },
+        add: async (selection: CatalogAddSelection, input: CatalogAddInput): Promise<CatalogAddResult> => {
+          const item = await resolveCatalogCoverageItem(selection, sonarrClients, radarrClients);
+          if (item === undefined) throw new TypeError("Catalog item is no longer available");
+          if (input.confirmation !== catalogAddConfirmation(item)) throw new TypeError("Catalog add confirmation does not match");
+          const receipt = selection.application === "sonarr"
+            ? await requireClient(sonarrClients.get(selection.instanceId)).addCatalogSeries({
+                tvdbId: Number(selection.value),
+                rootFolderId: input.rootFolderId,
+                qualityProfileId: input.qualityProfileId,
+                monitored: input.monitored,
+                monitor: input.monitor ?? "all",
+              })
+            : await requireClient(radarrClients.get(selection.instanceId)).addCatalogMovie({
+                tmdbId: Number(selection.value),
+                rootFolderId: input.rootFolderId,
+                qualityProfileId: input.qualityProfileId,
+                monitored: input.monitored,
+                minimumAvailability: input.minimumAvailability ?? "released",
+              });
+          return {
+            kind: "catalog-add",
+            mode: "catalog_add",
+            status: receipt.status,
+            receipt,
+            next: receipt.application === "radarr"
+              ? { action: "exact_movie_release_analysis", movieId: receipt.itemId }
+              : { action: "choose_series_scope", seriesId: receipt.itemId },
+          };
+        },
+      };
+
   return {
     readSonarrStatus,
     readRadarrStatus,
@@ -567,7 +660,7 @@ export function createRuntimeServices(
         }))),
       ];
       if (sources.length === 0) {
-        return { kind: "catalog-search", mode: "read_only", status: "disabled", query: normalizedQuery, items: [], sources: [] };
+        return { kind: "catalog-search", mode: "read_only", status: "disabled", query: normalizedQuery, items: [], sources: [], capabilities: { catalogAdd: catalogAdd !== undefined } };
       }
       const settled = await Promise.allSettled(sources.map(({ read }) => read()));
       const sourceStatus = sources.map(({ application: sourceApplication, instanceId }, index) => ({
@@ -584,6 +677,7 @@ export function createRuntimeServices(
         query: normalizedQuery,
         items,
         sources: sourceStatus,
+        capabilities: { catalogAdd: catalogAdd !== undefined },
       };
     },
     readSubtitleSettings: subtitleSettingsView,
@@ -633,6 +727,7 @@ export function createRuntimeServices(
         providerRequests: searched.requestCount,
       };
     },
+    ...(catalogAdd === undefined ? {} : { catalogAdd }),
     readMissingInventory,
     readItemFeasibility: (selection, readOptions) => itemFeasibility.read(selection, readOptions),
     ...(controlledGrab === undefined
@@ -700,6 +795,15 @@ function createUiOpenSubtitlesSource(
     }),
     environment,
   });
+}
+
+function catalogAddConfirmation(item: CatalogMediaItem): string {
+  return `ADD ${item.title} TO ${item.application.toUpperCase()}`;
+}
+
+function requireClient<Client>(client: Client | undefined): Client {
+  if (client === undefined) throw new TypeError("Catalog instance is unavailable");
+  return client;
 }
 
 async function resolveCatalogCoverageItem(

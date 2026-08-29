@@ -39,6 +39,27 @@ export interface CatalogMediaItem {
   readonly alreadyAdded: boolean;
 }
 
+export interface ArrCatalogAddOptions {
+  readonly rootFolders: readonly {
+    readonly id: number;
+    readonly label: string;
+    readonly accessible: boolean;
+  }[];
+  readonly qualityProfiles: readonly {
+    readonly id: number;
+    readonly name: string;
+  }[];
+}
+
+export interface ArrCatalogAddReceipt {
+  readonly status: "added" | "already_added";
+  readonly application: "sonarr" | "radarr";
+  readonly instanceId: string;
+  readonly itemId: number;
+  readonly title: string;
+  readonly automaticSearch: false;
+}
+
 export interface MissingMediaItem {
   readonly application: "sonarr" | "radarr";
   readonly instanceId: string;

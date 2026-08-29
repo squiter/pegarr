@@ -35,6 +35,27 @@ class FakeTransport implements JsonTransport {
   }
 }
 
+class AddTransport implements JsonTransport {
+  readonly requests: JsonRequest[] = [];
+
+  async requestJson(request: JsonRequest): Promise<JsonResponse> {
+    this.requests.push(request);
+    if (request.method === "GET" && request.path === "/api/v3/rootfolder") {
+      return { status: 200, headers: {}, body: [{ id: 3, path: "/private/media/TV", accessible: true, freeSpace: 42 }] };
+    }
+    if (request.method === "GET" && request.path === "/api/v3/qualityprofile") {
+      return { status: 200, headers: {}, body: [{ id: 7, name: "Synthetic HD", items: [{ private: true }] }] };
+    }
+    if (request.method === "GET" && request.path === "/api/v3/series/lookup") {
+      return { status: 200, headers: {}, body: [{ title: "Synthetic Add Series", tvdbId: 12345, id: 0, titleSlug: "synthetic-add-series", images: [], seasons: [], privateField: "must-not-forward" }] };
+    }
+    if (request.method === "POST" && request.path === "/api/v3/series") {
+      return { status: 201, headers: {}, body: { id: 91, title: "Synthetic Add Series", path: "/private/media/TV/Synthetic Add Series" } };
+    }
+    return { status: 404, headers: {}, body: {} };
+  }
+}
+
 function client(transport: JsonTransport): SonarrClient {
   return new SonarrClient(
     {
@@ -109,6 +130,44 @@ test("PEG-SONARR-011 catalog lookup finds unadded series and discards private me
   assert.doesNotMatch(JSON.stringify(items), /private|overview|path|image|remoteUrl/iu);
   await assert.rejects(client(transport).lookupSeries("x"), /2 through 200/u);
   assert.deepEqual(mapSonarrCatalogResponse([{ title: "Existing", tvdbId: 42, id: 9 }])[0]?.alreadyAdded, true);
+});
+
+test("PEG-SONARR-012 add options are sanitized and series add always disables automatic search", async () => {
+  const transport = new AddTransport();
+  const sonarr = client(transport);
+  const options = await sonarr.readCatalogAddOptions();
+  assert.deepEqual(options, {
+    rootFolders: [{ id: 3, label: "TV", accessible: true }],
+    qualityProfiles: [{ id: 7, name: "Synthetic HD" }],
+  });
+  assert.doesNotMatch(JSON.stringify(options), /private|\/media|freeSpace|items/iu);
+
+  const receipt = await sonarr.addCatalogSeries({
+    tvdbId: 12345,
+    rootFolderId: 3,
+    qualityProfileId: 7,
+    monitored: true,
+    monitor: "all",
+  });
+  assert.deepEqual(receipt, {
+    status: "added",
+    application: "sonarr",
+    instanceId: "synthetic-sonarr",
+    itemId: 91,
+    title: "Synthetic Add Series",
+    automaticSearch: false,
+  });
+  const post = transport.requests.find((request) => request.method === "POST");
+  assert.equal(post?.method, "POST");
+  if (post?.method !== "POST") return;
+  assert.deepEqual(post.body.addOptions, {
+    monitor: "all",
+    searchForMissingEpisodes: false,
+    searchForCutoffUnmetEpisodes: false,
+  });
+  assert.equal(post.body.rootFolderPath, "/private/media/TV");
+  assert.equal(post.body.privateField, undefined);
+  assert.doesNotMatch(JSON.stringify(receipt), /private|rootFolderPath|qualityProfile/u);
 });
 
 test("PEG-SONARR-002 releases preserve Arr decisions and safe evidence", () => {

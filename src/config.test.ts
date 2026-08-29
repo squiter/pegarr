@@ -29,6 +29,26 @@ test("PEG-CONFIG-001 disabled configuration stays disabled and partial input fai
   );
 });
 
+test("PEG-CONFIG-015 catalog add is opt-in and requires Pegarr login", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-catalog-add-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const passwordPath = join(directory, "password");
+  await writeFile(passwordPath, "synthetic-password-value-00000000001\n", { mode: 0o600 });
+
+  assert.equal((await loadRuntimeConfiguration({})).catalogAdd, undefined);
+  await assert.rejects(loadRuntimeConfiguration({ PEGARR_ADD_ENABLED: "true" }), /requires Pegarr username\/password login/u);
+  await assert.rejects(loadRuntimeConfiguration({ PEGARR_ADD_ENABLED: "sometimes" }), /must be true or false/u);
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_ADD_ENABLED: "true",
+    PEGARR_USERNAME: "pegarr-user",
+    PEGARR_PASSWORD_FILE: passwordPath,
+  });
+  assert.deepEqual(configuration.catalogAdd, { enabled: true });
+});
+
 test("PEG-CONFIG-002 Sonarr credentials load only from a bounded secret file", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-config-"));
   context.after(async () => {

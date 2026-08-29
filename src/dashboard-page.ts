@@ -68,7 +68,7 @@ export const dashboardPage = `<!doctype html>
       <div>
         <p class="eyebrow">Sonarr and Radarr catalog</p>
         <h2 id="catalog-title">Search for something new</h2>
-        <p class="catalog-explainer">Search safely, then preview title-level subtitle evidence using the policy and providers configured above. The explicit add-and-continue action remains the next P0 mutation slice.</p>
+        <p class="catalog-explainer">Search safely, preview title-level subtitle evidence, then explicitly add with automatic search disabled when catalog add is enabled. Pegarr never downloads a release from this action.</p>
       </div>
       <form id="catalog-form" class="catalog-form">
         <label for="catalog-query"><span>Series or movie</span></label>

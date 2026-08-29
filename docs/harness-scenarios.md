@@ -143,6 +143,13 @@
 | PEG-PROVIDERSETTINGS-003 | Provider writes require login and never return credentials | `src/app.test.ts` |
 | PEG-CATALOG-005 | A UI-configured provider is immediately usable for pre-add coverage | `src/runtime.test.ts` |
 | PEG-DASH-043 | Provider onboarding clears credentials and stays page-memory-only | `src/app.test.ts` |
+| PEG-CONFIG-015 | Catalog add is opt-in and requires username-password login | `src/config.test.ts` |
+| PEG-SONARR-012 | Sonarr add options are sanitized and automatic search stays off | `src/adapters/sonarr.test.ts` |
+| PEG-RADARR-011 | Radarr add options are sanitized and automatic search stays off | `src/adapters/radarr.test.ts` |
+| PEG-CATALOG-006 | Catalog add-option reads authenticate before upstream work | `src/app.test.ts` |
+| PEG-CATALOG-007 | Catalog add requires login, feature opt-in, and exact bounded input | `src/app.test.ts` |
+| PEG-CATALOG-008 | Explicit catalog add returns a safe Arr identity and Pegarr continuation | `src/runtime.test.ts` |
+| PEG-DASH-044 | Catalog add is an explicit login-only UI mutation with automatic search off | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |
@@ -264,5 +271,6 @@
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |
 | PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The official search contract and adapter are pinned; an operator-owned key, sanitized response, measured rate headers, and language mapping remain unverified |
+| PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | Synthetic tests prove the exact add bodies; a separately authorized harmless live add remains manual |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.
