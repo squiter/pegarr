@@ -45,7 +45,7 @@ export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "session_status" | "session_login" | "session_logout" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "catalog_continuation" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "session_status" | "session_login" | "session_logout" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "onboarding" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "catalog_continuation" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -111,10 +111,11 @@ export async function resolveRoute(
   const sessionLogin = pathname === "/api/v1/session/login";
   const sessionLogout = pathname === "/api/v1/session/logout";
   const sessionStatus = pathname === "/api/v1/session";
+  const onboarding = pathname === "/api/v1/onboarding";
   if ((sessionStatus || sessionLogin || sessionLogout) && (access?.sessionStore === undefined || access.control.loginConfigured !== true)) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
-  const protectedLibraryRoute = catalogSearch || catalogCoverage !== undefined || catalogAdd !== undefined || catalogContinuation !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
+  const protectedLibraryRoute = onboarding || catalogSearch || catalogCoverage !== undefined || catalogAdd !== undefined || catalogContinuation !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
@@ -136,6 +137,7 @@ export async function resolveRoute(
     "/api/v1/integrations/sonarr/status",
     "/api/v1/integrations/radarr/status",
     "/api/v1/library/instances",
+    "/api/v1/onboarding",
     "/api/v1/catalog/search",
     "/api/v1/library/missing",
     ...dashboardAssetRoutes.keys(),
@@ -302,6 +304,39 @@ export async function resolveRoute(
           kind: "arr-instance-status",
           mode: "read_only",
           instances: await (services?.readArrInstanceStatuses?.() ?? Promise.resolve([])),
+        },
+      };
+    } catch {
+      return { statusCode: 503, body: { service: "pegarr", mode: "read_only", status: "unavailable" } };
+    }
+  }
+
+  if (onboarding) {
+    const rejection = authorizeLibraryRoute(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      const onboardingStatus = await services?.readOnboardingStatus?.();
+      if (onboardingStatus === undefined) {
+        return { statusCode: 503, body: { service: "pegarr", mode: "read_only", status: "unavailable" } };
+      }
+      const loginApiAuthorized = access?.control.authorizeLogin(access.authorization) === true;
+      const operatorMutation = access?.sessionAuthenticated === true || loginApiAuthorized;
+      return {
+        statusCode: 200,
+        body: {
+          ...onboardingStatus,
+          access: {
+            role: access?.sessionAuthenticated === true
+              ? "operator_session"
+              : loginApiAuthorized
+                ? "operator_api"
+                : "legacy_read_only",
+            settingsMutation: operatorMutation,
+            catalogAddMutation: operatorMutation && onboardingStatus.capabilities.catalogAdd,
+            controlledGrab: onboardingStatus.capabilities.controlledGrab
+              ? "administrator_token_required"
+              : "disabled",
+          },
         },
       };
     } catch {
@@ -1056,6 +1091,7 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (parseCatalogContinuationPath(pathname) !== undefined) return "catalog_continuation";
   if (/^\/api\/v1\/settings\/providers\/(?:subdl|opensubtitles)$/u.test(pathname)) return "provider_settings";
   if (pathname === "/api/v1/library/instances") return "arr_instances";
+  if (pathname === "/api/v1/onboarding") return "onboarding";
   if (pathname === "/api/v1/catalog/search") return "catalog_search";
   if (parseCatalogCoveragePath(pathname) !== undefined) return "catalog_coverage";
   if (pathname === "/api/v1/settings/subtitles") return "subtitle_settings";

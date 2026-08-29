@@ -277,6 +277,10 @@ for (const contract of [
   "textContent",
   "loadCatalogContinuationAnalysis",
   "loadCatalogSeriesScopes",
+  "loadOnboarding",
+  'fetch("/api/v1/onboarding"',
+  'access.role === "legacy_read_only"',
+  'access.controlledGrab === "administrator_token_required"',
   "/api/v1/catalog/continuations/",
 ]) {
   if (!dashboardClient.includes(contract)) {
@@ -509,6 +513,7 @@ if (/^phase-(?:2|3)-/u.test(manifest.phase)) {
     "parseExecuteGrabBody",
     "parseCatalogContinuationGrabPath",
     'pathname === "/api/v1/session/login"',
+    'pathname === "/api/v1/onboarding"',
     "sessionMutationAuthorized",
     "SameSite=Strict",
     "parseReconcileGrabBody",

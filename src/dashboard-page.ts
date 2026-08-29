@@ -51,6 +51,19 @@ export const dashboardPage = `<!doctype html>
 
     <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
 
+    <section id="onboarding" class="onboarding-panel" aria-labelledby="onboarding-title" hidden>
+      <div class="onboarding-heading">
+        <div>
+          <p class="eyebrow">First-run guide</p>
+          <h2 id="onboarding-title">Your Pegarr path</h2>
+        </div>
+        <span id="onboarding-state" class="source-chip">Checking setup</span>
+      </div>
+      <p id="onboarding-summary" class="catalog-explainer">Pegarr is checking the server-owned configuration needed for discovery and subtitle preview.</p>
+      <ol id="onboarding-steps" class="onboarding-steps" aria-label="Pegarr setup steps"></ol>
+      <p id="onboarding-access" class="onboarding-access"></p>
+    </section>
+
     <section id="subtitle-settings" class="settings-panel" aria-labelledby="subtitle-settings-title" hidden>
       <div>
         <p class="eyebrow">Subtitle policy</p>

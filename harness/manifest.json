@@ -1645,6 +1645,24 @@
       "title": "Continuation release rows reuse the exact controlled Grab dialog",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with server-owned continuation paths and no browser storage, cookies, network, or mutation"
+    },
+    {
+      "id": "PEG-ONBOARD-001",
+      "title": "Onboarding derives only safe discovery prerequisites and capabilities",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary settings files and synthetic deployment configuration; no network, live services, or secret output"
+    },
+    {
+      "id": "PEG-ONBOARD-002",
+      "title": "Onboarding authenticates before work and projects access capabilities",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with synthetic credentials and service spy; no network or mutation"
+    },
+    {
+      "id": "PEG-DASH-048",
+      "title": "First-run guidance separates prerequisites, operator actions, and administrator Grab",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
     }
   ],
   "manualGaps": [

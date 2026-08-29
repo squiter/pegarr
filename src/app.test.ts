@@ -115,6 +115,65 @@ test("PEG-SESSION-002 login, restore, CSRF mutation, and logout use a bounded Ht
   assert.equal(sessionStore.authenticate(sessionToken), false);
 });
 
+test("PEG-ONBOARD-002 onboarding authenticates before work and projects the current access boundary", async () => {
+  const token = "synthetic-access-token-value-0000000001";
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  const control = new AccessControl(new SecretValue(token), { username, password: new SecretValue(password) });
+  let reads = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  Object.assign(services, {
+    readOnboardingStatus: async () => {
+      reads += 1;
+      return {
+        kind: "onboarding-status",
+        mode: "read_only",
+        status: "ready",
+        requirements: {
+          arrCatalog: { status: "ready", sonarrInstances: 1, radarrInstances: 1 },
+          subtitlePolicy: { status: "ready", languageCount: 1 },
+          subtitleProvider: { status: "ready", providers: ["subdl"] },
+        },
+        capabilities: { catalogSearch: true, subtitlePreview: true, catalogAdd: true, controlledGrab: true },
+      } as const;
+    },
+  });
+
+  assert.equal((await resolveRoute("GET", "/api/v1/onboarding", tmpdir(), services, { control })).statusCode, 401);
+  assert.equal(reads, 0);
+  assert.equal((await resolveRoute("POST", "/api/v1/onboarding", tmpdir(), services, {
+    control,
+    authorization: `Bearer ${token}`,
+  })).statusCode, 405);
+  assert.equal(reads, 0);
+
+  const legacy = await resolveRoute("GET", "/api/v1/onboarding", tmpdir(), services, {
+    control,
+    authorization: `Bearer ${token}`,
+  });
+  assert.equal(legacy.statusCode, 200);
+  assert.deepEqual((legacy.body as { access: unknown }).access, {
+    role: "legacy_read_only",
+    settingsMutation: false,
+    catalogAddMutation: false,
+    controlledGrab: "administrator_token_required",
+  });
+
+  const session = await resolveRoute("GET", "/api/v1/onboarding", tmpdir(), services, {
+    control,
+    sessionAuthenticated: true,
+  });
+  assert.equal(session.statusCode, 200);
+  assert.deepEqual((session.body as { access: unknown }).access, {
+    role: "operator_session",
+    settingsMutation: true,
+    catalogAddMutation: true,
+    controlledGrab: "administrator_token_required",
+  });
+  assert.equal(reads, 2);
+  assert.doesNotMatch(JSON.stringify([legacy, session]), /synthetic-access|synthetic-password/u);
+});
+
 test("PEG-API-001 health routes reject mutations", async () => {
   const result = await resolveRoute("POST", "/health", tmpdir());
 
@@ -811,6 +870,18 @@ test("PEG-DASH-047 continuation release rows reuse the explicit controlled Grab 
   assert.match(String(client.body), /independent administrator token|confirmation must match|crypto\.randomUUID/u);
   assert.match(String(model.body), /controlledGrab: capabilities\.controlledGrab === true/u);
   assert.doesNotMatch(assets, /\bguid\b|indexerId|localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-048 first-run guidance distinguishes prerequisites, operator actions, and administrator Grab", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, styles.body].join("\n");
+  assert.match(String(page.body), /First-run guide|Your Pegarr path|Pegarr setup steps/u);
+  assert.match(String(client.body), /loadOnboarding|renderOnboarding|\/api\/v1\/onboarding|Missing setup never becomes a false No match found/u);
+  assert.match(String(client.body), /Legacy token: search and preview only|Operator session: settings changes|separate administrator token/u);
+  assert.match(String(styles.body), /onboarding-panel|onboarding-steps|onboarding-step--ready/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
 test("PEG-DASH-010 analyzed-item cards and controls remain page-memory-only assets", async () => {

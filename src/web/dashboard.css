@@ -162,6 +162,23 @@ button:disabled { cursor: wait; opacity: .55; }
 .status-message[data-state="warning"] { color: var(--warning); }
 .status-message[data-state="success"] { color: var(--accent); }
 
+.onboarding-panel {
+  margin-top: 2rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: linear-gradient(145deg, rgb(18 36 33 / 85%), rgb(13 26 24 / 95%));
+  border: 1px solid var(--border-strong);
+  border-radius: 1.25rem;
+}
+.onboarding-heading { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
+.onboarding-heading h2 { margin-bottom: .5rem; font-size: 2rem; }
+.onboarding-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; margin: 1.2rem 0; padding: 0; list-style: none; }
+.onboarding-step { display: flex; gap: .75rem; align-items: flex-start; min-width: 0; padding: .9rem; background: var(--surface-raised); border: 1px solid var(--border); border-radius: .8rem; }
+.onboarding-step-marker { flex: none; padding: .22rem .45rem; color: var(--warning); border: 1px solid rgb(251 191 36 / 40%); border-radius: 999px; font-size: .66rem; font-weight: 800; text-transform: uppercase; }
+.onboarding-step--ready .onboarding-step-marker { color: var(--accent); border-color: rgb(52 211 153 / 40%); }
+.onboarding-step strong, .onboarding-step div > span { display: block; }
+.onboarding-step div > span { margin-top: .3rem; color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.onboarding-access { margin: 0; padding-top: .9rem; color: var(--muted); border-top: 1px solid var(--border); font-size: .82rem; line-height: 1.55; }
+
 .dashboard { margin-top: 3.25rem; }
 .settings-panel {
   margin-top: 3.25rem;
@@ -466,6 +483,8 @@ footer {
   .access-panel { grid-template-columns: 1fr; gap: 1.5rem; }
   .token-row { align-items: stretch; flex-direction: column; }
   .catalog-form { grid-template-columns: 1fr; }
+  .onboarding-heading { flex-direction: column; }
+  .onboarding-steps { grid-template-columns: 1fr; }
   .settings-form { grid-template-columns: 1fr; }
   .catalog-result { grid-template-columns: 1fr; }
   .catalog-result-actions { align-items: stretch; flex-direction: column; }

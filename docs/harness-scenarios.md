@@ -168,6 +168,9 @@
 | PEG-CONTINUE-008 | Only exact episode continuation scopes can use controlled Grab | `src/runtime.test.ts` |
 | PEG-CONTINUE-009 | Continuation Grab routes authorize administrators before work | `src/app.test.ts` |
 | PEG-DASH-047 | Continuation rows reuse the exact controlled Grab dialog | `src/app.test.ts` |
+| PEG-ONBOARD-001 | Onboarding derives only safe discovery prerequisites and capabilities | `src/runtime.test.ts` |
+| PEG-ONBOARD-002 | Onboarding authenticates before work and projects access capabilities | `src/app.test.ts` |
+| PEG-DASH-048 | First-run guidance separates prerequisites, operator actions, and administrator Grab | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |

@@ -6,6 +6,11 @@ const elements = {
   accessToken: document.querySelector("#access-token"),
   loginUsername: document.querySelector("#login-username"),
   loginPassword: document.querySelector("#login-password"),
+  onboarding: document.querySelector("#onboarding"),
+  onboardingAccess: document.querySelector("#onboarding-access"),
+  onboardingState: document.querySelector("#onboarding-state"),
+  onboardingSteps: document.querySelector("#onboarding-steps"),
+  onboardingSummary: document.querySelector("#onboarding-summary"),
   activeFilterCount: document.querySelector("#active-filter-count"),
   analysisFilter: document.querySelector("#analysis-filter"),
   analysisAgeFilter: document.querySelector("#analysis-age-filter"),
@@ -303,11 +308,12 @@ async function loadInventory() {
     if (selectedRow !== undefined && !inventoryRows.some(({ key }) => key === selectedRow.key)) closeFeasibility();
     renderSources(inventory);
     elements.accessPanel.hidden = true;
+    elements.onboarding.hidden = false;
     elements.catalog.hidden = false;
     elements.subtitleSettings.hidden = false;
     elements.dashboard.hidden = false;
     elements.sessionLogout.hidden = false;
-    await loadSubtitleSettings();
+    await Promise.all([loadSubtitleSettings(), loadOnboarding()]);
     renderInventory();
     setStatus(
       inventory.status === "partial"
@@ -326,12 +332,110 @@ async function loadInventory() {
 
 function showAccess(message) {
   elements.dashboard.hidden = true;
+  elements.onboarding.hidden = true;
   elements.catalog.hidden = true;
   elements.subtitleSettings.hidden = true;
   elements.sessionLogout.hidden = true;
   elements.accessPanel.hidden = false;
   setStatus(message, "error");
   elements.loginUsername?.focus();
+}
+
+async function loadOnboarding() {
+  try {
+    const response = await fetch("/api/v1/onboarding", {
+      method: "GET",
+      headers: libraryHeaders(),
+      cache: "no-store",
+      credentials: "same-origin",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) throw new Error("onboarding_unavailable");
+    renderOnboarding(await response.json());
+  } catch {
+    elements.onboardingState.className = "source-chip source-chip--integration_failure";
+    elements.onboardingState.textContent = "Status unavailable";
+    elements.onboardingSummary.textContent = "Pegarr could not read the setup guide. Existing discovery actions remain unchanged.";
+    elements.onboardingSteps.replaceChildren();
+    elements.onboardingAccess.textContent = "No configuration was changed.";
+  }
+}
+
+function renderOnboarding(status) {
+  const requirements = status?.requirements ?? {};
+  const arr = requirements.arrCatalog ?? {};
+  const policy = requirements.subtitlePolicy ?? {};
+  const provider = requirements.subtitleProvider ?? {};
+  const providers = Array.isArray(provider.providers) ? provider.providers : [];
+  const sonarrCount = Number.isSafeInteger(arr.sonarrInstances) ? arr.sonarrInstances : 0;
+  const radarrCount = Number.isSafeInteger(arr.radarrInstances) ? arr.radarrInstances : 0;
+  const languageCount = Number.isSafeInteger(policy.languageCount) ? policy.languageCount : 0;
+  const steps = [
+    {
+      title: "Connect a catalog",
+      ready: arr.status === "ready",
+      detail: arr.status === "ready"
+        ? `${sonarrCount} Sonarr and ${radarrCount} Radarr ${sonarrCount + radarrCount === 1 ? "instance" : "instances"} configured.`
+        : "Configure at least one Sonarr or Radarr instance in the deployment.",
+    },
+    {
+      title: "Choose subtitle languages",
+      ready: policy.status === "ready",
+      detail: policy.status === "ready"
+        ? `${languageCount} ${languageCount === 1 ? "language" : "languages"} in the active Pegarr policy.`
+        : "Choose at least one language in Subtitle policy below.",
+    },
+    {
+      title: "Connect a subtitle provider",
+      ready: provider.status === "ready",
+      detail: provider.status === "ready"
+        ? `${providers.map(providerName).join(" and ")} ${providers.length === 1 ? "is" : "are"} configured without exposing credentials.`
+        : "Configure SubDL or OpenSubtitles below to preview coverage.",
+    },
+  ];
+  elements.onboardingSteps.replaceChildren(...steps.map(renderOnboardingStep));
+  const ready = status?.status === "ready";
+  elements.onboardingState.className = `source-chip ${ready ? "source-chip--ready" : ""}`;
+  elements.onboardingState.textContent = ready ? "Discovery ready" : "Setup needed";
+  elements.onboardingSummary.textContent = ready
+    ? "Catalog search and subtitle preview are ready. Adding and downloading remain separate explicit capabilities."
+    : "Complete the required steps below. Missing setup never becomes a false No match found result.";
+
+  const access = status?.access ?? {};
+  const capabilityMessages = access.role === "legacy_read_only"
+    ? ["Legacy token: search and preview only. Sign in with the Pegarr username and password to change settings or add titles."]
+    : [
+        access.catalogAddMutation
+          ? "Operator session: settings changes and explicit catalog add are available."
+          : "Operator session: settings changes are available; catalog add is disabled by deployment configuration.",
+      ];
+  capabilityMessages.push(
+    access.controlledGrab === "administrator_token_required"
+      ? "Controlled Grab is enabled but always requires the separate administrator token and exact confirmation."
+      : "Controlled Grab is disabled; every analysis remains read-only.",
+  );
+  elements.onboardingAccess.textContent = capabilityMessages.join(" ");
+}
+
+function renderOnboardingStep(step) {
+  const item = document.createElement("li");
+  item.className = `onboarding-step ${step.ready ? "onboarding-step--ready" : "onboarding-step--missing"}`;
+  const marker = document.createElement("span");
+  marker.className = "onboarding-step-marker";
+  marker.textContent = step.ready ? "Ready" : "Needed";
+  const copy = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = step.title;
+  const detail = document.createElement("span");
+  detail.textContent = step.detail;
+  copy.append(title, detail);
+  item.append(marker, copy);
+  return item;
+}
+
+function providerName(value) {
+  return value === "opensubtitles" ? "OpenSubtitles" : value === "subdl" ? "SubDL" : "Provider";
 }
 
 async function searchCatalog(event) {

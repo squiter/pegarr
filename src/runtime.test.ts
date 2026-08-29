@@ -112,6 +112,52 @@ test("PEG-RUNTIME-003 upstream failures remain distinct and redact private detai
   }
 });
 
+test("PEG-ONBOARD-001 onboarding status derives only safe discovery prerequisites and capabilities", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-onboarding-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  const services = createRuntimeServices({
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+    catalogAdd: { enabled: true },
+  }, { dataDirectory: directory });
+  context.after(() => services.close());
+
+  assert.deepEqual(await services.readOnboardingStatus?.(), {
+    kind: "onboarding-status",
+    mode: "read_only",
+    status: "setup_required",
+    requirements: {
+      arrCatalog: { status: "ready", sonarrInstances: 1, radarrInstances: 0 },
+      subtitlePolicy: { status: "missing", languageCount: 0 },
+      subtitleProvider: { status: "missing", providers: [] },
+    },
+    capabilities: {
+      catalogSearch: true,
+      subtitlePreview: false,
+      catalogAdd: true,
+      controlledGrab: false,
+    },
+  });
+
+  await services.updateSubtitleSettings({
+    languages: [{ code: "pt-BR", required: true, forced: false, hearingImpaired: "either" }],
+  });
+  await services.updateProviderSettings("subdl", {
+    apiKey: "synthetic-provider-key-value",
+    languageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
+  });
+  const ready = await services.readOnboardingStatus?.();
+  assert.equal(ready?.status, "ready");
+  assert.deepEqual(ready?.requirements.subtitleProvider, { status: "ready", providers: ["subdl"] });
+  assert.equal(ready?.capabilities.subtitlePreview, true);
+  assert.doesNotMatch(JSON.stringify(ready), /synthetic-provider-key|synthetic-sonarr-key|example\.invalid/iu);
+});
+
 test("PEG-RUNTIME-004 concurrent and repeated status reads use one bounded probe window", async () => {
   const configuration = {
     sonarr: {

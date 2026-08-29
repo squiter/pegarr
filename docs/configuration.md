@@ -109,7 +109,7 @@ The database contains private normalized matching evidence such as media identif
 
 The server writes one JSON record for startup, shutdown, and each completed HTTP request. Request records contain only `event`, `service`, a bounded method, a safe route category, status code, and bounded duration. They never contain the raw URL, query string, item ID, title, authorization header, API key, access token, configured hostname, or upstream error detail. Logging failures cannot change the HTTP response.
 
-Safe route categories include health, readiness, dashboard, dashboard asset, session status/login/logout, integration status, catalog search, catalog add options, catalog add, catalog continuation, missing inventory, item feasibility, synthetic demo, and not found. This keeps container logs useful for operations without turning them into library or discovery history.
+Safe route categories include health, readiness, dashboard, dashboard asset, session status/login/logout, integration status, onboarding, catalog search, catalog add options, catalog add, catalog continuation, missing inventory, item feasibility, synthetic demo, and not found. This keeps container logs useful for operations without turning them into library or discovery history.
 
 ## Browser login and API access
 

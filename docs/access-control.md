@@ -35,6 +35,9 @@ Authentication: Pegarr server session, Basic, or legacy Bearer
 GET /api/v1/library/instances
 Authentication: Pegarr server session, Basic, or legacy Bearer
 
+GET /api/v1/onboarding
+Authentication: Pegarr server session, Basic, or legacy Bearer
+
 GET /api/v1/library/items/sonarr/<instance-id>/episode/<episode-id>/feasibility
 GET /api/v1/library/items/radarr/<instance-id>/movie/<movie-id>/feasibility
 Authentication: Pegarr server session, Basic, or legacy Bearer
@@ -80,6 +83,8 @@ POST /api/v1/session/logout  requires X-Pegarr-CSRF and clears the session
 ```
 
 The opaque session token is returned only as the `HttpOnly` cookie. Login and restore responses return the CSRF token and fixed expiry, never the session token or configured password.
+
+The authenticated onboarding route returns only safe counts, configured/not-configured prerequisite states, deployment capability flags, and the current access class. It never probes a subtitle provider, returns a hostname or API key, or claims an unavailable provider is a subtitle miss. A username/password session is described as an operator session for settings and optional catalog add; legacy bearer access is described as read-only; controlled Grab always remains behind the independent administrator token.
 
 ## Legacy token boundary
 
@@ -131,4 +136,4 @@ Authorized inventory reads request at most one configured page from each Arr ins
 
 Authorized item reads resolve the requested instance and ID from that server-owned inventory before starting release, Bazarr, or provider work. Legacy unscoped URLs remain available only when the item identity is unambiguous. Successful item reports share a 30-second bounded in-memory window. See [item feasibility API](item-feasibility-api.md).
 
-`PEG-ACCESS-001` through `PEG-ACCESS-005`, `PEG-SESSION-001` through `PEG-SESSION-003`, `PEG-CONFIG-006`, `PEG-CONFIG-014`, `PEG-CONFIG-015`, `PEG-CATALOG-001`, `PEG-CATALOG-002`, `PEG-CATALOG-006`, `PEG-CATALOG-007`, `PEG-SONARR-011`, `PEG-RADARR-010`, `PEG-INVENTORY-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-011`, and `PEG-DOCKER-013` are the deterministic evidence for this boundary.
+`PEG-ACCESS-001` through `PEG-ACCESS-005`, `PEG-SESSION-001` through `PEG-SESSION-003`, `PEG-ONBOARD-001`, `PEG-ONBOARD-002`, `PEG-CONFIG-006`, `PEG-CONFIG-014`, `PEG-CONFIG-015`, `PEG-CATALOG-001`, `PEG-CATALOG-002`, `PEG-CATALOG-006`, `PEG-CATALOG-007`, `PEG-SONARR-011`, `PEG-RADARR-010`, `PEG-INVENTORY-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-011`, and `PEG-DOCKER-013` are the deterministic evidence for this boundary.

@@ -119,6 +119,33 @@ export interface SubtitleSettingsView extends SubtitleSettingsSnapshot {
   }[];
 }
 
+export interface OnboardingStatus {
+  readonly kind: "onboarding-status";
+  readonly mode: "read_only";
+  readonly status: "ready" | "setup_required";
+  readonly requirements: {
+    readonly arrCatalog: {
+      readonly status: "ready" | "missing";
+      readonly sonarrInstances: number;
+      readonly radarrInstances: number;
+    };
+    readonly subtitlePolicy: {
+      readonly status: "ready" | "missing";
+      readonly languageCount: number;
+    };
+    readonly subtitleProvider: {
+      readonly status: "ready" | "missing";
+      readonly providers: readonly ("subdl" | "opensubtitles")[];
+    };
+  };
+  readonly capabilities: {
+    readonly catalogSearch: boolean;
+    readonly subtitlePreview: boolean;
+    readonly catalogAdd: boolean;
+    readonly controlledGrab: boolean;
+  };
+}
+
 export interface CatalogCoverageSelection {
   readonly application: "sonarr" | "radarr";
   readonly instanceId: string;
@@ -248,6 +275,7 @@ export interface RuntimeServices {
   readonly readArrInstanceStatuses?: () => Promise<readonly ArrInstanceIntegrationStatus[]>;
   searchCatalog(query: string, application?: "sonarr" | "radarr"): Promise<CatalogSearchResult>;
   readSubtitleSettings(): Promise<SubtitleSettingsView>;
+  readonly readOnboardingStatus?: () => Promise<OnboardingStatus>;
   updateSubtitleSettings(input: SubtitleSettingsInput): Promise<SubtitleSettingsView>;
   updateProviderSettings(provider: ConfigurableProviderId, input: ProviderSettingsInput): Promise<SubtitleSettingsView>;
   previewCatalogCoverage(selection: CatalogCoverageSelection): Promise<CatalogCoverageResult>;
@@ -1022,6 +1050,41 @@ export function createRuntimeServices(
       };
     },
     readSubtitleSettings: subtitleSettingsView,
+    readOnboardingStatus: async () => {
+      const settings = await subtitleSettingsView();
+      const providers = settings.providers
+        .filter(({ configured }) => configured)
+        .map(({ provider }) => provider);
+      const arrReady = sonarrClients.size + radarrClients.size > 0;
+      const policyReady = settings.status === "configured";
+      const providerReady = providers.length > 0;
+      return {
+        kind: "onboarding-status",
+        mode: "read_only",
+        status: arrReady && policyReady && providerReady ? "ready" : "setup_required",
+        requirements: {
+          arrCatalog: {
+            status: arrReady ? "ready" : "missing",
+            sonarrInstances: sonarrClients.size,
+            radarrInstances: radarrClients.size,
+          },
+          subtitlePolicy: {
+            status: policyReady ? "ready" : "missing",
+            languageCount: settings.policy.languages.length,
+          },
+          subtitleProvider: {
+            status: providerReady ? "ready" : "missing",
+            providers,
+          },
+        },
+        capabilities: {
+          catalogSearch: arrReady,
+          subtitlePreview: arrReady && policyReady && providerReady,
+          catalogAdd: catalogAdd !== undefined,
+          controlledGrab: controlledGrab !== undefined,
+        },
+      };
+    },
     updateSubtitleSettings: async (input) => {
       await subtitleSettings.update(input);
       return subtitleSettingsView();
