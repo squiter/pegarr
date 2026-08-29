@@ -97,6 +97,7 @@ export async function resolveRoute(
   const catalogCoverage = parseCatalogCoveragePath(pathname);
   const catalogAdd = parseCatalogAddPath(pathname);
   const catalogContinuation = parseCatalogContinuationPath(pathname);
+  const catalogContinuationGrab = parseCatalogContinuationGrabPath(pathname);
   const subtitleSettings = pathname === "/api/v1/settings/subtitles";
   const providerSettings = parseProviderSettingsPath(pathname);
   const protectedLibraryRoute = catalogSearch || catalogCoverage !== undefined || catalogAdd !== undefined || catalogContinuation !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
@@ -107,10 +108,10 @@ export async function resolveRoute(
   if (catalogAdd !== undefined && services?.catalogAdd === undefined) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
-  if (catalogContinuation !== undefined && services?.catalogContinuation === undefined) {
+  if ((catalogContinuation !== undefined || catalogContinuationGrab !== undefined) && services?.catalogContinuation === undefined) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
-  if ((grabSelection !== undefined || grabHistory || grabReconciliation !== undefined) && !controlledGrabAvailable) {
+  if ((grabSelection !== undefined || catalogContinuationGrab !== undefined || grabHistory || grabReconciliation !== undefined) && !controlledGrabAvailable) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   const knownReadOnlyRoutes = new Set([
@@ -140,6 +141,9 @@ export async function resolveRoute(
     return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
   }
   if (grabSelection !== undefined && method !== "POST") {
+    return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (catalogContinuationGrab !== undefined && method !== "POST") {
     return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
   }
   if (subtitleSettings && method !== "GET" && method !== "PUT") {
@@ -321,6 +325,37 @@ export async function resolveRoute(
       return error instanceof TypeError
         ? { statusCode: 400, body: { service: "pegarr", mode: "read_only", status: "invalid_request" } }
         : { statusCode: 503, body: { service: "pegarr", mode: "read_only", status: "unavailable" } };
+    }
+  }
+
+  if (catalogContinuationGrab !== undefined) {
+    const rejection = authorizeAdministratorRoute(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      if (catalogContinuationGrab.action === "prepare") {
+        const body = parsePrepareGrabBody(requestBody);
+        const result = await services?.catalogContinuation?.prepareGrab(
+          catalogContinuationGrab.continuationId,
+          body.releaseId,
+          catalogContinuationGrab.scope,
+        );
+        if (result === undefined) return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+        return { statusCode: result.status === "confirmation_required" ? 200 : 409, body: result };
+      }
+      const body = parseExecuteGrabBody(requestBody);
+      const result = await services?.catalogContinuation?.executeGrab(
+        catalogContinuationGrab.continuationId,
+        body.challengeId,
+        body.confirmation,
+        body.idempotencyKey,
+        catalogContinuationGrab.scope,
+      );
+      if (result === undefined) return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+      return { statusCode: executeGrabStatusCode(result.status), body: result };
+    } catch (error) {
+      return error instanceof InvalidRequestBodyError || error instanceof TypeError
+        ? { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } }
+        : { statusCode: 503, body: { service: "pegarr", status: "controlled_grab_unavailable" } };
     }
   }
 
@@ -616,6 +651,24 @@ function parseCatalogContinuationPath(pathname: string): {
     : { continuationId, action, scope: { kind: "episode", episodeId: Number(scopeValue) } };
 }
 
+function parseCatalogContinuationGrabPath(pathname: string): {
+  readonly continuationId: string;
+  readonly action: "prepare" | "execute";
+  readonly scope?: import("./runtime.js").CatalogContinuationScope;
+} | undefined {
+  const match = /^\/api\/v1\/catalog\/continuations\/([A-Za-z0-9_-]{32})\/analysis(?:\/(season|episode)\/(\d{1,16}))?\/grab\/(prepare|execute)$/u.exec(pathname);
+  if (match === null) return undefined;
+  const continuationId = match[1] as string;
+  const scopeKind = match[2];
+  const scopeValue = match[3];
+  const action = match[4] as "prepare" | "execute";
+  if (scopeKind === undefined) return { continuationId, action };
+  if (scopeValue === undefined || !Number.isSafeInteger(Number(scopeValue))) return undefined;
+  return scopeKind === "season"
+    ? { continuationId, action, scope: { kind: "season", seasonNumber: Number(scopeValue) } }
+    : { continuationId, action, scope: { kind: "episode", episodeId: Number(scopeValue) } };
+}
+
 class InvalidRequestBodyError extends Error {}
 
 function parsePrepareGrabBody(value: unknown): { readonly releaseId: string } {
@@ -889,6 +942,9 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (pathname === "/api/v1/integrations/radarr/status") return "radarr_status";
   if (/^\/api\/v1\/catalog\/(?:sonarr|radarr)\/[a-z0-9][a-z0-9_-]{0,63}\/(?:tvdb|tmdb)\/\d{1,16}\/add-options$/iu.test(pathname)) return "catalog_add_options";
   if (/^\/api\/v1\/catalog\/(?:sonarr|radarr)\/[a-z0-9][a-z0-9_-]{0,63}\/(?:tvdb|tmdb)\/\d{1,16}\/add$/iu.test(pathname)) return "catalog_add";
+  const continuationGrab = parseCatalogContinuationGrabPath(pathname);
+  if (continuationGrab?.action === "prepare") return "grab_prepare";
+  if (continuationGrab?.action === "execute") return "grab_execute";
   if (parseCatalogContinuationPath(pathname) !== undefined) return "catalog_continuation";
   if (/^\/api\/v1\/settings\/providers\/(?:subdl|opensubtitles)$/u.test(pathname)) return "provider_settings";
   if (pathname === "/api/v1/library/instances") return "arr_instances";

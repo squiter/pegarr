@@ -477,6 +477,81 @@ test("PEG-CONTINUE-006 Sonarr scope routes authenticate before upstream work", a
   assert.equal(analyses, 1);
 });
 
+test("PEG-CONTINUE-009 continuation Grab routes require independent administrator authorization before work", async () => {
+  const libraryToken = "synthetic-access-token-value-0000000001";
+  const adminToken = "synthetic-admin-token-value-00000000005";
+  const continuationId = "g".repeat(32);
+  const scope = { kind: "episode", episodeId: 305 } as const;
+  let preparations = 0;
+  let executions = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  Object.assign(services, {
+    catalogContinuation: {
+      scopes: async () => { throw new Error("not expected"); },
+      analyze: async () => { throw new Error("not expected"); },
+      prepareGrab: async (receivedId: string, releaseId: string, receivedScope: unknown) => {
+        preparations += 1;
+        assert.equal(receivedId, continuationId);
+        assert.equal(releaseId, "sonarr-0123456789abcdef01234567");
+        assert.deepEqual(receivedScope, scope);
+        return {
+          status: "confirmation_required",
+          mode: "controlled_grab",
+          challengeId: "continuation_challenge_0001",
+          application: "sonarr",
+          instanceId: "synthetic-sonarr",
+          kind: "episode",
+          itemId: 305,
+          targetLabel: "Synthetic Show S03E05 · Synthetic Episode",
+          releaseId,
+          releaseTitle: "Synthetic.Show.S03E05.1080p.WEB-DL-GROUP",
+          confirmation: "GRAB Synthetic.Show.S03E05.1080p.WEB-DL-GROUP FOR Synthetic Show S03E05 · Synthetic Episode",
+          expiresAt: "2030-01-01T00:00:00.000Z",
+        } as const;
+      },
+      executeGrab: async (_receivedId: string, _challengeId: string, _confirmation: string, _idempotencyKey: string, receivedScope: unknown) => {
+        executions += 1;
+        assert.deepEqual(receivedScope, scope);
+        return { status: "challenge_expired", mode: "controlled_grab", detailCode: "challenge_missing_or_expired" } as const;
+      },
+    },
+    controlledGrab: {
+      prepare: async () => { throw new Error("not expected"); },
+      execute: async () => { throw new Error("not expected"); },
+      history: () => [],
+      reconcile: () => { throw new Error("not expected"); },
+    },
+  });
+  const control = new AccessControl(new SecretValue(libraryToken));
+  const adminControl = new AccessControl(new SecretValue(adminToken));
+  const access = { control, adminControl, authorization: `Bearer ${adminToken}` };
+  const basePath = `/api/v1/catalog/continuations/${continuationId}/analysis/episode/305/grab`;
+  const prepareBody = { releaseId: "sonarr-0123456789abcdef01234567" };
+
+  assert.equal((await resolveRoute("POST", `${basePath}/prepare`, tmpdir(), services, {
+    ...access,
+    authorization: `Bearer ${libraryToken}`,
+  }, prepareBody)).statusCode, 401);
+  assert.equal(preparations, 0);
+  assert.equal((await resolveRoute("GET", `${basePath}/prepare`, tmpdir(), services, access)).statusCode, 405);
+  assert.equal(preparations, 0);
+  const prepared = await resolveRoute("POST", `${basePath}/prepare`, tmpdir(), services, access, prepareBody);
+  assert.equal(prepared.statusCode, 200);
+  assert.equal(preparations, 1);
+  assert.doesNotMatch(JSON.stringify(prepared), /guid|indexerId|api.?key|synthetic-admin-token/iu);
+
+  assert.equal((await resolveRoute("POST", `${basePath}/execute`, tmpdir(), services, access, {
+    challengeId: "continuation_challenge_0001",
+  })).statusCode, 400);
+  assert.equal(executions, 0);
+  assert.equal((await resolveRoute("POST", `${basePath}/execute`, tmpdir(), services, access, {
+    challengeId: "continuation_challenge_0001",
+    confirmation: "GRAB exact confirmation",
+    idempotencyKey: "continuation_idempotency_0001",
+  })).statusCode, 410);
+  assert.equal(executions, 1);
+});
+
 test("PEG-INSTANCE-004 instance status is authenticated, bounded, and read-only", async () => {
   const token = "synthetic-access-token-value-0000000001";
   let reads = 0;
@@ -662,6 +737,17 @@ test("PEG-DASH-046 successful series add loads explicit season and episode scope
   assert.match(String(model.body), /item\.kind === "season"|Specials|Season \$\{item\.season\}/u);
   assert.match(String(styles.body), /catalog-scope-panel/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-047 continuation release rows reuse the explicit controlled Grab dialog without browser-owned targets", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const assets = [client.body, model.body].join("\n");
+  assert.match(String(client.body), /grabEndpoint: `\/api\/v1\/catalog\/continuations\/\$\{encodeURIComponent\(continuationId\)\}\/analysis\$\{scopePath\}\/grab`/u);
+  assert.match(String(client.body), /typeof row\.grabEndpoint === "string"|`\$\{row\.grabEndpoint\}\/prepare`|`\$\{row\.grabEndpoint\}\/execute`/u);
+  assert.match(String(client.body), /independent administrator token|confirmation must match|crypto\.randomUUID/u);
+  assert.match(String(model.body), /controlledGrab: capabilities\.controlledGrab === true/u);
+  assert.doesNotMatch(assets, /\bguid\b|indexerId|localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
 test("PEG-DASH-010 analyzed-item cards and controls remain page-memory-only assets", async () => {

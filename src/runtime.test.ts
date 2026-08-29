@@ -403,7 +403,7 @@ test("PEG-CATALOG-008 PEG-CONTINUE-001 catalog add returns a bounded server-owne
   services.close();
 });
 
-test("PEG-CONTINUE-002 Radarr continuation runs exact read-only analysis from Pegarr policy", async (context) => {
+test("PEG-CONTINUE-002 PEG-CONTINUE-007 Radarr continuation analysis can prepare and execute only an explicit controlled Grab", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-radarr-continuation-"));
   context.after(async () => rm(directory, { recursive: true }));
   await new SubtitleSettingsStore(directory).update({ languages: [
@@ -426,8 +426,14 @@ test("PEG-CONTINUE-002 Radarr continuation runs exact read-only analysis from Pe
     },
     subdlLanguageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
     catalogAdd: { enabled: true as const },
+    controlledGrab: {
+      enabled: true as const,
+      adminToken: new SecretValue("synthetic-admin-token-value-00000000004"),
+      auditFile: join(directory, "grab-audit.sqlite"),
+    },
   };
   const requests: string[] = [];
+  let releasePosts = 0;
   const services = createRuntimeServices(configuration, {
     dataDirectory: directory,
     now: () => 10_000,
@@ -442,7 +448,13 @@ test("PEG-CONTINUE-002 Radarr continuation runs exact read-only analysis from Pe
       if (url.pathname === "/api/v3/qualityprofile") return new Response(JSON.stringify([{ id: 8, name: "Synthetic UHD" }]), { status: 200 });
       if (url.hostname === "radarr.example.invalid" && url.pathname === "/api/v3/movie" && method === "POST") return new Response(JSON.stringify({ id: 93 }), { status: 201 });
       if (url.hostname === "radarr.example.invalid" && url.pathname === "/api/v3/movie/93") return new Response(JSON.stringify({ id: 93, title: "Synthetic Movie", tmdbId: 84 }), { status: 200 });
-      if (url.hostname === "radarr.example.invalid" && url.pathname === "/api/v3/release") return new Response(JSON.stringify(syntheticRadarrMovieReleaseResponse), { status: 200 });
+      if (url.hostname === "radarr.example.invalid" && url.pathname === "/api/v3/release") {
+        if (method === "POST") {
+          releasePosts += 1;
+          return new Response(null, { status: 200 });
+        }
+        return new Response(JSON.stringify(syntheticRadarrMovieReleaseResponse), { status: 200 });
+      }
       if (url.hostname === "subdl.example.invalid" && url.pathname === "/api/v2/subtitles/search") return new Response(JSON.stringify(syntheticSubdlV2MovieSearchResponse), { status: 200 });
       return new Response("not found", { status: 404 });
     },
@@ -465,15 +477,29 @@ test("PEG-CONTINUE-002 Radarr continuation runs exact read-only analysis from Pe
   assert.equal(result.report.item.title, "Synthetic Movie");
   assert.equal(result.report.policy.source, "explicit_default");
   assert.ok(result.report.releases.length > 0);
-  assert.deepEqual(result.capabilities, { controlledGrab: false });
+  assert.deepEqual(result.capabilities, { controlledGrab: true });
+  const releaseId = result.report.releases.find(({ video }) => video.downloadAllowed)?.releaseId;
+  assert.ok(releaseId);
+  const prepared = await services.catalogContinuation.prepareGrab(added.next.continuationId, releaseId);
+  assert.equal(prepared.status, "confirmation_required");
+  if (prepared.status !== "confirmation_required") return;
+  assert.equal(prepared.confirmation, `GRAB ${prepared.releaseTitle} FOR Synthetic Movie (2025)`);
+  const grabbed = await services.catalogContinuation.executeGrab(
+    added.next.continuationId,
+    prepared.challengeId,
+    prepared.confirmation,
+    "continuation_movie_runtime_0001",
+  );
+  assert.equal(grabbed.status, "grabbed");
+  assert.equal(releasePosts, 1);
   await services.catalogContinuation.analyze(added.next.continuationId);
-  assert.equal(requests.filter((entry) => entry.includes("/api/v3/release")).length, 1);
+  assert.equal(requests.filter((entry) => entry.startsWith("GET ") && entry.includes("/api/v3/release")).length, 3);
   assert.equal(requests.filter((entry) => entry.includes("/api/v2/subtitles/search")).length, 1);
   assert.doesNotMatch(JSON.stringify(result), /private|api.?key|example\.invalid|download.*handle/iu);
   services.close();
 });
 
-test("PEG-CONTINUE-004 PEG-CONTINUE-005 Sonarr continuation accepts only issued scopes for exact analysis", async (context) => {
+test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 Sonarr continuation accepts only issued scopes and exact episodes can use controlled Grab", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-sonarr-continuation-"));
   context.after(async () => rm(directory, { recursive: true }));
   await new SubtitleSettingsStore(directory).update({ languages: [
@@ -496,8 +522,14 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 Sonarr continuation accepts only issued 
     },
     subdlLanguageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
     catalogAdd: { enabled: true as const },
+    controlledGrab: {
+      enabled: true as const,
+      adminToken: new SecretValue("synthetic-admin-token-value-00000000003"),
+      auditFile: join(directory, "grab-audit.sqlite"),
+    },
   };
   const requests: URL[] = [];
+  let releasePosts = 0;
   const services = createRuntimeServices(configuration, {
     dataDirectory: directory,
     now: () => 20_000,
@@ -519,6 +551,10 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 Sonarr continuation accepts only issued 
         ]), { status: 200 });
       }
       if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/release") {
+        if (method === "POST") {
+          releasePosts += 1;
+          return new Response(null, { status: 200 });
+        }
         return new Response(JSON.stringify(url.searchParams.has("seasonNumber") ? syntheticSonarrSeasonReleaseResponse : syntheticSonarrEpisodeReleaseResponse), { status: 200 });
       }
       if (url.hostname === "subdl.example.invalid" && url.pathname === "/api/v2/subtitles/search") {
@@ -553,14 +589,41 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 Sonarr continuation accepts only issued 
   assert.equal(season.report.item.kind, "season");
   assert.equal(season.report.item.season, 3);
   assert.equal(season.report.policy.source, "explicit_default");
+  assert.deepEqual(season.capabilities, { controlledGrab: false });
   const episode = await services.catalogContinuation.analyze(added.next.continuationId, { kind: "episode", episodeId: 305 });
   assert.equal(episode.status, "ready");
   if (episode.status !== "ready") return;
   assert.equal(episode.report.item.kind, "episode");
   assert.equal(episode.report.item.episode, 5);
-  assert.deepEqual(episode.capabilities, { controlledGrab: false });
+  assert.deepEqual(episode.capabilities, { controlledGrab: true });
+  const releaseId = episode.report.releases.find(({ video }) => video.downloadAllowed)?.releaseId;
+  assert.ok(releaseId);
+  const seasonPrepare = await services.catalogContinuation.prepareGrab(
+    added.next.continuationId,
+    releaseId,
+    { kind: "season", seasonNumber: 3 },
+  );
+  assert.equal(seasonPrepare.status, "item_unavailable");
+  assert.equal("detailCode" in seasonPrepare ? seasonPrepare.detailCode : undefined, "scope_not_grabbable");
+  const prepared = await services.catalogContinuation.prepareGrab(
+    added.next.continuationId,
+    releaseId,
+    { kind: "episode", episodeId: 305 },
+  );
+  assert.equal(prepared.status, "confirmation_required");
+  if (prepared.status !== "confirmation_required") return;
+  assert.equal(prepared.confirmation, `GRAB ${prepared.releaseTitle} FOR Synthetic Show S03E05 · Synthetic Episode`);
+  const grabbed = await services.catalogContinuation.executeGrab(
+    added.next.continuationId,
+    prepared.challengeId,
+    prepared.confirmation,
+    "continuation_runtime_0001",
+    { kind: "episode", episodeId: 305 },
+  );
+  assert.equal(grabbed.status, "grabbed");
+  assert.equal(releasePosts, 1);
   assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/episode").length, 1);
-  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/release").length, 2);
+  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/release").length, 5);
   assert.doesNotMatch(JSON.stringify({ scopes, season, episode }), /private|api.?key|example\.invalid|download.*handle/iu);
   services.close();
 });

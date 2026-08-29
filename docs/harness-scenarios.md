@@ -161,6 +161,10 @@
 | PEG-CONTINUE-005 | Sonarr scopes run exact read-only analysis from Pegarr policy | `src/runtime.test.ts` |
 | PEG-CONTINUE-006 | Sonarr scope routes authenticate before upstream work | `src/app.test.ts` |
 | PEG-DASH-046 | Successful series add loads explicit season and episode scope choices | `src/app.test.ts` |
+| PEG-CONTINUE-007 | Exact movie continuation rows can use explicit controlled Grab | `src/runtime.test.ts` |
+| PEG-CONTINUE-008 | Only exact episode continuation scopes can use controlled Grab | `src/runtime.test.ts` |
+| PEG-CONTINUE-009 | Continuation Grab routes authorize administrators before work | `src/app.test.ts` |
+| PEG-DASH-047 | Continuation rows reuse the exact controlled Grab dialog | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |
@@ -235,6 +239,7 @@
 | PEG-GRAB-006 | Interrupted mutations recover as Unknown and require reconciliation | `src/grab-audit.test.ts` |
 | PEG-GRAB-007 | Durable reconciliation releases only verified not-grabbed duplicates | `src/grab-audit.test.ts` |
 | PEG-GRAB-008 | Reconciliation requires an exact outcome-specific attestation | `src/controlled-grab.test.ts` |
+| PEG-GRAB-009 | Server-owned continuation targets retain controlled Grab safety semantics | `src/controlled-grab.test.ts` |
 | PEG-GRABAPI-001 | Grab routes require the independent administrator token | `src/app.test.ts` |
 | PEG-GRABAPI-002 | Execution and history expose only bounded public outcomes | `src/app.test.ts` |
 | PEG-GRABAPI-003 | Reconciliation is administrator-only, exact, and bounded | `src/app.test.ts` |

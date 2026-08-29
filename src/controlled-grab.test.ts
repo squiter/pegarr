@@ -101,6 +101,60 @@ test("PEG-GRAB-001 preparation revalidates and requires the exact target and rel
   assert.equal((await rejectedService.prepare(selection, releaseId)).status, "release_rejected");
 });
 
+test("PEG-GRAB-009 a server-owned continuation target keeps revalidation, confirmation, execution, and audit", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-continuation-grab-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  let inventoryReads = 0;
+  let revalidations = 0;
+  let grabs = 0;
+  let id = 0;
+  const service = new ControlledGrabService({
+    readInventory: async () => {
+      inventoryReads += 1;
+      throw new Error("continuation targets must not be resolved from missing inventory");
+    },
+    sonarr: {
+      revalidate: async (receivedSelection, receivedReleaseId) => {
+        revalidations += 1;
+        assert.deepEqual(receivedSelection, { ...selection, instanceId: "sonarr" });
+        assert.equal(receivedReleaseId, releaseId);
+        return revalidated;
+      },
+      grab: async (handle) => {
+        grabs += 1;
+        assert.deepEqual(handle, { guid: "server-only-guid", indexerId: 11 });
+        return { status: "accepted", responseStatus: 200 };
+      },
+    },
+    audit: new GrabAuditStore(join(directory, "audit.sqlite")),
+    now: () => 2_000 + id,
+    randomId: () => `continuation_id_${String(++id).padStart(8, "0")}`,
+  });
+  context.after(() => service.close());
+
+  const prepared = await service.prepareTarget({
+    selection: { ...selection, instanceId: "sonarr" },
+    targetLabel: "Synthetic Show S03E05 · Synthetic Episode Five",
+  }, releaseId);
+  assert.equal(prepared.status, "confirmation_required");
+  if (prepared.status !== "confirmation_required") return;
+  assert.equal(prepared.confirmation, "GRAB Synthetic.Show.S03E05.1080p.WEB-DL-GROUP FOR Synthetic Show S03E05 · Synthetic Episode Five");
+  assert.equal(inventoryReads, 0);
+  assert.equal(revalidations, 1);
+  assert.doesNotMatch(JSON.stringify(prepared), /server-only-guid|indexerId/iu);
+
+  const result = await service.execute(
+    { ...selection, instanceId: "sonarr" },
+    prepared.challengeId,
+    prepared.confirmation,
+    "continuation_execution_0001",
+  );
+  assert.equal(result.status, "grabbed");
+  assert.equal(revalidations, 2);
+  assert.equal(grabs, 1);
+  assert.equal(service.history()[0]?.targetLabel, "Synthetic Show S03E05 · Synthetic Episode Five");
+});
+
 test("PEG-GRAB-002 execution revalidates again and performs exactly one confirmed Grab", async (context) => {
   let revalidations = 0;
   let grabs = 0;

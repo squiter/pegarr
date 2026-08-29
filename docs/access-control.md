@@ -103,6 +103,18 @@ Bearer authentication does not encrypt traffic. Use HTTPS or a trusted private n
 
 The read-only token is deliberately unable to authorize a controlled Grab. Phase 2 uses a second administrator token, loaded from its own secret file, for the mutation routes. See [controlled Grab](controlled-grab.md).
 
+Exact movie and episode catalog continuations can use that same administrator boundary when both catalog add and controlled Grab are enabled:
+
+```text
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/grab/prepare
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/grab/execute
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>/grab/prepare
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>/grab/execute
+Authorization: Bearer <independent administrator token>
+```
+
+Administrator authorization is checked before continuation lookup, Arr revalidation, or audit work. The browser cannot submit an Arr item ID, target label, release handle, or season-pack mutation through these routes.
+
 ## Request bounds
 
 Authorized inventory reads request at most one configured page from each Arr instance. Concurrent requests share one in-flight operation, and completed results are reused for 30 seconds. `PEGARR_MISSING_PAGE_SIZE` defaults to 50 and accepts values from 1 through 100. The instance-status route probes every configured Arr through the same independently bounded 30-second status readers and returns only safe capability evidence plus each configured instance ID.

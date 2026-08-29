@@ -1167,6 +1167,12 @@
       "boundary": "Injected timeout, deterministic clock, and synthetic retry callback only"
     },
     {
+      "id": "PEG-GRAB-009",
+      "title": "Server-owned continuation targets retain controlled Grab safety semantics",
+      "evidence": "src/controlled-grab.test.ts",
+      "boundary": "Temporary audit database and injected revalidation and mutation callbacks; no network or live service"
+    },
+    {
       "id": "PEG-GRABAPI-001",
       "title": "Controlled Grab routes require an independent administrator token",
       "evidence": "src/app.test.ts",
@@ -1597,6 +1603,30 @@
       "title": "Successful series add loads explicit season and episode scope choices",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
+    },
+    {
+      "id": "PEG-CONTINUE-007",
+      "title": "Exact movie continuation rows can use explicit controlled Grab",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary audit database and injected Radarr responses; exactly one synthetic mutation callback and no network or live service"
+    },
+    {
+      "id": "PEG-CONTINUE-008",
+      "title": "Only exact episode continuation scopes can use controlled Grab",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary audit database and injected Sonarr responses; season mutation is blocked and no network or live service is used"
+    },
+    {
+      "id": "PEG-CONTINUE-009",
+      "title": "Continuation Grab routes authorize administrators before work",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process routes with synthetic authorization and service spies; no network or mutation"
+    },
+    {
+      "id": "PEG-DASH-047",
+      "title": "Continuation release rows reuse the exact controlled Grab dialog",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with server-owned continuation paths and no browser storage, cookies, network, or mutation"
     }
   ],
   "manualGaps": [

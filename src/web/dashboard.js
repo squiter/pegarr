@@ -534,6 +534,7 @@ async function loadCatalogContinuationAnalysis(continuationId, item, receipt, st
   status.dataset.state = "loading";
   const scopeKind = scope?.kind === "season" || scope?.kind === "episode" ? scope.kind : undefined;
   const scopeValue = Number.isSafeInteger(scope?.value) ? scope.value : undefined;
+  const scopePath = scopeKind === undefined ? "" : `/${scopeKind}/${scopeValue}`;
   const row = {
     key: `catalog-continuation:${continuationId}`,
     itemId: scopeKind === "episode" ? scopeValue : receipt?.itemId,
@@ -546,6 +547,7 @@ async function loadCatalogContinuationAnalysis(continuationId, item, receipt, st
       : scopeKind === "episode"
         ? "Selected episode"
         : Number.isSafeInteger(item?.year) ? String(item.year) : "Movie",
+    grabEndpoint: `/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis${scopePath}/grab`,
   };
   selectedRow = row;
   activeFeasibility = undefined;
@@ -559,7 +561,6 @@ async function loadCatalogContinuationAnalysis(continuationId, item, receipt, st
   elements.releaseControls.hidden = true;
   setFeasibilityNotice("Searching exact Radarr releases and checking subtitle evidence…", "loading");
   try {
-    const scopePath = scopeKind === undefined ? "" : `/${scopeKind}/${scopeValue}`;
     const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis${scopePath}`, {
       method: "GET",
       headers: { authorization: libraryAuthorization },
@@ -1367,8 +1368,11 @@ async function prepareControlledGrab() {
   setGrabStatus("Revalidating the release with Sonarr or Radarr…", "loading");
   try {
     const { row, release } = grabContext;
+    const endpoint = typeof row.grabEndpoint === "string"
+      ? `${row.grabEndpoint}/prepare`
+      : `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/grab/prepare`;
     const result = await grabRequest(
-      `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/grab/prepare`,
+      endpoint,
       { releaseId: release.id },
     );
     if (result.response.status === 401) {
@@ -1379,7 +1383,7 @@ async function prepareControlledGrab() {
       return;
     }
     if (result.body?.status !== "confirmation_required") {
-      setGrabStatus(prepareGrabMessage(result.body?.status), "error");
+      setGrabStatus(prepareGrabMessage(result.body?.status, result.body?.detailCode), "error");
       return;
     }
     grabContext = { ...grabContext, challengeId: result.body.challengeId, confirmation: result.body.confirmation };
@@ -1405,8 +1409,11 @@ async function executeControlledGrab() {
   setGrabStatus("Revalidating once more, then asking Arr to Grab this release…", "loading");
   try {
     const { row, challengeId, confirmation } = grabContext;
+    const endpoint = typeof row.grabEndpoint === "string"
+      ? `${row.grabEndpoint}/execute`
+      : `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/grab/execute`;
     const result = await grabRequest(
-      `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/grab/execute`,
+      endpoint,
       { challengeId, confirmation, idempotencyKey: crypto.randomUUID() },
     );
     if (result.response.status === 401) {
@@ -1452,7 +1459,9 @@ async function grabRequest(endpoint, body) {
   return { response, body: result };
 }
 
-function prepareGrabMessage(status) {
+function prepareGrabMessage(status, detailCode) {
+  if (detailCode === "continuation_missing_or_expired") return "This catalog continuation expired. Add or search the title again before preparing a Grab.";
+  if (detailCode === "scope_not_grabbable") return "Only an exact movie or episode can prepare a controlled Grab. Season analysis remains read-only.";
   const messages = {
     item_unavailable: "This item is no longer present in Pegarr's bounded missing inventory.",
     release_changed: "Arr no longer returns this exact release. Refresh the analysis before choosing another candidate.",

@@ -498,6 +498,7 @@ if (/^phase-(?:2|3)-/u.test(manifest.phase)) {
     "authorizeAdministratorRoute(access)",
     "parsePrepareGrabBody",
     "parseExecuteGrabBody",
+    "parseCatalogContinuationGrabPath",
     "parseReconcileGrabBody",
     'pathname === "/api/v1/grabs/history"',
     "readBoundedJsonBody(request)",
@@ -505,7 +506,8 @@ if (/^phase-(?:2|3)-/u.test(manifest.phase)) {
     if (!app.includes(contract)) issues.push(`The Phase 2 API boundary must retain ${contract}`);
   }
   for (const contract of [
-    "source.revalidate(canonicalSelection, normalizedReleaseId)",
+    "prepareTarget(target: ControlledGrabTarget",
+    "source.revalidate(selection, normalizedReleaseId)",
     "confirmationText(releaseTitle, targetLabel)",
     "this.#options.audit.begin",
     "source.revalidate(canonicalSelection, challenge.releaseId)",
@@ -529,6 +531,7 @@ if (/^phase-(?:2|3)-/u.test(manifest.phase)) {
     "activeFeasibility?.controlledGrab === true",
     "historyAdministratorToken = undefined",
     "submitReconciliation",
+    "row.grabEndpoint",
   ]) {
     if (!dashboardClient.includes(contract)) issues.push(`The controlled Grab dashboard must retain ${contract}`);
   }

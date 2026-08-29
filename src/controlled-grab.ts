@@ -28,6 +28,11 @@ export interface ControlledGrabServiceOptions {
   readonly maxChallenges?: number;
 }
 
+export interface ControlledGrabTarget {
+  readonly selection: ItemFeasibilitySelection;
+  readonly targetLabel: string;
+}
+
 export interface GrabChallenge {
   readonly status: "confirmation_required";
   readonly mode: "controlled_grab";
@@ -119,22 +124,39 @@ export class ControlledGrabService {
 
   async prepare(selection: ItemFeasibilitySelection, releaseId: string): Promise<PrepareGrabResult> {
     const validated = validateSelection(selection);
-    const normalizedReleaseId = validateReleaseId(releaseId, validated.application);
-    const source = this.#source(validated.application);
-    if (source === undefined) return failure("item_unavailable", "integration_disabled");
     const item = await this.#item(validated);
     if (item === undefined) return failure("item_unavailable", "item_not_missing");
     const canonicalSelection = { ...validated, instanceId: item.instanceId };
+    return this.#prepareTarget(canonicalSelection, itemLabel(item), releaseId);
+  }
+
+  async prepareTarget(target: ControlledGrabTarget, releaseId: string): Promise<PrepareGrabResult> {
+    const selection = validateSelection(target.selection);
+    if (selection.instanceId === undefined) throw new TypeError("Controlled Grab target instance is required");
+    return this.#prepareTarget(
+      { ...selection, instanceId: selection.instanceId },
+      boundedText(target.targetLabel, "targetLabel", 2_048),
+      releaseId,
+    );
+  }
+
+  async #prepareTarget(
+    selection: ItemFeasibilitySelection & { readonly instanceId: string },
+    targetLabel: string,
+    releaseId: string,
+  ): Promise<PrepareGrabResult> {
+    const normalizedReleaseId = validateReleaseId(releaseId, selection.application);
+    const source = this.#source(selection.application);
+    if (source === undefined) return failure("item_unavailable", "integration_disabled");
     let release: RevalidatedArrRelease | undefined;
     try {
-      release = await source.revalidate(canonicalSelection, normalizedReleaseId);
+      release = await source.revalidate(selection, normalizedReleaseId);
     } catch (error) {
       return failure("integration_failure", safeUpstreamCode(error));
     }
     if (release === undefined) return failure("release_changed", "release_not_returned");
     if (!release.candidate.downloadAllowed) return failure("release_rejected", "arr_rejected_release");
     const releaseTitle = boundedText(release.candidate.title, "releaseTitle", 4_096);
-    const targetLabel = itemLabel(item);
     const requestedAt = safeNow(this.#now());
     this.#pruneChallenges(requestedAt);
     while (this.#challenges.size >= this.#maxChallenges) {
@@ -148,10 +170,10 @@ export class ControlledGrabService {
       status: "confirmation_required",
       mode: "controlled_grab",
       challengeId,
-      application: validated.application,
-      instanceId: item.instanceId,
-      kind: validated.kind,
-      itemId: validated.itemId,
+      application: selection.application,
+      instanceId: selection.instanceId,
+      kind: selection.kind,
+      itemId: selection.itemId,
       targetLabel,
       releaseId: normalizedReleaseId,
       releaseTitle,

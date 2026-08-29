@@ -194,7 +194,7 @@ export type CatalogContinuationAnalysisResult =
       readonly report: FeasibilityReport;
       readonly metrics: CatalogContinuationMetrics;
       readonly analysis: { readonly source: "computed"; readonly generatedAt: string; readonly expiresAt: string; readonly staleUntil: string };
-      readonly capabilities: { readonly controlledGrab: false };
+      readonly capabilities: { readonly controlledGrab: boolean };
     }
   | {
       readonly kind: "item-feasibility";
@@ -258,6 +258,8 @@ export interface RuntimeServices {
   readonly catalogContinuation?: {
     scopes(continuationId: string): Promise<CatalogContinuationScopesResult | { readonly kind: "catalog-continuation"; readonly mode: "read_only"; readonly status: "not_found" | "scope_required" }>;
     analyze(continuationId: string, scope?: CatalogContinuationScope): Promise<CatalogContinuationAnalysisResult>;
+    prepareGrab(continuationId: string, releaseId: string, scope?: CatalogContinuationScope): Promise<PrepareGrabResult>;
+    executeGrab(continuationId: string, challengeId: string, confirmation: string, idempotencyKey: string, scope?: CatalogContinuationScope): Promise<ExecuteGrabResult>;
   };
   readMissingInventory(): Promise<MissingInventoryResult>;
   readItemFeasibility(
@@ -752,7 +754,7 @@ export function createRuntimeServices(
         expiresAt: new Date(entry.expiresAtEpochMs).toISOString(),
         staleUntil: new Date(entry.expiresAtEpochMs).toISOString(),
       },
-      capabilities: { controlledGrab: false },
+      capabilities: { controlledGrab: controlledGrab !== undefined },
     };
   };
   const readSonarrContinuationScopes = async (entry: CatalogContinuationEntry): Promise<SonarrSeriesReleaseScopes> => {
@@ -842,13 +844,33 @@ export function createRuntimeServices(
         expiresAt: new Date(entry.expiresAtEpochMs).toISOString(),
         staleUntil: new Date(entry.expiresAtEpochMs).toISOString(),
       },
-      capabilities: { controlledGrab: false },
+      capabilities: { controlledGrab: controlledGrab !== undefined && selectedEpisode !== undefined },
     };
   };
   const readCatalogContinuationEntry = (continuationId: string): CatalogContinuationEntry | undefined => {
     if (!/^[A-Za-z0-9_-]{32}$/u.test(continuationId)) throw new TypeError("Catalog continuation ID is invalid");
     pruneCatalogContinuations();
     return catalogContinuations.get(continuationId);
+  };
+  const catalogGrabTarget = async (
+    entry: CatalogContinuationEntry,
+    scope?: CatalogContinuationScope,
+  ): Promise<{ readonly selection: ItemFeasibilitySelection; readonly targetLabel: string } | undefined> => {
+    if (entry.application === "radarr") {
+      if (scope !== undefined) return undefined;
+      return {
+        selection: { application: "radarr", instanceId: entry.instanceId, kind: "movie", itemId: entry.itemId },
+        targetLabel: `${entry.item.title}${entry.item.year === undefined ? "" : ` (${entry.item.year})`}`,
+      };
+    }
+    if (scope?.kind !== "episode") return undefined;
+    const scopes = await readSonarrContinuationScopes(entry);
+    const episode = scopes.episodes.find(({ episodeId }) => episodeId === scope.episodeId);
+    if (episode === undefined) return undefined;
+    return {
+      selection: { application: "sonarr", instanceId: entry.instanceId, kind: "episode", itemId: episode.episodeId },
+      targetLabel: `${entry.item.title} S${String(episode.seasonNumber).padStart(2, "0")}E${String(episode.episodeNumber).padStart(2, "0")} · ${episode.title}`,
+    };
   };
   const catalogContinuation = configuration.catalogAdd === undefined
     ? undefined
@@ -878,6 +900,28 @@ export function createRuntimeServices(
             entry.analyses.set(key, analysis);
           }
           return analysis;
+        },
+        prepareGrab: async (continuationId: string, releaseId: string, scope?: CatalogContinuationScope): Promise<PrepareGrabResult> => {
+          if (controlledGrab === undefined) return { status: "item_unavailable", mode: "controlled_grab", detailCode: "integration_disabled" };
+          const entry = readCatalogContinuationEntry(continuationId);
+          if (entry === undefined) return { status: "item_unavailable", mode: "controlled_grab", detailCode: "continuation_missing_or_expired" };
+          const target = await catalogGrabTarget(entry, scope);
+          if (target === undefined) return { status: "item_unavailable", mode: "controlled_grab", detailCode: "scope_not_grabbable" };
+          return controlledGrab.prepareTarget(target, releaseId);
+        },
+        executeGrab: async (
+          continuationId: string,
+          challengeId: string,
+          confirmation: string,
+          idempotencyKey: string,
+          scope?: CatalogContinuationScope,
+        ): Promise<ExecuteGrabResult> => {
+          if (controlledGrab === undefined) return { status: "challenge_expired", mode: "controlled_grab", detailCode: "integration_disabled" };
+          const entry = readCatalogContinuationEntry(continuationId);
+          if (entry === undefined) return { status: "challenge_expired", mode: "controlled_grab", detailCode: "continuation_missing_or_expired" };
+          const target = await catalogGrabTarget(entry, scope);
+          if (target === undefined) return { status: "confirmation_mismatch", mode: "controlled_grab", detailCode: "challenge_target_mismatch" };
+          return controlledGrab.execute(target.selection, challengeId, confirmation, idempotencyKey);
         },
       };
 

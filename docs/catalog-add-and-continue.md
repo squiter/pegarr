@@ -40,14 +40,21 @@ A successful response returns only a safe Arr ID, title, application/instance id
 
 For Radarr, the dashboard follows the continuation automatically and opens exact movie release analysis using the explicit Pegarr subtitle policy. For Sonarr, the dashboard loads a sanitized list of seasons and episodes from the verified series; choosing one starts the matching exact season or episode release analysis. Scope IDs that were not issued by that continuation are rejected before release search.
 
-The continuation expires after ten minutes, is held only in bounded server memory, and repeated reads for the same scope share one analysis. It never enables controlled Grab.
+The continuation expires after ten minutes, is held only in bounded server memory, and repeated reads for the same scope share one analysis. It carries no Arr handle, API key, or mutation authority. When controlled Grab is independently enabled, an exact movie or exact episode analysis may prepare the existing administrator-only challenge through the server-owned continuation target. Season-pack analysis remains read-only because it does not map safely to the existing episode/movie audit identity.
 
 ```text
 GET /api/v1/catalog/continuations/<opaque-id>/analysis
 GET /api/v1/catalog/continuations/<opaque-id>/scopes
 GET /api/v1/catalog/continuations/<opaque-id>/analysis/season/<season-number>
 GET /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>
+
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/grab/prepare
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/grab/execute
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>/grab/prepare
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>/grab/execute
 ```
+
+The GET routes use the normal Pegarr login. The Grab routes use only the independent administrator token and retain the same two revalidations, exact phrase, idempotency, duplicate protection, timeout-as-Unknown handling, and durable audit as library-item controlled Grab. No continuation action performs a Grab automatically.
 
 If the upstream POST times out, Pegarr reports `timeout_unknown` and does not claim the title was absent or retry automatically. If Arr accepts the add but the identity re-read fails or mismatches, Pegarr reports `verification_unknown`; the user must check the Arr library before trying again.
 
