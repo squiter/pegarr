@@ -311,8 +311,10 @@ export async function resolveRoute(
     const rejection = authorizeLibraryRoute(access);
     if (rejection !== undefined) return rejection;
     try {
-      const result = await services?.catalogContinuation?.analyze(catalogContinuation);
-      if (result === undefined || result.status === "not_found") return { statusCode: 404, body: { service: "pegarr", mode: "read_only", status: "not_found" } };
+      const result = catalogContinuation.action === "scopes"
+        ? await services?.catalogContinuation?.scopes(catalogContinuation.continuationId)
+        : await services?.catalogContinuation?.analyze(catalogContinuation.continuationId, catalogContinuation.scope);
+      if (result === undefined || result.status === "not_found" || result.status === "scope_not_found") return { statusCode: 404, body: { service: "pegarr", mode: "read_only", status: "not_found" } };
       if (result.status === "scope_required") return { statusCode: 409, body: result };
       return { statusCode: 200, body: result };
     } catch (error) {
@@ -595,8 +597,23 @@ function parseCatalogAddPath(pathname: string): { readonly selection: import("./
   return undefined;
 }
 
-function parseCatalogContinuationPath(pathname: string): string | undefined {
-  return /^\/api\/v1\/catalog\/continuations\/([A-Za-z0-9_-]{32})\/analysis$/u.exec(pathname)?.[1];
+function parseCatalogContinuationPath(pathname: string): {
+  readonly continuationId: string;
+  readonly action: "scopes" | "analysis";
+  readonly scope?: import("./runtime.js").CatalogContinuationScope;
+} | undefined {
+  const match = /^\/api\/v1\/catalog\/continuations\/([A-Za-z0-9_-]{32})\/(scopes|analysis)(?:\/(season|episode)\/(\d{1,16}))?$/u.exec(pathname);
+  if (match === null) return undefined;
+  const continuationId = match[1] as string;
+  const action = match[2] as "scopes" | "analysis";
+  const scopeKind = match[3];
+  const scopeValue = match[4];
+  if (action === "scopes" && scopeKind === undefined) return { continuationId, action };
+  if (action === "analysis" && scopeKind === undefined) return { continuationId, action };
+  if (action !== "analysis" || scopeValue === undefined || !Number.isSafeInteger(Number(scopeValue))) return undefined;
+  return scopeKind === "season"
+    ? { continuationId, action, scope: { kind: "season", seasonNumber: Number(scopeValue) } }
+    : { continuationId, action, scope: { kind: "episode", episodeId: Number(scopeValue) } };
 }
 
 class InvalidRequestBodyError extends Error {}

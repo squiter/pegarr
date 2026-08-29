@@ -13,6 +13,7 @@ import type {
   MissingMediaItem,
   ReleaseTraits,
   RevalidatedArrRelease,
+  SonarrSeriesReleaseScopes,
 } from "../domain.js";
 import {
   addedArrId,
@@ -190,6 +191,20 @@ export class SonarrClient {
       this.#readQualityProfiles(),
     ]);
     return publicArrAddOptions(rootFolders, qualityProfiles);
+  }
+
+  async readSeriesReleaseScopes(seriesId: number): Promise<SonarrSeriesReleaseScopes> {
+    const normalizedSeriesId = positiveInteger(seriesId, "seriesId");
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/episode",
+      query: { seriesId: String(normalizedSeriesId), includeImages: "false" },
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: this.#maxResponseBytes,
+    });
+    assertSuccessfulStatus(response, "series episode list");
+    return mapSonarrSeriesReleaseScopes(response.body);
   }
 
   async addCatalogSeries(input: SonarrCatalogAddInput): Promise<ArrCatalogAddReceipt> {
@@ -468,6 +483,37 @@ export function mapSonarrSystemStatus(body: unknown): SonarrSystemStatus {
     appName: "Sonarr",
     version,
     ...(isDocker === undefined ? {} : { isDocker }),
+  };
+}
+
+export function mapSonarrSeriesReleaseScopes(body: unknown): SonarrSeriesReleaseScopes {
+  if (!Array.isArray(body) || body.length > 5_000) throw new TypeError("Sonarr episode list must be a bounded array");
+  const episodeIds = new Set<number>();
+  const episodes = body.map((value, index) => {
+    const episode = record(value, `episode[${index}]`);
+    const episodeId = requiredBoundedInteger(episode.id, 1, Number.MAX_SAFE_INTEGER, `episode[${index}].id`);
+    const seasonNumber = requiredBoundedInteger(episode.seasonNumber, 0, 10_000, `episode[${index}].seasonNumber`);
+    const episodeNumber = requiredBoundedInteger(episode.episodeNumber, 1, 100_000, `episode[${index}].episodeNumber`);
+    if (episodeIds.has(episodeId)) throw new TypeError("Sonarr episode IDs must be unique");
+    episodeIds.add(episodeId);
+    return {
+      episodeId,
+      seasonNumber,
+      episodeNumber,
+      title: safeScopeTitle(episode.title, `episode[${index}].title`),
+    };
+  }).toSorted((left, right) =>
+    left.seasonNumber - right.seasonNumber || left.episodeNumber - right.episodeNumber || left.episodeId - right.episodeId,
+  );
+  const seasonCounts = new Map<number, number>();
+  for (const episode of episodes) seasonCounts.set(episode.seasonNumber, (seasonCounts.get(episode.seasonNumber) ?? 0) + 1);
+  return {
+    seasons: [...seasonCounts].map(([seasonNumber, episodeCount]) => ({
+      seasonNumber,
+      label: seasonNumber === 0 ? "Specials" : `Season ${seasonNumber}`,
+      episodeCount,
+    })),
+    episodes,
   };
 }
 
@@ -906,6 +952,18 @@ function boundedInteger(value: number, minimum: number, maximum: number, field: 
     throw new TypeError(`${field} must be an integer between ${minimum} and ${maximum}`);
   }
   return value;
+}
+
+function requiredBoundedInteger(value: unknown, minimum: number, maximum: number, field: string): number {
+  if (typeof value !== "number") throw new TypeError(`${field} must be an integer`);
+  return boundedInteger(value, minimum, maximum, field);
+}
+
+function safeScopeTitle(value: unknown, field: string): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 1_024 || /[\u0000-\u001f\u007f]/u.test(value)) {
+    throw new TypeError(`${field} must be a safe bounded string`);
+  }
+  return value.trim();
 }
 
 function optionalBoundedInteger(

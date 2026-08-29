@@ -210,6 +210,9 @@ button:disabled { cursor: wait; opacity: .55; }
 .catalog-add-form code { display: block; margin-top: .35rem; color: var(--text); overflow-wrap: anywhere; }
 .catalog-add-form-actions { display: flex; gap: .55rem; }
 .catalog-add-status { margin-bottom: 0; }
+.catalog-scope-panel { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; align-items: end; padding-top: .8rem; border-top: 1px solid var(--border); }
+.catalog-scope-panel label { color: var(--muted); font-size: .76rem; font-weight: 700; }
+.catalog-scope-panel select { margin-top: .35rem; }
 .coverage-chip { padding: .25rem .5rem; border: 1px solid var(--border); border-radius: 999px; text-transform: capitalize; }
 .coverage-chip--available { color: var(--accent); border-color: rgb(52 211 153 / 45%); }
 .coverage-chip--no_match_found, .coverage-chip--unsupported { color: var(--warning); border-color: rgb(251 191 36 / 45%); }
@@ -467,6 +470,7 @@ footer {
   .catalog-result-actions { align-items: stretch; flex-direction: column; }
   .catalog-add-form { grid-template-columns: 1fr; }
   .catalog-add-warning, .catalog-add-form-actions, .catalog-add-status { grid-column: 1; }
+  .catalog-scope-panel { grid-template-columns: 1fr; }
   .summary-row { align-items: flex-start; flex-direction: column; }
   .source-status { justify-content: flex-start; }
   .controls { grid-template-columns: 1fr; }

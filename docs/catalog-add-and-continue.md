@@ -38,10 +38,15 @@ The POST body is exact and bounded. Sonarr accepts root-folder/profile IDs, `mon
 
 A successful response returns only a safe Arr ID, title, application/instance identity, `automaticSearch: false`, and a short-lived opaque Pegarr continuation. Before issuing it, Pegarr re-reads the created Arr record by internal ID and verifies that its TVDB or TMDB identity still matches the selected catalog title.
 
-For Radarr, the dashboard follows the continuation automatically and opens exact movie release analysis using the explicit Pegarr subtitle policy. The continuation expires after ten minutes, is held only in bounded server memory, and repeated reads share one analysis. It never enables controlled Grab. Sonarr still requires the user to choose a season or episode before exact analysis; that scope selector is the next delivery slice.
+For Radarr, the dashboard follows the continuation automatically and opens exact movie release analysis using the explicit Pegarr subtitle policy. For Sonarr, the dashboard loads a sanitized list of seasons and episodes from the verified series; choosing one starts the matching exact season or episode release analysis. Scope IDs that were not issued by that continuation are rejected before release search.
+
+The continuation expires after ten minutes, is held only in bounded server memory, and repeated reads for the same scope share one analysis. It never enables controlled Grab.
 
 ```text
 GET /api/v1/catalog/continuations/<opaque-id>/analysis
+GET /api/v1/catalog/continuations/<opaque-id>/scopes
+GET /api/v1/catalog/continuations/<opaque-id>/analysis/season/<season-number>
+GET /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>
 ```
 
 If the upstream POST times out, Pegarr reports `timeout_unknown` and does not claim the title was absent or retry automatically. If Arr accepts the add but the identity re-read fails or mismatches, Pegarr reports `verification_unknown`; the user must check the Arr library before trying again.

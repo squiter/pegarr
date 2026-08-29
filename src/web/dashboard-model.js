@@ -324,6 +324,8 @@ export function feasibilityView(value) {
   const title = typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Selected item";
   const context = item.kind === "episode" && Number.isSafeInteger(item.season) && Number.isSafeInteger(item.episode)
     ? episodeLabel(item.season, item.episode)
+    : item.kind === "season" && Number.isSafeInteger(item.season)
+      ? item.season === 0 ? "Specials" : `Season ${item.season}`
     : Number.isSafeInteger(item.year) ? String(item.year) : item.kind === "movie" ? "Movie" : "Item";
   const languages = Array.isArray(policy.languages)
     ? policy.languages.flatMap((language) => isRecord(language) && typeof language.code === "string"

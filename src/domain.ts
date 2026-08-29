@@ -60,6 +60,20 @@ export interface ArrCatalogAddReceipt {
   readonly automaticSearch: false;
 }
 
+export interface SonarrSeriesReleaseScopes {
+  readonly seasons: readonly {
+    readonly seasonNumber: number;
+    readonly label: string;
+    readonly episodeCount: number;
+  }[];
+  readonly episodes: readonly {
+    readonly episodeId: number;
+    readonly seasonNumber: number;
+    readonly episodeNumber: number;
+    readonly title: string;
+  }[];
+}
+
 export interface MissingMediaItem {
   readonly application: "sonarr" | "radarr";
   readonly instanceId: string;

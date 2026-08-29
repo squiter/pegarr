@@ -43,7 +43,7 @@ import {
 } from "./controlled-grab.js";
 import type { GrabReconciliationOutcome } from "./grab-audit.js";
 import { GrabAuditStore } from "./grab-audit.js";
-import type { CatalogMediaItem } from "./domain.js";
+import type { CatalogMediaItem, SonarrSeriesReleaseScopes } from "./domain.js";
 import type { ArrCatalogAddOptions, ArrCatalogAddReceipt } from "./domain.js";
 import type { MediaIdentity, ProviderSearchResult } from "./domain.js";
 import type { FeasibilityReport } from "./domain.js";
@@ -159,14 +159,40 @@ export interface CatalogAddResult {
     | { readonly action: "choose_series_scope"; readonly continuationId: string; readonly expiresAt: string };
 }
 
+export type CatalogContinuationScope =
+  | { readonly kind: "season"; readonly seasonNumber: number }
+  | { readonly kind: "episode"; readonly episodeId: number };
+
+export interface CatalogContinuationScopesResult {
+  readonly kind: "catalog-continuation-scopes";
+  readonly mode: "read_only";
+  readonly status: "ready";
+  readonly title: string;
+  readonly seasons: readonly { readonly seasonNumber: number; readonly label: string; readonly episodeCount: number }[];
+  readonly episodes: readonly { readonly episodeId: number; readonly seasonNumber: number; readonly episodeNumber: number; readonly title: string }[];
+}
+
+type CatalogContinuationSelection =
+  | { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number }
+  | { readonly application: "sonarr"; readonly instanceId: string; readonly kind: "season"; readonly itemId: number; readonly seasonNumber: number }
+  | { readonly application: "sonarr"; readonly instanceId: string; readonly kind: "episode"; readonly itemId: number; readonly parentId: number };
+
+interface CatalogContinuationMetrics {
+  readonly radarrRequests?: 1;
+  readonly sonarrRequests?: 1;
+  readonly bazarrRequests: 0;
+  readonly providerRequests: number;
+  readonly elapsedMs: number;
+}
+
 export type CatalogContinuationAnalysisResult =
   | {
       readonly kind: "item-feasibility";
       readonly mode: "read_only";
       readonly status: "ready";
-      readonly selection: { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number };
+      readonly selection: CatalogContinuationSelection;
       readonly report: FeasibilityReport;
-      readonly metrics: { readonly radarrRequests: 1; readonly bazarrRequests: 0; readonly providerRequests: number; readonly elapsedMs: number };
+      readonly metrics: CatalogContinuationMetrics;
       readonly analysis: { readonly source: "computed"; readonly generatedAt: string; readonly expiresAt: string; readonly staleUntil: string };
       readonly capabilities: { readonly controlledGrab: false };
     }
@@ -175,25 +201,25 @@ export type CatalogContinuationAnalysisResult =
       readonly mode: "read_only";
       readonly status: "policy_unresolved";
       readonly reason: "explicit_default_unconfigured";
-      readonly selection: { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number };
+      readonly selection: CatalogContinuationSelection;
     }
   | {
       readonly kind: "item-feasibility";
       readonly mode: "read_only";
       readonly status: "disabled";
-      readonly selection: { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number };
+      readonly selection: CatalogContinuationSelection;
       readonly missingIntegrations: readonly ["subdl"];
     }
   | {
       readonly kind: "item-feasibility";
       readonly mode: "read_only";
       readonly status: "integration_failure";
-      readonly selection: { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number };
-      readonly failures: readonly [{ readonly integration: "radarr"; readonly operation: "release_search"; readonly state: ArrIntegrationState; readonly retryAfterSeconds?: number }];
+      readonly selection: CatalogContinuationSelection;
+      readonly failures: readonly [{ readonly integration: "sonarr" | "radarr"; readonly operation: "release_search"; readonly state: ArrIntegrationState; readonly retryAfterSeconds?: number }];
       readonly releases: readonly [];
-      readonly metrics: { readonly radarrRequests: 1; readonly bazarrRequests: 0; readonly providerRequests: 0; readonly elapsedMs: number };
+      readonly metrics: CatalogContinuationMetrics;
     }
-  | { readonly kind: "catalog-continuation"; readonly mode: "read_only"; readonly status: "not_found" | "scope_required" };
+  | { readonly kind: "catalog-continuation"; readonly mode: "read_only"; readonly status: "not_found" | "scope_required" | "scope_not_found" };
 
 export type CatalogCoverageResult =
   | {
@@ -230,7 +256,8 @@ export interface RuntimeServices {
     add(selection: CatalogAddSelection, input: CatalogAddInput): Promise<CatalogAddResult>;
   };
   readonly catalogContinuation?: {
-    analyze(continuationId: string): Promise<CatalogContinuationAnalysisResult>;
+    scopes(continuationId: string): Promise<CatalogContinuationScopesResult | { readonly kind: "catalog-continuation"; readonly mode: "read_only"; readonly status: "not_found" | "scope_required" }>;
+    analyze(continuationId: string, scope?: CatalogContinuationScope): Promise<CatalogContinuationAnalysisResult>;
   };
   readMissingInventory(): Promise<MissingInventoryResult>;
   readItemFeasibility(
@@ -266,7 +293,8 @@ interface CatalogContinuationEntry {
   readonly itemId: number;
   readonly item: MediaIdentity;
   readonly expiresAtEpochMs: number;
-  analysis?: Promise<CatalogContinuationAnalysisResult>;
+  scopes?: Promise<SonarrSeriesReleaseScopes>;
+  readonly analyses: Map<string, Promise<CatalogContinuationAnalysisResult>>;
 }
 
 const catalogContinuationTtlMs = 10 * 60 * 1_000;
@@ -671,6 +699,7 @@ export function createRuntimeServices(
         ids: item.ids,
       },
       expiresAtEpochMs,
+      analyses: new Map(),
     });
     return { continuationId, expiresAt: new Date(expiresAtEpochMs).toISOString() };
   };
@@ -726,20 +755,129 @@ export function createRuntimeServices(
       capabilities: { controlledGrab: false },
     };
   };
+  const readSonarrContinuationScopes = async (entry: CatalogContinuationEntry): Promise<SonarrSeriesReleaseScopes> => {
+    const client = sonarrClients.get(entry.instanceId);
+    if (client === undefined) throw new TypeError("Catalog continuation instance is unavailable");
+    entry.scopes ??= client.readSeriesReleaseScopes(entry.itemId).catch((error) => {
+      delete entry.scopes;
+      throw error;
+    });
+    return entry.scopes;
+  };
+  const buildSonarrContinuation = async (
+    entry: CatalogContinuationEntry,
+    scope: CatalogContinuationScope,
+    scopes: SonarrSeriesReleaseScopes,
+  ): Promise<CatalogContinuationAnalysisResult> => {
+    const selectedSeason = scope.kind === "season"
+      ? scopes.seasons.find(({ seasonNumber }) => seasonNumber === scope.seasonNumber)
+      : undefined;
+    const selectedEpisode = scope.kind === "episode"
+      ? scopes.episodes.find(({ episodeId }) => episodeId === scope.episodeId)
+      : undefined;
+    if (selectedSeason === undefined && selectedEpisode === undefined) {
+      return { kind: "catalog-continuation", mode: "read_only", status: "scope_not_found" };
+    }
+    const selection: CatalogContinuationSelection = selectedEpisode === undefined
+      ? { application: "sonarr", instanceId: entry.instanceId, kind: "season", itemId: entry.itemId, seasonNumber: selectedSeason?.seasonNumber ?? 0 }
+      : { application: "sonarr", instanceId: entry.instanceId, kind: "episode", itemId: selectedEpisode.episodeId, parentId: entry.itemId };
+    const item: MediaIdentity = selectedEpisode === undefined
+      ? {
+          ...entry.item,
+          kind: "season",
+          season: selectedSeason?.seasonNumber ?? 0,
+        }
+      : {
+          ...entry.item,
+          kind: "episode",
+          season: selectedEpisode.seasonNumber,
+          episode: selectedEpisode.episodeNumber,
+        };
+    const settings = await subtitleSettings.read();
+    if (settings.status !== "configured") {
+      return { kind: "item-feasibility", mode: "read_only", status: "policy_unresolved", reason: "explicit_default_unconfigured", selection };
+    }
+    const providers = await resolveCatalogProviders("series");
+    if (providers.length === 0) {
+      return { kind: "item-feasibility", mode: "read_only", status: "disabled", selection, missingIntegrations: ["subdl"] };
+    }
+    const client = sonarrClients.get(entry.instanceId);
+    if (client === undefined) return { kind: "catalog-continuation", mode: "read_only", status: "not_found" };
+    const startedAt = now();
+    let releases: Awaited<ReturnType<SonarrClient["searchEpisodeReleases"]>>;
+    try {
+      releases = selectedEpisode === undefined
+        ? await client.searchSeasonReleases(entry.itemId, selectedSeason?.seasonNumber ?? 0)
+        : await client.searchEpisodeReleases(selectedEpisode.episodeId);
+    } catch (error) {
+      const adapterError = error instanceof SonarrAdapterError ? error : undefined;
+      return {
+        kind: "item-feasibility", mode: "read_only", status: "integration_failure", selection,
+        failures: [{
+          integration: "sonarr", operation: "release_search", state: adapterError?.code ?? "unavailable",
+          ...(adapterError?.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: adapterError.retryAfterSeconds }),
+        }],
+        releases: [],
+        metrics: { sonarrRequests: 1, bazarrRequests: 0, providerRequests: 0, elapsedMs: boundedElapsed(startedAt, now()) },
+      };
+    }
+    const searched = await searchProviderPolicy({ item, policy: settings.policy, releases, providers });
+    const generatedAt = now();
+    return {
+      kind: "item-feasibility",
+      mode: "read_only",
+      status: "ready",
+      selection,
+      report: buildFeasibilityReport({
+        fixture: selectedEpisode === undefined ? "catalog-continuation-sonarr-season-v1" : "catalog-continuation-sonarr-episode-v1",
+        item,
+        policy: settings.policy,
+        releases,
+        providerResults: searched.results,
+      }),
+      metrics: { sonarrRequests: 1, bazarrRequests: 0, providerRequests: searched.requestCount, elapsedMs: boundedElapsed(startedAt, generatedAt) },
+      analysis: {
+        source: "computed",
+        generatedAt: new Date(generatedAt).toISOString(),
+        expiresAt: new Date(entry.expiresAtEpochMs).toISOString(),
+        staleUntil: new Date(entry.expiresAtEpochMs).toISOString(),
+      },
+      capabilities: { controlledGrab: false },
+    };
+  };
+  const readCatalogContinuationEntry = (continuationId: string): CatalogContinuationEntry | undefined => {
+    if (!/^[A-Za-z0-9_-]{32}$/u.test(continuationId)) throw new TypeError("Catalog continuation ID is invalid");
+    pruneCatalogContinuations();
+    return catalogContinuations.get(continuationId);
+  };
   const catalogContinuation = configuration.catalogAdd === undefined
     ? undefined
     : {
-        analyze: async (continuationId: string): Promise<CatalogContinuationAnalysisResult> => {
-          if (!/^[A-Za-z0-9_-]{32}$/u.test(continuationId)) throw new TypeError("Catalog continuation ID is invalid");
-          pruneCatalogContinuations();
-          const entry = catalogContinuations.get(continuationId);
+        scopes: async (continuationId: string): Promise<CatalogContinuationScopesResult | { readonly kind: "catalog-continuation"; readonly mode: "read_only"; readonly status: "not_found" | "scope_required" }> => {
+          const entry = readCatalogContinuationEntry(continuationId);
           if (entry === undefined) return { kind: "catalog-continuation", mode: "read_only", status: "not_found" };
-          if (entry.application === "sonarr") return { kind: "catalog-continuation", mode: "read_only", status: "scope_required" };
-          entry.analysis ??= buildRadarrContinuation(entry).catch((error) => {
-            delete entry.analysis;
-            throw error;
-          });
-          return entry.analysis;
+          if (entry.application !== "sonarr") return { kind: "catalog-continuation", mode: "read_only", status: "scope_required" };
+          const scopes = await readSonarrContinuationScopes(entry);
+          return { kind: "catalog-continuation-scopes", mode: "read_only", status: "ready", title: entry.item.title, ...scopes };
+        },
+        analyze: async (continuationId: string, scope?: CatalogContinuationScope): Promise<CatalogContinuationAnalysisResult> => {
+          const entry = readCatalogContinuationEntry(continuationId);
+          if (entry === undefined) return { kind: "catalog-continuation", mode: "read_only", status: "not_found" };
+          if (entry.application === "sonarr" && scope === undefined) return { kind: "catalog-continuation", mode: "read_only", status: "scope_required" };
+          if (entry.application === "radarr" && scope !== undefined) throw new TypeError("Radarr continuation does not accept a series scope");
+          const key = scope === undefined ? "movie" : `${scope.kind}:${scope.kind === "season" ? scope.seasonNumber : scope.episodeId}`;
+          let analysis = entry.analyses.get(key);
+          if (analysis === undefined) {
+            analysis = scope === undefined
+              ? buildRadarrContinuation(entry)
+              : readSonarrContinuationScopes(entry).then((scopes) => buildSonarrContinuation(entry, scope, scopes));
+            analysis = analysis.catch((error) => {
+              entry.analyses.delete(key);
+              throw error;
+            });
+            entry.analyses.set(key, analysis);
+          }
+          return analysis;
         },
       };
 

@@ -156,6 +156,11 @@
 | PEG-CONTINUE-002 | Radarr continuation runs exact read-only analysis from Pegarr policy | `src/runtime.test.ts` |
 | PEG-CONTINUE-003 | Continuation analysis authenticates before Arr or provider work | `src/app.test.ts` |
 | PEG-DASH-045 | Successful movie add continues automatically into exact read-only analysis | `src/app.test.ts` |
+| PEG-SONARR-014 | Series release scopes are bounded, sorted, and sanitized | `src/adapters/sonarr.test.ts` |
+| PEG-CONTINUE-004 | Sonarr continuation accepts only server-issued scopes | `src/runtime.test.ts` |
+| PEG-CONTINUE-005 | Sonarr scopes run exact read-only analysis from Pegarr policy | `src/runtime.test.ts` |
+| PEG-CONTINUE-006 | Sonarr scope routes authenticate before upstream work | `src/app.test.ts` |
+| PEG-DASH-046 | Successful series add loads explicit season and episode scope choices | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |

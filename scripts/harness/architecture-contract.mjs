@@ -59,6 +59,8 @@ if (
   !sonarrAdapter.includes("searchForCutoffUnmetEpisodes: false") ||
   !sonarrAdapter.includes('path: `/api/v3/series/${itemId}`') ||
   !sonarrAdapter.includes('"verification_unknown"') ||
+  !sonarrAdapter.includes("readSeriesReleaseScopes") ||
+  !sonarrAdapter.includes('path: "/api/v3/episode"') ||
   !sonarrAdapter.includes('method: "POST"') ||
   !sonarrAdapter.includes("body: normalized") ||
   (sonarrAdapter.match(/method: "POST"/gu) ?? []).length !== 2 ||
@@ -266,6 +268,7 @@ for (const contract of [
   "replaceChildren",
   "textContent",
   "loadCatalogContinuationAnalysis",
+  "loadCatalogSeriesScopes",
   "/api/v1/catalog/continuations/",
 ]) {
   if (!dashboardClient.includes(contract)) {

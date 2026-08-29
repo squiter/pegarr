@@ -19,6 +19,9 @@ POST /api/v1/catalog/<application>/<instance-id>/<provider-id>/<value>/add
 Authorization: Basic <Pegarr username and password only>
 
 GET /api/v1/catalog/continuations/<opaque-id>/analysis
+GET /api/v1/catalog/continuations/<opaque-id>/scopes
+GET /api/v1/catalog/continuations/<opaque-id>/analysis/season/<season-number>
+GET /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>
 Authorization: Basic <Pegarr username and password>
 
 PUT /api/v1/settings/subtitles

@@ -38,6 +38,11 @@ class FakeTransport implements JsonTransport {
 class AddTransport implements JsonTransport {
   readonly requests: JsonRequest[] = [];
   verificationBody: unknown = { id: 91, title: "Synthetic Add Series", tvdbId: 12345, path: "/private/media/TV/Synthetic Add Series" };
+  scopeBody: unknown = [
+    { id: 303, seasonNumber: 1, episodeNumber: 2, title: "Second" },
+    { id: 301, seasonNumber: 0, episodeNumber: 1, title: "Special" },
+    { id: 302, seasonNumber: 1, episodeNumber: 1, title: "Pilot", overview: "private" },
+  ];
 
   async requestJson(request: JsonRequest): Promise<JsonResponse> {
     this.requests.push(request);
@@ -55,6 +60,9 @@ class AddTransport implements JsonTransport {
     }
     if (request.method === "GET" && request.path === "/api/v3/series/91") {
       return { status: 200, headers: {}, body: this.verificationBody };
+    }
+    if (request.method === "GET" && request.path === "/api/v3/episode") {
+      return { status: 200, headers: {}, body: this.scopeBody };
     }
     return { status: 404, headers: {}, body: {} };
   }
@@ -192,6 +200,30 @@ test("PEG-SONARR-013 added series identity is re-read before Pegarr continues", 
     client(mismatched).addCatalogSeries({ tvdbId: 12345, rootFolderId: 3, qualityProfileId: 7, monitored: true, monitor: "all" }),
     (error: unknown) => error instanceof Error && "code" in error && error.code === "verification_unknown",
   );
+});
+
+test("PEG-SONARR-014 series release scopes are bounded, sorted, and sanitized", async () => {
+  const transport = new AddTransport();
+  const scopes = await client(transport).readSeriesReleaseScopes(91);
+  assert.deepEqual(transport.requests[0], {
+    method: "GET", path: "/api/v3/episode", query: { seriesId: "91", includeImages: "false" },
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500, maxResponseBytes: 64_000,
+  });
+  assert.deepEqual(scopes, {
+    seasons: [
+      { seasonNumber: 0, label: "Specials", episodeCount: 1 },
+      { seasonNumber: 1, label: "Season 1", episodeCount: 2 },
+    ],
+    episodes: [
+      { episodeId: 301, seasonNumber: 0, episodeNumber: 1, title: "Special" },
+      { episodeId: 302, seasonNumber: 1, episodeNumber: 1, title: "Pilot" },
+      { episodeId: 303, seasonNumber: 1, episodeNumber: 2, title: "Second" },
+    ],
+  });
+  assert.doesNotMatch(JSON.stringify(scopes), /private|overview|path/iu);
+  transport.scopeBody = [{ id: 1, seasonNumber: 1, episodeNumber: 0, title: "Invalid" }];
+  await assert.rejects(client(transport).readSeriesReleaseScopes(91), /episodeNumber/u);
 });
 
 test("PEG-SONARR-002 releases preserve Arr decisions and safe evidence", () => {

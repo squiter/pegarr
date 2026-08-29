@@ -74,9 +74,9 @@ This is one Pegarr workflow; the user does not need to visit the Arr UI. Exact p
 
 ## Implementation status
 
-- Completed locally: username/password-compatible authentication, sanitized multi-instance catalog lookup, discovery-first dashboard, persistent explicit default language policy, secret-safe SubDL/OpenSubtitles credential and mapping entry, immediate UI-configured provider use, title-level pre-add coverage preview, opt-in explicit add-to-Arr with server-owned defaults and automatic search forced off, created-record identity verification, and automatic Radarr handoff into exact read-only release analysis.
-- Next: add the Sonarr season/episode scope selector and continue its verified series identity into exact release analysis.
-- Not yet implemented: automatic-search suppression verification against live Arr, richer forced/hearing-impaired policy controls, cookie sessions, and the Sonarr post-add scope handoff. Radarr exact analysis is executable; neither continuation can silently Grab.
+- Completed locally: username/password-compatible authentication, sanitized multi-instance catalog lookup, discovery-first dashboard, persistent explicit default language policy, secret-safe SubDL/OpenSubtitles credential and mapping entry, immediate UI-configured provider use, title-level pre-add coverage preview, opt-in explicit add-to-Arr with server-owned defaults and automatic search forced off, created-record identity verification, automatic Radarr exact analysis, and Sonarr season/episode scope selection into exact analysis.
+- Next: connect continuation release rows to the existing controlled-Grab preparation boundary without bypassing its independent administrator authorization, revalidation, confirmation, or audit semantics.
+- Not yet implemented: automatic-search suppression verification against live Arr, richer forced/hearing-impaired policy controls, cookie sessions, and controlled-Grab preparation from continuation-scoped release rows. Neither continuation can silently Grab.
 
 Every behavior change must have a stable scenario in `harness/manifest.json`. Synthetic tests must never mutate a live Sonarr or Radarr instance, and no automated test may execute a live Grab.
 

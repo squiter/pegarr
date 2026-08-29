@@ -1567,6 +1567,36 @@
       "title": "Successful movie add continues automatically into exact read-only analysis",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
+    },
+    {
+      "id": "PEG-SONARR-014",
+      "title": "Series release scopes are bounded, sorted, and sanitized",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Injected transport and synthetic episode list; no network or mutation"
+    },
+    {
+      "id": "PEG-CONTINUE-004",
+      "title": "Sonarr continuation accepts only server-issued season and episode scopes",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary policy and injected Sonarr scope responses; no network, Grab, or live mutation"
+    },
+    {
+      "id": "PEG-CONTINUE-005",
+      "title": "Sonarr scopes run exact read-only analysis from Pegarr policy",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary policy plus injected Sonarr and subtitle-provider responses; no network, Grab, or live mutation"
+    },
+    {
+      "id": "PEG-CONTINUE-006",
+      "title": "Sonarr scope routes authenticate before upstream work",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process routes with synthetic login and upstream-call spies; no network or mutation"
+    },
+    {
+      "id": "PEG-DASH-046",
+      "title": "Successful series add loads explicit season and episode scope choices",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
     }
   ],
   "manualGaps": [

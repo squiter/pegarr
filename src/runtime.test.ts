@@ -12,11 +12,12 @@ import { syntheticRadarrMissingItemsResponse } from "./fixtures/radarr-missing-i
 import { syntheticRadarrMovieReleaseResponse } from "./fixtures/radarr-release-search.js";
 import { syntheticSonarrMissingItemsResponse } from "./fixtures/sonarr-missing-items.js";
 import { syntheticSonarrEpisodeReleaseResponse } from "./fixtures/sonarr-release-search.js";
+import { syntheticSonarrSeasonReleaseResponse } from "./fixtures/sonarr-season-release-search.js";
 import {
   syntheticBazarrLanguageProfilesResponse,
   syntheticBazarrSeriesAssignmentResponse,
 } from "./fixtures/bazarr-language-policy.js";
-import { syntheticSubdlV2EpisodeSearchResponse, syntheticSubdlV2MovieSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
+import { syntheticSubdlV2EpisodeSearchResponse, syntheticSubdlV2MovieSearchResponse, syntheticSubdlV2SeasonSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
 import { syntheticOpenSubtitlesEpisodeSearchResponse } from "./fixtures/opensubtitles-subtitle-search.js";
 import { createRuntimeServices } from "./runtime.js";
 import { SubtitleSettingsStore } from "./subtitle-settings.js";
@@ -469,6 +470,98 @@ test("PEG-CONTINUE-002 Radarr continuation runs exact read-only analysis from Pe
   assert.equal(requests.filter((entry) => entry.includes("/api/v3/release")).length, 1);
   assert.equal(requests.filter((entry) => entry.includes("/api/v2/subtitles/search")).length, 1);
   assert.doesNotMatch(JSON.stringify(result), /private|api.?key|example\.invalid|download.*handle/iu);
+  services.close();
+});
+
+test("PEG-CONTINUE-004 PEG-CONTINUE-005 Sonarr continuation accepts only issued scopes for exact analysis", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-sonarr-continuation-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  await new SubtitleSettingsStore(directory).update({ languages: [
+    { code: "pt-BR", required: true, forced: false, hearingImpaired: "either" },
+  ] });
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+    subdl: {
+      instanceId: "subdl",
+      baseUrl: "https://subdl.example.invalid",
+      allowedHosts: ["subdl.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-subdl-key-value"),
+    },
+    subdlLanguageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
+    catalogAdd: { enabled: true as const },
+  };
+  const requests: URL[] = [];
+  const services = createRuntimeServices(configuration, {
+    dataDirectory: directory,
+    now: () => 20_000,
+    fetchImplementation: async (input, init) => {
+      const url = new URL(input);
+      requests.push(url);
+      const method = init?.method ?? "GET";
+      if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/series/lookup") {
+        return new Response(JSON.stringify([{ title: "Synthetic Show", year: 2024, tvdbId: 42, tmdbId: 900005, imdbId: "tt9000005", id: 0, seasons: [] }]), { status: 200 });
+      }
+      if (url.pathname === "/api/v3/rootfolder") return new Response(JSON.stringify([{ id: 3, path: "/private/media/TV", accessible: true }]), { status: 200 });
+      if (url.pathname === "/api/v3/qualityprofile") return new Response(JSON.stringify([{ id: 7, name: "Synthetic HD" }]), { status: 200 });
+      if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/series" && method === "POST") return new Response(JSON.stringify({ id: 91 }), { status: 201 });
+      if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/series/91") return new Response(JSON.stringify({ id: 91, title: "Synthetic Show", tvdbId: 42 }), { status: 200 });
+      if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/episode") {
+        return new Response(JSON.stringify([
+          { id: 305, seasonNumber: 3, episodeNumber: 5, title: "Synthetic Episode" },
+          { id: 306, seasonNumber: 3, episodeNumber: 6, title: "Another Episode" },
+        ]), { status: 200 });
+      }
+      if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/release") {
+        return new Response(JSON.stringify(url.searchParams.has("seasonNumber") ? syntheticSonarrSeasonReleaseResponse : syntheticSonarrEpisodeReleaseResponse), { status: 200 });
+      }
+      if (url.hostname === "subdl.example.invalid" && url.pathname === "/api/v2/subtitles/search") {
+        return new Response(JSON.stringify(url.searchParams.has("episode") ? syntheticSubdlV2EpisodeSearchResponse : syntheticSubdlV2SeasonSearchResponse), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    },
+  });
+  assert.ok(services.catalogAdd);
+  assert.ok(services.catalogContinuation);
+  const selection = { application: "sonarr" as const, instanceId: "synthetic-sonarr", providerId: "tvdb" as const, value: "42" };
+  const options = await services.catalogAdd.readOptions(selection);
+  const added = await services.catalogAdd.add(selection, {
+    rootFolderId: 3,
+    qualityProfileId: 7,
+    monitored: true,
+    monitor: "all",
+    confirmation: options.confirmation,
+  });
+  const scopes = await services.catalogContinuation.scopes(added.next.continuationId);
+  assert.equal(scopes.status, "ready");
+  if (scopes.status !== "ready") return;
+  assert.deepEqual(scopes.seasons, [{ seasonNumber: 3, label: "Season 3", episodeCount: 2 }]);
+  assert.deepEqual(scopes.episodes.map(({ episodeId }) => episodeId), [305, 306]);
+  const releasesBeforeInvalidScope = requests.filter(({ pathname }) => pathname === "/api/v3/release").length;
+  assert.equal((await services.catalogContinuation.analyze(added.next.continuationId, { kind: "episode", episodeId: 999 })).status, "scope_not_found");
+  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/release").length, releasesBeforeInvalidScope);
+
+  const season = await services.catalogContinuation.analyze(added.next.continuationId, { kind: "season", seasonNumber: 3 });
+  assert.equal(season.status, "ready");
+  if (season.status !== "ready") return;
+  assert.equal(season.report.item.kind, "season");
+  assert.equal(season.report.item.season, 3);
+  assert.equal(season.report.policy.source, "explicit_default");
+  const episode = await services.catalogContinuation.analyze(added.next.continuationId, { kind: "episode", episodeId: 305 });
+  assert.equal(episode.status, "ready");
+  if (episode.status !== "ready") return;
+  assert.equal(episode.report.item.kind, "episode");
+  assert.equal(episode.report.item.episode, 5);
+  assert.deepEqual(episode.capabilities, { controlledGrab: false });
+  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/episode").length, 1);
+  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/release").length, 2);
+  assert.doesNotMatch(JSON.stringify({ scopes, season, episode }), /private|api.?key|example\.invalid|download.*handle/iu);
   services.close();
 });
 

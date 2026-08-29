@@ -445,6 +445,38 @@ test("PEG-CONTINUE-003 continuation analysis authenticates before Arr or provide
   assert.equal(analyses, 1);
 });
 
+test("PEG-CONTINUE-006 Sonarr scope routes authenticate before upstream work", async () => {
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  const control = new AccessControl(undefined, { username, password: new SecretValue(password) });
+  const basic = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  const continuationId = "s".repeat(32);
+  let scopeReads = 0;
+  let analyses = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  Object.assign(services, {
+    catalogContinuation: {
+      scopes: async () => {
+        scopeReads += 1;
+        return { kind: "catalog-continuation-scopes", mode: "read_only", status: "ready", title: "Synthetic Series", seasons: [], episodes: [] } as const;
+      },
+      analyze: async (_value: string, scope: import("./runtime.js").CatalogContinuationScope | undefined) => {
+        analyses += 1;
+        assert.deepEqual(scope, { kind: "season", seasonNumber: 1 });
+        return { kind: "catalog-continuation", mode: "read_only", status: "scope_not_found" } as const;
+      },
+    },
+  });
+  const scopesPath = `/api/v1/catalog/continuations/${continuationId}/scopes`;
+  const analysisPath = `/api/v1/catalog/continuations/${continuationId}/analysis/season/1`;
+  assert.equal((await resolveRoute("GET", scopesPath, tmpdir(), services, { control, authorization: "Basic invalid" })).statusCode, 401);
+  assert.equal(scopeReads, 0);
+  assert.equal((await resolveRoute("GET", scopesPath, tmpdir(), services, { control, authorization: basic })).statusCode, 200);
+  assert.equal(scopeReads, 1);
+  assert.equal((await resolveRoute("GET", analysisPath, tmpdir(), services, { control, authorization: basic })).statusCode, 404);
+  assert.equal(analyses, 1);
+});
+
 test("PEG-INSTANCE-004 instance status is authenticated, bounded, and read-only", async () => {
   const token = "synthetic-access-token-value-0000000001";
   let reads = 0;
@@ -617,6 +649,18 @@ test("PEG-DASH-045 successful movie add continues automatically into exact read-
   assert.match(String(client.body), /Loading exact Radarr releases|Exact release analysis is ready below/u);
   assert.match(String(client.body), /Fresh Arr and Pegarr-policy analysis/u);
   assert.match(String(model.body), /explicit_default_unconfigured|Configure at least one Pegarr subtitle language/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-046 successful series add loads explicit season and episode scope choices", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [client.body, model.body, styles.body].join("\n");
+  assert.match(String(client.body), /loadCatalogSeriesScopes|\/scopes`|Analyze a season or episode|Analyze exact releases/u);
+  assert.match(String(client.body), /analysis\$\{scopePath\}|seasonGroup|episodeGroup/u);
+  assert.match(String(model.body), /item\.kind === "season"|Specials|Season \$\{item\.season\}/u);
+  assert.match(String(styles.body), /catalog-scope-panel/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 

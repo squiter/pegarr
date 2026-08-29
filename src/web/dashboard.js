@@ -456,6 +456,9 @@ async function submitCatalogAdd(event, context) {
     if (result?.next?.action === "exact_movie_release_analysis" && typeof result.next.continuationId === "string") {
       await loadCatalogContinuationAnalysis(result.next.continuationId, context.item, result.receipt, context.status);
     }
+    if (result?.next?.action === "choose_series_scope" && typeof result.next.continuationId === "string") {
+      await loadCatalogSeriesScopes(result.next.continuationId, context.item, result.receipt, context.status);
+    }
   } catch {
     context.status.textContent = "Pegarr could not confirm the add. Nothing else was started.";
     context.status.dataset.state = "error";
@@ -463,17 +466,86 @@ async function submitCatalogAdd(event, context) {
   }
 }
 
-async function loadCatalogContinuationAnalysis(continuationId, item, receipt, status) {
-  status.textContent = "Added with automatic search off. Loading exact Radarr releases and subtitle evidence…";
+async function loadCatalogSeriesScopes(continuationId, item, receipt, status) {
+  status.textContent = "Added with automatic search off. Loading seasons and episodes…";
   status.dataset.state = "loading";
+  try {
+    const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/scopes`, {
+      method: "GET",
+      headers: { authorization: libraryAuthorization },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    const result = await response.json();
+    if (!response.ok || result?.status !== "ready") throw new Error("catalog_scopes_unavailable");
+    const scopePanel = document.createElement("div");
+    scopePanel.className = "catalog-scope-panel";
+    const label = document.createElement("label");
+    label.textContent = "Analyze a season or episode";
+    const select = document.createElement("select");
+    const seasonGroup = document.createElement("optgroup");
+    seasonGroup.label = "Seasons";
+    for (const season of Array.isArray(result.seasons) ? result.seasons : []) {
+      if (!Number.isSafeInteger(season?.seasonNumber)) continue;
+      const option = document.createElement("option");
+      option.value = `season:${season.seasonNumber}`;
+      option.textContent = `${season.label} · ${season.episodeCount} ${season.episodeCount === 1 ? "episode" : "episodes"}`;
+      seasonGroup.append(option);
+    }
+    const episodeGroup = document.createElement("optgroup");
+    episodeGroup.label = "Episodes";
+    for (const episode of Array.isArray(result.episodes) ? result.episodes : []) {
+      if (!Number.isSafeInteger(episode?.episodeId) || !Number.isSafeInteger(episode?.seasonNumber) || !Number.isSafeInteger(episode?.episodeNumber)) continue;
+      const option = document.createElement("option");
+      option.value = `episode:${episode.episodeId}`;
+      option.textContent = `S${String(episode.seasonNumber).padStart(2, "0")}E${String(episode.episodeNumber).padStart(2, "0")} · ${episode.title}`;
+      episodeGroup.append(option);
+    }
+    select.append(seasonGroup, episodeGroup);
+    const analyze = document.createElement("button");
+    analyze.className = "secondary-button";
+    analyze.type = "button";
+    analyze.textContent = "Analyze exact releases";
+    analyze.disabled = select.options.length === 0;
+    analyze.addEventListener("click", async () => {
+      const [kind, rawValue] = select.value.split(":");
+      const value = Number(rawValue);
+      if ((kind !== "season" && kind !== "episode") || !Number.isSafeInteger(value)) return;
+      analyze.disabled = true;
+      await loadCatalogContinuationAnalysis(continuationId, item, receipt, status, { kind, value });
+      analyze.disabled = false;
+    });
+    label.append(select);
+    scopePanel.append(label, analyze);
+    status.parentElement?.append(scopePanel);
+    status.textContent = "Added with automatic search off. Choose one season or episode for exact analysis.";
+    status.dataset.state = "success";
+  } catch {
+    status.textContent = "The series was added, but Pegarr could not load its season and episode choices.";
+    status.dataset.state = "warning";
+  }
+}
+
+async function loadCatalogContinuationAnalysis(continuationId, item, receipt, status, scope) {
+  const applicationName = receipt?.application === "sonarr" ? "Sonarr" : "Radarr";
+  status.textContent = `Added with automatic search off. Loading exact ${applicationName} releases and subtitle evidence…`;
+  status.dataset.state = "loading";
+  const scopeKind = scope?.kind === "season" || scope?.kind === "episode" ? scope.kind : undefined;
+  const scopeValue = Number.isSafeInteger(scope?.value) ? scope.value : undefined;
   const row = {
     key: `catalog-continuation:${continuationId}`,
-    itemId: receipt?.itemId,
-    application: "radarr",
+    itemId: scopeKind === "episode" ? scopeValue : receipt?.itemId,
+    application: receipt?.application,
     instanceId: item?.instanceId,
-    kind: "movie",
+    kind: scopeKind ?? "movie",
     title: item?.title ?? "Added movie",
-    context: Number.isSafeInteger(item?.year) ? String(item.year) : "Movie",
+    context: scopeKind === "season"
+      ? `Season ${scopeValue}`
+      : scopeKind === "episode"
+        ? "Selected episode"
+        : Number.isSafeInteger(item?.year) ? String(item.year) : "Movie",
   };
   selectedRow = row;
   activeFeasibility = undefined;
@@ -487,7 +559,8 @@ async function loadCatalogContinuationAnalysis(continuationId, item, receipt, st
   elements.releaseControls.hidden = true;
   setFeasibilityNotice("Searching exact Radarr releases and checking subtitle evidence…", "loading");
   try {
-    const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis`, {
+    const scopePath = scopeKind === undefined ? "" : `/${scopeKind}/${scopeValue}`;
+    const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis${scopePath}`, {
       method: "GET",
       headers: { authorization: libraryAuthorization },
       cache: "no-store",
