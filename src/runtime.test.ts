@@ -18,6 +18,7 @@ import {
 import { syntheticSubdlV2EpisodeSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
 import { syntheticOpenSubtitlesEpisodeSearchResponse } from "./fixtures/opensubtitles-subtitle-search.js";
 import { createRuntimeServices } from "./runtime.js";
+import { SubtitleSettingsStore } from "./subtitle-settings.js";
 
 test("PEG-RUNTIME-001 configured Sonarr status returns only safe read-only evidence", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-runtime-"));
@@ -195,6 +196,105 @@ test("PEG-CATALOG-001 catalog search fans out and preserves partial availability
     "sonarr.example.invalid/api/v3/series/lookup?term=Synthetic+Discovery",
   ]);
   assert.doesNotMatch(JSON.stringify(result), /private|example\.invalid|key-value/iu);
+});
+
+test("PEG-CATALOG-003 pre-add series coverage uses stored policy and honest provider evidence", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-catalog-coverage-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  await new SubtitleSettingsStore(directory).update({ languages: [
+    { code: "pt-BR", required: true, forced: false, hearingImpaired: "either" },
+  ] });
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+    subdl: {
+      instanceId: "subdl",
+      baseUrl: "https://subdl.example.invalid",
+      allowedHosts: ["subdl.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-subdl-key-value"),
+    },
+    subdlLanguageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
+  };
+  const requests: URL[] = [];
+  const services = createRuntimeServices(configuration, {
+    dataDirectory: directory,
+    fetchImplementation: async (input) => {
+      const url = new URL(input);
+      requests.push(url);
+      if (url.pathname === "/api/v3/series/lookup") {
+        return new Response(JSON.stringify([{ title: "Synthetic Discovery", year: 2026, tvdbId: 42, tmdbId: 84, imdbId: "tt1234567", id: 0 }]), { status: 200 });
+      }
+      if (url.pathname === "/api/v2/subtitles/search") {
+        return new Response(JSON.stringify(syntheticSubdlV2EpisodeSearchResponse), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    },
+  });
+
+  const result = await services.previewCatalogCoverage({ application: "sonarr", instanceId: "synthetic-sonarr", providerId: "tvdb", value: "42" });
+  assert.equal(result.status, "ready");
+  if (result.status !== "ready") return;
+  assert.equal(result.item.title, "Synthetic Discovery");
+  assert.equal(result.languages[0]?.state, "available");
+  assert.ok((result.languages[0]?.subtitleCount ?? 0) > 0);
+  assert.equal(result.providers[0]?.status, "success");
+  assert.equal(requests[0]?.searchParams.get("term"), "tvdb:42");
+  assert.equal(requests[1]?.searchParams.get("type"), "tv");
+  assert.equal(requests[1]?.searchParams.has("season"), false);
+  assert.doesNotMatch(JSON.stringify(result), /release_name|download|api.?key|example\.invalid/iu);
+});
+
+test("PEG-CATALOG-005 a UI-configured provider is usable immediately for pre-add coverage", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-ui-provider-coverage-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  await new SubtitleSettingsStore(directory).update({ languages: [
+    { code: "pt-BR", required: true, forced: false, hearingImpaired: "either" },
+  ] });
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+  };
+  const providerKey = "synthetic-ui-subdl-key-value";
+  let providerAuthorization: string | null = null;
+  const services = createRuntimeServices(configuration, {
+    dataDirectory: directory,
+    fetchImplementation: async (input, init) => {
+      const url = new URL(input);
+      if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/series/lookup") {
+        return new Response(JSON.stringify([{ title: "Synthetic Discovery", year: 2026, tvdbId: 42, tmdbId: 84, imdbId: "tt1234567", id: 0 }]), { status: 200 });
+      }
+      if (url.hostname === "api.subdl.com" && url.pathname === "/api/v2/subtitles/search") {
+        providerAuthorization = new Headers(init?.headers).get("authorization");
+        return new Response(JSON.stringify(syntheticSubdlV2EpisodeSearchResponse), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    },
+  });
+
+  assert.equal((await services.previewCatalogCoverage({ application: "sonarr", instanceId: "synthetic-sonarr", providerId: "tvdb", value: "42" })).status, "provider_unconfigured");
+  const settings = await services.updateProviderSettings("subdl", {
+    apiKey: providerKey,
+    languageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
+  });
+  assert.equal(settings.providers[0]?.origin, "ui");
+  assert.doesNotMatch(JSON.stringify(settings), /synthetic-ui-subdl-key-value/u);
+
+  const result = await services.previewCatalogCoverage({ application: "sonarr", instanceId: "synthetic-sonarr", providerId: "tvdb", value: "42" });
+  assert.equal(result.status, "ready");
+  assert.equal(providerAuthorization, `Bearer ${providerKey}`);
+  assert.doesNotMatch(JSON.stringify(result), /synthetic-ui-subdl-key-value|api\.subdl\.com/iu);
+  services.close();
 });
 
 test("PEG-RUNTIME-005 configured Radarr status returns measured browser-safe evidence", async (context) => {

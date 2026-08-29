@@ -16,6 +16,7 @@ import { createConfiguredOpenSubtitlesSource } from "./configured-opensubtitles-
 import {
   configuredRadarrInstances,
   configuredSonarrInstances,
+  type SecretValue,
   type ArrRuntimeConfiguration,
   type RuntimeConfiguration,
 } from "./config.js";
@@ -41,6 +42,19 @@ import {
 import type { GrabReconciliationOutcome } from "./grab-audit.js";
 import { GrabAuditStore } from "./grab-audit.js";
 import type { CatalogMediaItem } from "./domain.js";
+import type { MediaIdentity, ProviderSearchResult } from "./domain.js";
+import { searchProviderPolicy } from "./provider-policy-search.js";
+import type { ProviderLanguageMapping } from "./provider-policy-search.js";
+import {
+  ProviderSettingsStore,
+  type ConfigurableProviderId,
+  type ProviderSettingsInput,
+} from "./provider-settings.js";
+import {
+  SubtitleSettingsStore,
+  type SubtitleSettingsInput,
+  type SubtitleSettingsSnapshot,
+} from "./subtitle-settings.js";
 
 export type ArrIntegrationState =
   | "disabled"
@@ -88,11 +102,54 @@ export interface CatalogSearchResult {
   }[];
 }
 
+export interface SubtitleSettingsView extends SubtitleSettingsSnapshot {
+  readonly kind: "subtitle-settings";
+  readonly mode: "settings";
+  readonly providers: readonly {
+    readonly provider: "subdl" | "opensubtitles";
+    readonly configured: boolean;
+    readonly origin: "ui" | "deployment" | "unconfigured";
+    readonly languageMappings: readonly { readonly policyCode: string; readonly providerCode: string }[];
+  }[];
+}
+
+export interface CatalogCoverageSelection {
+  readonly application: "sonarr" | "radarr";
+  readonly instanceId: string;
+  readonly providerId: "tvdb" | "tmdb";
+  readonly value: string;
+}
+
+export type CatalogCoverageResult =
+  | {
+      readonly kind: "catalog-subtitle-coverage";
+      readonly mode: "read_only";
+      readonly status: "ready";
+      readonly item: CatalogMediaItem;
+      readonly policy: SubtitleSettingsSnapshot["policy"];
+      readonly languages: readonly {
+        readonly code: string;
+        readonly state: "available" | "no_match_found" | "unknown" | "unsupported";
+        readonly subtitleCount: number;
+      }[];
+      readonly providers: readonly Pick<ProviderSearchResult, "provider" | "status" | "searchedLanguages" | "quota" | "cache">[];
+      readonly providerRequests: number;
+    }
+  | {
+      readonly kind: "catalog-subtitle-coverage";
+      readonly mode: "read_only";
+      readonly status: "policy_unresolved" | "item_not_found" | "provider_unconfigured";
+    };
+
 export interface RuntimeServices {
   readSonarrStatus(): Promise<SonarrIntegrationStatus>;
   readRadarrStatus(): Promise<RadarrIntegrationStatus>;
   readonly readArrInstanceStatuses?: () => Promise<readonly ArrInstanceIntegrationStatus[]>;
   searchCatalog(query: string, application?: "sonarr" | "radarr"): Promise<CatalogSearchResult>;
+  readSubtitleSettings(): Promise<SubtitleSettingsView>;
+  updateSubtitleSettings(input: SubtitleSettingsInput): Promise<SubtitleSettingsView>;
+  updateProviderSettings(provider: ConfigurableProviderId, input: ProviderSettingsInput): Promise<SubtitleSettingsView>;
+  previewCatalogCoverage(selection: CatalogCoverageSelection): Promise<CatalogCoverageResult>;
   readMissingInventory(): Promise<MissingInventoryResult>;
   readItemFeasibility(
     selection: ItemFeasibilitySelection,
@@ -118,6 +175,7 @@ export interface RuntimeServicesOptions {
   readonly itemFeasibilityStaleTtlMs?: number;
   readonly itemFeasibilityMaxEntries?: number;
   readonly environment?: Readonly<Record<string, string | undefined>>;
+  readonly dataDirectory?: string;
 }
 
 interface AdapterErrorShape {
@@ -161,6 +219,12 @@ export function createRuntimeServices(
     ...inventoryConfiguration
   } = configuration;
   const now = options.now ?? Date.now;
+  const subtitleSettings = new SubtitleSettingsStore(
+    options.dataDirectory ?? options.environment?.DATA_DIR ?? "./data",
+  );
+  const providerSettings = new ProviderSettingsStore(
+    options.dataDirectory ?? options.environment?.DATA_DIR ?? "./data",
+  );
   const sonarrConfigurations = configuredSonarrInstances(configuration);
   const radarrConfigurations = configuredRadarrInstances(configuration);
   const primarySonarrConfiguration = sonarrConfigurations[0];
@@ -296,6 +360,60 @@ export function createRuntimeServices(
         }),
         environment: options.environment ?? {},
       });
+  let uiManagedSubdl: ReturnType<typeof createConfiguredSubdlSource> | undefined;
+  let uiManagedOpenSubtitles: ReturnType<typeof createConfiguredOpenSubtitlesSource> | undefined;
+  let uiProviderRevision = -1;
+
+  const resetUiProviders = (): void => {
+    uiManagedSubdl?.close();
+    uiManagedOpenSubtitles?.close();
+    uiManagedSubdl = undefined;
+    uiManagedOpenSubtitles = undefined;
+    uiProviderRevision = -1;
+  };
+
+  const resolveCatalogProviders = async (kind: CatalogMediaItem["kind"]): Promise<readonly {
+    readonly provider: "subdl" | "opensubtitles";
+    readonly tier: "preferred" | "fallback";
+    readonly mappings: readonly ProviderLanguageMapping[];
+    readonly source: import("./provider-policy-search.js").SubdlWindowSource;
+  }[]> => {
+    const settings = await providerSettings.read();
+    if (settings.revision !== uiProviderRevision) {
+      resetUiProviders();
+      const subdlCredential = await providerSettings.readCredential("subdl");
+      if (subdlCredential !== undefined) {
+        uiManagedSubdl = createUiSubdlSource(subdlCredential, fetchOption, options.environment ?? {});
+      }
+      const openSubtitlesCredential = await providerSettings.readCredential("opensubtitles");
+      if (openSubtitlesCredential !== undefined) {
+        uiManagedOpenSubtitles = createUiOpenSubtitlesSource(openSubtitlesCredential, fetchOption, options.environment ?? {});
+      }
+      uiProviderRevision = settings.revision;
+    }
+    const subdlSettings = settings.providers.find(({ provider }) => provider === "subdl");
+    const openSubtitlesSettings = settings.providers.find(({ provider }) => provider === "opensubtitles");
+    const effectiveSubdl = uiManagedSubdl ?? managedSubdl;
+    const effectiveOpenSubtitles = uiManagedOpenSubtitles ?? managedOpenSubtitles;
+    return [
+      ...(effectiveSubdl === undefined ? [] : [{
+        provider: "subdl" as const,
+        tier: "preferred" as const,
+        mappings: subdlSettings?.settingsConfigured === true
+          ? subdlSettings.languageMappings
+          : configuration.subdlLanguageMappings ?? [],
+        source: effectiveSubdl.source,
+      }]),
+      ...(effectiveOpenSubtitles === undefined || kind === "series" ? [] : [{
+        provider: "opensubtitles" as const,
+        tier: "fallback" as const,
+        mappings: openSubtitlesSettings?.settingsConfigured === true
+          ? openSubtitlesSettings.languageMappings
+          : configuration.opensubtitlesLanguageMappings ?? [],
+        source: effectiveOpenSubtitles.source,
+      }]),
+    ];
+  };
   const missingIntegrations = {
     episode: [
       ...(sonarrClients.size === 0 ? ["sonarr" as const] : []),
@@ -402,6 +520,31 @@ export function createRuntimeServices(
         now,
       });
 
+  const subtitleSettingsView = async (): Promise<SubtitleSettingsView> => {
+    const storedProviders = await providerSettings.read();
+    const providerView = (provider: ConfigurableProviderId): SubtitleSettingsView["providers"][number] => {
+      const stored = storedProviders.providers.find((entry) => entry.provider === provider);
+      const deploymentConfigured = provider === "subdl" ? managedSubdl !== undefined : managedOpenSubtitles !== undefined;
+      const uiConfigured = stored?.credentialConfigured === true;
+      return {
+        provider,
+        configured: uiConfigured || deploymentConfigured,
+        origin: uiConfigured ? "ui" : deploymentConfigured ? "deployment" : "unconfigured",
+        languageMappings: stored?.settingsConfigured === true
+          ? stored.languageMappings
+          : provider === "subdl"
+            ? configuration.subdlLanguageMappings ?? []
+            : configuration.opensubtitlesLanguageMappings ?? [],
+      };
+    };
+    return {
+      kind: "subtitle-settings",
+      mode: "settings",
+      ...(await subtitleSettings.read()),
+      providers: [providerView("subdl"), providerView("opensubtitles")],
+    };
+  };
+
   return {
     readSonarrStatus,
     readRadarrStatus,
@@ -443,6 +586,53 @@ export function createRuntimeServices(
         sources: sourceStatus,
       };
     },
+    readSubtitleSettings: subtitleSettingsView,
+    updateSubtitleSettings: async (input) => {
+      await subtitleSettings.update(input);
+      return subtitleSettingsView();
+    },
+    updateProviderSettings: async (provider, input) => {
+      await providerSettings.update(provider, input);
+      resetUiProviders();
+      return subtitleSettingsView();
+    },
+    previewCatalogCoverage: async (selection) => {
+      const settings = await subtitleSettings.read();
+      if (settings.status !== "configured") {
+        return { kind: "catalog-subtitle-coverage", mode: "read_only", status: "policy_unresolved" };
+      }
+      const catalogItem = await resolveCatalogCoverageItem(selection, sonarrClients, radarrClients);
+      if (catalogItem === undefined) {
+        return { kind: "catalog-subtitle-coverage", mode: "read_only", status: "item_not_found" };
+      }
+      const providers = await resolveCatalogProviders(catalogItem.kind);
+      if (providers.length === 0) {
+        return { kind: "catalog-subtitle-coverage", mode: "read_only", status: "provider_unconfigured" };
+      }
+      const item: MediaIdentity = {
+        kind: catalogItem.kind,
+        title: catalogItem.title,
+        ...(catalogItem.year === undefined ? {} : { year: catalogItem.year }),
+        ids: catalogItem.ids,
+      };
+      const searched = await searchProviderPolicy({ item, policy: settings.policy, releases: [], providers });
+      return {
+        kind: "catalog-subtitle-coverage",
+        mode: "read_only",
+        status: "ready",
+        item: catalogItem,
+        policy: settings.policy,
+        languages: settings.policy.languages.map(({ code }) => summarizeCatalogLanguage(code, searched.results)),
+        providers: searched.results.map(({ provider, status, searchedLanguages, quota, cache }) => ({
+          provider,
+          status,
+          ...(searchedLanguages === undefined ? {} : { searchedLanguages }),
+          ...(quota === undefined ? {} : { quota }),
+          ...(cache === undefined ? {} : { cache }),
+        })),
+        providerRequests: searched.requestCount,
+      };
+    },
     readMissingInventory,
     readItemFeasibility: (selection, readOptions) => itemFeasibility.read(selection, readOptions),
     ...(controlledGrab === undefined
@@ -459,8 +649,89 @@ export function createRuntimeServices(
       controlledGrab?.close();
       managedSubdl?.close();
       managedOpenSubtitles?.close();
+      resetUiProviders();
     },
   };
+}
+
+function createUiSubdlSource(
+  apiKey: SecretValue,
+  fetchOption: { readonly fetchImplementation?: FetchImplementation },
+  environment: Readonly<Record<string, string | undefined>>,
+): ReturnType<typeof createConfiguredSubdlSource> {
+  const configuration = {
+    instanceId: "subdl",
+    baseUrl: "https://api.subdl.com",
+    allowedHosts: ["api.subdl.com"],
+    allowInsecureHttp: false,
+    apiKey,
+  };
+  return createConfiguredSubdlSource({
+    configuration,
+    transport: new FetchJsonTransport({
+      baseUrl: configuration.baseUrl,
+      allowedHosts: configuration.allowedHosts,
+      allowInsecureHttp: false,
+      ...fetchOption,
+    }),
+    environment,
+  });
+}
+
+function createUiOpenSubtitlesSource(
+  apiKey: SecretValue,
+  fetchOption: { readonly fetchImplementation?: FetchImplementation },
+  environment: Readonly<Record<string, string | undefined>>,
+): ReturnType<typeof createConfiguredOpenSubtitlesSource> {
+  const configuration = {
+    instanceId: "opensubtitles",
+    baseUrl: "https://api.opensubtitles.com/api/v1",
+    allowedHosts: ["api.opensubtitles.com"],
+    allowInsecureHttp: false,
+    apiKey,
+  };
+  return createConfiguredOpenSubtitlesSource({
+    configuration,
+    transport: new FetchJsonTransport({
+      baseUrl: configuration.baseUrl,
+      allowedHosts: configuration.allowedHosts,
+      allowInsecureHttp: false,
+      ...fetchOption,
+    }),
+    environment,
+  });
+}
+
+async function resolveCatalogCoverageItem(
+  selection: CatalogCoverageSelection,
+  sonarrClients: ReadonlyMap<string, SonarrClient>,
+  radarrClients: ReadonlyMap<string, RadarrClient>,
+): Promise<CatalogMediaItem | undefined> {
+  if (!/^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(selection.instanceId) || !/^\d{1,16}$/u.test(selection.value)) {
+    throw new TypeError("Catalog coverage selection is invalid");
+  }
+  if (selection.application === "sonarr") {
+    if (selection.providerId !== "tvdb") throw new TypeError("Sonarr catalog coverage requires a TVDB ID");
+    const client = sonarrClients.get(selection.instanceId);
+    if (client === undefined) return undefined;
+    return (await client.lookupSeries(`tvdb:${selection.value}`)).find(({ ids }) => ids.tvdb === selection.value);
+  }
+  if (selection.providerId !== "tmdb") throw new TypeError("Radarr catalog coverage requires a TMDB ID");
+  const client = radarrClients.get(selection.instanceId);
+  if (client === undefined) return undefined;
+  return (await client.lookupMovies(`tmdb:${selection.value}`)).find(({ ids }) => ids.tmdb === selection.value);
+}
+
+function summarizeCatalogLanguage(
+  code: string,
+  results: readonly ProviderSearchResult[],
+): { readonly code: string; readonly state: "available" | "no_match_found" | "unknown" | "unsupported"; readonly subtitleCount: number } {
+  const relevant = results.filter(({ searchedLanguages }) => searchedLanguages?.includes(code) === true);
+  const subtitleCount = relevant.reduce((total, { subtitles }) => total + subtitles.length, 0);
+  if (subtitleCount > 0) return { code, state: "available", subtitleCount };
+  if (relevant.some(({ status }) => status !== "success" && status !== "unsupported")) return { code, state: "unknown", subtitleCount: 0 };
+  if (relevant.some(({ status }) => status === "success")) return { code, state: "no_match_found", subtitleCount: 0 };
+  return { code, state: "unsupported", subtitleCount: 0 };
 }
 
 function boundedCatalogQuery(value: string): string {

@@ -72,6 +72,12 @@ This is one Pegarr workflow; the user does not need to visit the Arr UI. Exact p
 5. **Session hardening and onboarding:** cookie sessions, logout/expiry, first-run setup, role separation, and migration away from the token-first screen.
 6. **Release-candidate acceptance:** resume the local/live validation work described in the previous release-candidate roadmap.
 
+## Implementation status
+
+- Completed locally: username/password-compatible authentication, sanitized multi-instance catalog lookup, discovery-first dashboard, persistent explicit default language policy, secret-safe SubDL/OpenSubtitles credential and mapping entry, immediate UI-configured provider use, and title-level pre-add coverage preview.
+- Next: richer forced/hearing-impaired policy controls and explicit add-to-Arr defaults and confirmation.
+- Not yet implemented: add-and-continue mutation, automatic-search suppression verification against live Arr, cookie sessions, and post-add handoff into exact release analysis.
+
 Every behavior change must have a stable scenario in `harness/manifest.json`. Synthetic tests must never mutate a live Sonarr or Radarr instance, and no automated test may execute a live Grab.
 
 ## Acceptance criteria for the first complete experience

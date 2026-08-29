@@ -132,6 +132,17 @@
 | PEG-CATALOG-001 | Catalog search fans out and preserves partial Arr availability | `src/runtime.test.ts` |
 | PEG-CATALOG-002 | Catalog search authenticates before bounded read-only work | `src/app.test.ts` |
 | PEG-DASH-041 | Discovery and username-password login stay page-memory-only | `src/app.test.ts` |
+| PEG-SETTINGS-001 | Subtitle policy persists atomically without provider secrets | `src/subtitle-settings.test.ts` |
+| PEG-SETTINGS-002 | Invalid, duplicate, oversized, and corrupt policy fails closed | `src/subtitle-settings.test.ts` |
+| PEG-SETTINGS-003 | Settings reads support API clients while writes require login | `src/app.test.ts` |
+| PEG-CATALOG-003 | Pre-add series coverage uses stored policy and honest provider evidence | `src/runtime.test.ts` |
+| PEG-CATALOG-004 | Catalog coverage authenticates before provider work and rejects mutations | `src/app.test.ts` |
+| PEG-DASH-042 | Subtitle policy settings and pre-add coverage stay secret-safe | `src/app.test.ts` |
+| PEG-PROVIDERSETTINGS-001 | Provider credentials stay separate, private, and redacted | `src/provider-settings.test.ts` |
+| PEG-PROVIDERSETTINGS-002 | Invalid provider credentials, mappings, and corrupt files fail closed | `src/provider-settings.test.ts` |
+| PEG-PROVIDERSETTINGS-003 | Provider writes require login and never return credentials | `src/app.test.ts` |
+| PEG-CATALOG-005 | A UI-configured provider is immediately usable for pre-add coverage | `src/runtime.test.ts` |
+| PEG-DASH-043 | Provider onboarding clears credentials and stays page-memory-only | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |

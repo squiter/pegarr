@@ -37,7 +37,7 @@ export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "catalog_coverage" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -92,7 +92,10 @@ export async function resolveRoute(
   const grabHistory = pathname === "/api/v1/grabs/history";
   const grabReconciliation = parseGrabReconciliationPath(pathname);
   const catalogSearch = pathname === "/api/v1/catalog/search";
-  const protectedLibraryRoute = catalogSearch || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
+  const catalogCoverage = parseCatalogCoveragePath(pathname);
+  const subtitleSettings = pathname === "/api/v1/settings/subtitles";
+  const providerSettings = parseProviderSettingsPath(pathname);
+  const protectedLibraryRoute = catalogSearch || catalogCoverage !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
@@ -128,6 +131,15 @@ export async function resolveRoute(
   }
   if (grabSelection !== undefined && method !== "POST") {
     return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (subtitleSettings && method !== "GET" && method !== "PUT") {
+    return { statusCode: 405, headers: { allow: "GET, PUT" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (providerSettings !== undefined && method !== "PUT") {
+    return { statusCode: 405, headers: { allow: "PUT" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (catalogCoverage !== undefined && method !== "GET") {
+    return { statusCode: 405, headers: { allow: "GET" }, body: { service: "pegarr", status: "method_not_allowed" } };
   }
 
   if (pathname === "/health") {
@@ -261,6 +273,55 @@ export async function resolveRoute(
     }
   }
 
+  if (catalogCoverage !== undefined) {
+    const rejection = authorizeLibraryRoute(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      const result = await services?.previewCatalogCoverage(catalogCoverage);
+      if (result === undefined) return { statusCode: 503, body: { service: "pegarr", mode: "read_only", status: "unavailable" } };
+      return { statusCode: result.status === "item_not_found" ? 404 : 200, body: result };
+    } catch (error) {
+      return error instanceof TypeError
+        ? { statusCode: 400, body: { service: "pegarr", mode: "read_only", status: "invalid_request" } }
+        : { statusCode: 503, body: { service: "pegarr", mode: "read_only", status: "unavailable" } };
+    }
+  }
+
+  if (subtitleSettings) {
+    if (method === "GET") {
+      const rejection = authorizeLibraryRoute(access);
+      if (rejection !== undefined) return rejection;
+      try {
+        return { statusCode: 200, body: await services?.readSubtitleSettings() };
+      } catch {
+        return { statusCode: 503, body: { service: "pegarr", status: "settings_unavailable" } };
+      }
+    }
+    const rejection = authorizeSettingsMutation(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      const body = parseSubtitleSettingsBody(requestBody);
+      return { statusCode: 200, body: await services?.updateSubtitleSettings(body) };
+    } catch (error) {
+      return error instanceof InvalidRequestBodyError || error instanceof TypeError
+        ? { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } }
+        : { statusCode: 503, body: { service: "pegarr", status: "settings_unavailable" } };
+    }
+  }
+
+  if (providerSettings !== undefined) {
+    const rejection = authorizeSettingsMutation(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      const body = parseProviderSettingsBody(requestBody);
+      return { statusCode: 200, body: await services?.updateProviderSettings(providerSettings.provider, body) };
+    } catch (error) {
+      return error instanceof InvalidRequestBodyError || error instanceof TypeError
+        ? { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } }
+        : { statusCode: 503, body: { service: "pegarr", status: "settings_unavailable" } };
+    }
+  }
+
   if (itemSelection !== undefined) {
     const rejection = authorizeLibraryRoute(access);
     if (rejection !== undefined) return rejection;
@@ -379,6 +440,19 @@ function authorizeAdministratorRoute(access: RouteAccess | undefined): RouteResu
   };
 }
 
+function authorizeSettingsMutation(access: RouteAccess | undefined): RouteResult | undefined {
+  if (access === undefined) return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+  if (access.control.authorizeLogin(access.authorization)) return undefined;
+  if (access.control.authorize(access.authorization)) {
+    return { statusCode: 403, body: { service: "pegarr", status: "login_required" } };
+  }
+  return {
+    statusCode: 401,
+    headers: { "www-authenticate": 'Basic realm="pegarr-settings", charset="UTF-8"' },
+    body: { service: "pegarr", status: "unauthorized" },
+  };
+}
+
 function parseItemFeasibilityPath(pathname: string): ItemFeasibilitySelection | undefined {
   const scoped = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/([a-z0-9][a-z0-9_-]{0,63})\/(episode|movie)\/(\d+)\/feasibility$/iu.exec(pathname);
   const legacy = /^\/api\/v1\/library\/items\/(sonarr|radarr)\/(episode|movie)\/(\d+)\/feasibility$/u.exec(pathname);
@@ -420,6 +494,26 @@ function parseGrabReconciliationPath(pathname: string): { readonly eventId: stri
   return match?.[1] === undefined ? undefined : { eventId: match[1] };
 }
 
+function parseCatalogCoveragePath(pathname: string): import("./runtime.js").CatalogCoverageSelection | undefined {
+  const match = /^\/api\/v1\/catalog\/(sonarr|radarr)\/([a-z0-9][a-z0-9_-]{0,63})\/(tvdb|tmdb)\/(\d{1,16})\/coverage$/iu.exec(pathname);
+  if (match === null) return undefined;
+  const application = match[1];
+  const instanceId = match[2];
+  const providerId = match[3];
+  const value = match[4];
+  if ((application === "sonarr" && providerId === "tvdb") || (application === "radarr" && providerId === "tmdb")) {
+    return { application, instanceId: instanceId as string, providerId, value: value as string };
+  }
+  return undefined;
+}
+
+function parseProviderSettingsPath(pathname: string): { readonly provider: import("./provider-settings.js").ConfigurableProviderId } | undefined {
+  const match = /^\/api\/v1\/settings\/providers\/(subdl|opensubtitles)$/u.exec(pathname);
+  return match?.[1] === undefined
+    ? undefined
+    : { provider: match[1] as import("./provider-settings.js").ConfigurableProviderId };
+}
+
 class InvalidRequestBodyError extends Error {}
 
 function parsePrepareGrabBody(value: unknown): { readonly releaseId: string } {
@@ -450,6 +544,26 @@ function parseReconcileGrabBody(value: unknown): {
   return {
     outcome,
     confirmation: requestString(body.confirmation, "confirmation", 8_192),
+  };
+}
+
+function parseSubtitleSettingsBody(value: unknown): import("./subtitle-settings.js").SubtitleSettingsInput {
+  const body = requestRecord(value, ["languages"]);
+  if (!Array.isArray(body.languages)) throw new InvalidRequestBodyError("languages is invalid");
+  return { languages: body.languages as import("./domain.js").SubtitleLanguageRequirement[] };
+}
+
+function parseProviderSettingsBody(value: unknown): import("./provider-settings.js").ProviderSettingsInput {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new InvalidRequestBodyError();
+  const body = value as Readonly<Record<string, unknown>>;
+  const keys = Object.keys(body);
+  if (!keys.includes("languageMappings") || keys.some((key) => key !== "apiKey" && key !== "languageMappings")) {
+    throw new InvalidRequestBodyError();
+  }
+  if (!Array.isArray(body.languageMappings)) throw new InvalidRequestBodyError("languageMappings is invalid");
+  return {
+    ...(body.apiKey === undefined ? {} : { apiKey: requestString(body.apiKey, "apiKey", 4_096) }),
+    languageMappings: body.languageMappings as import("./provider-policy-search.js").ProviderLanguageMapping[],
   };
 }
 
@@ -523,7 +637,8 @@ export function createRequestHandler(
     const authorization = request.headers.authorization;
     let result: RouteResult;
     try {
-      const requestBody = request.method === "POST" && safeRequestRoute(request.url).startsWith("grab_")
+      const safeRoute = safeRequestRoute(request.url);
+      const requestBody = (request.method === "POST" && safeRoute.startsWith("grab_")) || (request.method === "PUT" && (safeRoute === "subtitle_settings" || safeRoute === "provider_settings"))
         ? await readBoundedJsonBody(request)
         : undefined;
       result = await resolveRoute(
@@ -641,8 +756,11 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (pathname === "/api/v1/feasibility/demo") return "demo_feasibility";
   if (pathname === "/api/v1/integrations/sonarr/status") return "sonarr_status";
   if (pathname === "/api/v1/integrations/radarr/status") return "radarr_status";
+  if (/^\/api\/v1\/settings\/providers\/(?:subdl|opensubtitles)$/u.test(pathname)) return "provider_settings";
   if (pathname === "/api/v1/library/instances") return "arr_instances";
   if (pathname === "/api/v1/catalog/search") return "catalog_search";
+  if (parseCatalogCoveragePath(pathname) !== undefined) return "catalog_coverage";
+  if (pathname === "/api/v1/settings/subtitles") return "subtitle_settings";
   if (pathname === "/api/v1/library/missing") return "missing_inventory";
   if (parseItemFeasibilityPath(pathname) !== undefined) return "item_feasibility";
   const grab = parseGrabPath(pathname);

@@ -30,7 +30,13 @@ export class AccessControl {
       const candidate = authorization.slice(7);
       return candidate.length >= 32 && timingSafeEqual(this.#expectedDigest, digest(candidate));
     }
+    return this.authorizeLogin(authorization);
+  }
+
+  authorizeLogin(authorization: string | undefined): boolean {
     if (
+      authorization === undefined ||
+      authorization.length > 8_200 ||
       authorization.slice(0, 6).toLowerCase() !== "basic " ||
       this.#expectedUsernameDigest === undefined ||
       this.#expectedPasswordDigest === undefined

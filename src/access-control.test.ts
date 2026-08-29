@@ -29,6 +29,7 @@ test("PEG-ACCESS-005 username and password login is bounded and constant-time co
   assert.equal(access.configured, true);
   assert.equal(access.challenge, 'Basic realm="pegarr", charset="UTF-8"');
   assert.equal(access.authorize(basic(username, password)), true);
+  assert.equal(access.authorizeLogin(basic(username, password)), true);
   assert.equal(access.authorize(basic("wrong-user", password)), false);
   assert.equal(access.authorize(basic(username, "wrong-password-value-000000000000")), false);
   assert.equal(access.authorize("Basic not-base64!"), false);

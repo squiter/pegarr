@@ -1423,6 +1423,72 @@
       "title": "Discovery and username-password login remain page-memory-only assets",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
+    },
+    {
+      "id": "PEG-SETTINGS-001",
+      "title": "Subtitle policy persists atomically without provider secrets",
+      "evidence": "src/subtitle-settings.test.ts",
+      "boundary": "Temporary private settings file and synthetic policy; no credentials, browser, or network"
+    },
+    {
+      "id": "PEG-SETTINGS-002",
+      "title": "Invalid, duplicate, oversized, and corrupt subtitle policy fails closed",
+      "evidence": "src/subtitle-settings.test.ts",
+      "boundary": "Temporary malformed and bounded settings files; no credentials or network"
+    },
+    {
+      "id": "PEG-SETTINGS-003",
+      "title": "Settings reads support API clients while writes require username-password login",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process routes with synthetic login and legacy token; no persistence or network"
+    },
+    {
+      "id": "PEG-CATALOG-003",
+      "title": "Pre-add series coverage uses stored policy and honest provider evidence",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary policy, injected catalog and provider responses, and synthetic credentials; no network"
+    },
+    {
+      "id": "PEG-CATALOG-004",
+      "title": "Catalog coverage authenticates before provider work and rejects mutations",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with provider-work spy and synthetic access token; no network"
+    },
+    {
+      "id": "PEG-DASH-042",
+      "title": "Subtitle policy settings and pre-add coverage remain secret-safe assets",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
+    },
+    {
+      "id": "PEG-PROVIDERSETTINGS-001",
+      "title": "Provider credentials stay separate, private, and redacted",
+      "evidence": "src/provider-settings.test.ts",
+      "boundary": "Temporary metadata and credential files with synthetic values; no browser or network"
+    },
+    {
+      "id": "PEG-PROVIDERSETTINGS-002",
+      "title": "Invalid provider credentials, mappings, and corrupt files fail closed",
+      "evidence": "src/provider-settings.test.ts",
+      "boundary": "Temporary malformed settings and synthetic credentials; no browser or network"
+    },
+    {
+      "id": "PEG-PROVIDERSETTINGS-003",
+      "title": "Provider settings writes require login and never return credentials",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with synthetic login, legacy token, and credential; no persistence or network"
+    },
+    {
+      "id": "PEG-CATALOG-005",
+      "title": "A UI-configured provider is immediately usable for pre-add coverage",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary private settings and injected Arr/provider responses; no live network or mutation"
+    },
+    {
+      "id": "PEG-DASH-043",
+      "title": "Provider onboarding clears credentials and remains page-memory-only",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
     }
   ],
   "manualGaps": [

@@ -8,6 +8,15 @@ The protected read-only routes are:
 GET /api/v1/catalog/search?q=<title>&application=<optional sonarr or radarr>
 Authorization: Basic <Pegarr username and password>
 
+GET /api/v1/catalog/<application>/<instance-id>/<provider-id>/<value>/coverage
+GET /api/v1/settings/subtitles
+Authorization: Basic <Pegarr username and password>
+
+PUT /api/v1/settings/subtitles
+PUT /api/v1/settings/providers/subdl
+PUT /api/v1/settings/providers/opensubtitles
+Authorization: Basic <Pegarr username and password only>
+
 GET /api/v1/library/missing
 Authorization: Basic <Pegarr username and password>
 
@@ -19,7 +28,7 @@ GET /api/v1/library/items/radarr/<instance-id>/movie/<movie-id>/feasibility
 Authorization: Basic <Pegarr username and password>
 ```
 
-Legacy API clients may continue to send `Authorization: Bearer <access token>` when `PEGARR_ACCESS_TOKEN_FILE` is configured.
+Legacy API clients may continue to send `Authorization: Bearer <access token>` when `PEGARR_ACCESS_TOKEN_FILE` is configured. Bearer access remains read-only: subtitle-policy and provider settings PUT routes return `403 login_required` even when the bearer token is valid.
 
 A missing, malformed, query-string, or incorrect token returns `401` before any upstream request. Mutation methods return `405`. Successful responses use `Cache-Control: no-store`, contain an explicit `read_only` mode, and retain only the private library evidence required by the current dashboard.
 

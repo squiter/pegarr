@@ -16,7 +16,7 @@ export type ProviderSearchStatus =
   | "unexpected_status";
 
 export interface MediaIdentity {
-  readonly kind: "movie" | "episode" | "season";
+  readonly kind: "movie" | "series" | "episode" | "season";
   readonly title: string;
   readonly year?: number;
   readonly season?: number;

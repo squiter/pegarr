@@ -19,6 +19,12 @@ const elements = {
   catalogResults: document.querySelector("#catalog-results"),
   catalogStatus: document.querySelector("#catalog-status"),
   catalogSubmit: document.querySelector("#catalog-submit"),
+  subtitleSettings: document.querySelector("#subtitle-settings"),
+  subtitleSettingsForm: document.querySelector("#subtitle-settings-form"),
+  subtitleLanguages: document.querySelector("#subtitle-languages"),
+  subtitleSettingsSave: document.querySelector("#subtitle-settings-save"),
+  subtitleSettingsStatus: document.querySelector("#subtitle-settings-status"),
+  providerConfiguration: document.querySelector("#provider-configuration"),
   clearInventoryFilters: document.querySelector("#clear-inventory-filters"),
   dashboard: document.querySelector("#dashboard"),
   emptyState: document.querySelector("#empty-state"),
@@ -127,6 +133,7 @@ elements.accessForm?.addEventListener("submit", async (event) => {
 });
 
 elements.catalogForm?.addEventListener("submit", searchCatalog);
+elements.subtitleSettingsForm?.addEventListener("submit", saveSubtitleSettings);
 
 elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
@@ -205,7 +212,9 @@ async function loadInventory() {
     renderSources(inventory);
     elements.accessPanel.hidden = true;
     elements.catalog.hidden = false;
+    elements.subtitleSettings.hidden = false;
     elements.dashboard.hidden = false;
+    await loadSubtitleSettings();
     renderInventory();
     setStatus(
       inventory.status === "partial"
@@ -284,11 +293,229 @@ function renderCatalogItem(item) {
   const application = item?.application === "sonarr" ? "Sonarr series" : "Radarr movie";
   detail.textContent = `${application}${Number.isInteger(item?.year) ? ` · ${item.year}` : ""} · ${item?.instanceId ?? "default"}`;
   copy.append(title, detail);
+  const actions = document.createElement("div");
+  actions.className = "catalog-result-actions";
   const state = document.createElement("span");
   state.className = `source-chip ${item?.alreadyAdded ? "source-chip--ready" : ""}`;
   state.textContent = item?.alreadyAdded ? "Already added" : "Available to add";
-  row.append(copy, state);
+  const preview = document.createElement("button");
+  preview.className = "secondary-button catalog-preview-button";
+  preview.type = "button";
+  preview.textContent = "Preview subtitles";
+  const coverage = document.createElement("div");
+  coverage.className = "catalog-coverage";
+  coverage.hidden = true;
+  preview.addEventListener("click", () => previewCatalogCoverage(item, preview, coverage));
+  actions.append(state, preview);
+  row.append(copy, actions, coverage);
   return row;
+}
+
+async function loadSubtitleSettings() {
+  try {
+    const response = await fetch("/api/v1/settings/subtitles", {
+      method: "GET",
+      headers: { authorization: libraryAuthorization },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) throw new Error("settings_unavailable");
+    renderSubtitleSettings(await response.json());
+  } catch {
+    setSubtitleSettingsStatus("Subtitle settings are unavailable. Coverage remains unresolved.", "error");
+  }
+}
+
+function renderSubtitleSettings(settings) {
+  const languages = Array.isArray(settings?.policy?.languages) ? settings.policy.languages : [];
+  elements.subtitleLanguages.value = languages.map(({ code }) => code).filter((code) => typeof code === "string").join(", ");
+  const providers = Array.isArray(settings?.providers) ? settings.providers : [];
+  elements.providerConfiguration.replaceChildren(...providers.map((provider) => {
+    const card = document.createElement("div");
+    card.className = "provider-configuration-card";
+    const name = document.createElement("strong");
+    name.textContent = provider?.provider === "opensubtitles" ? "OpenSubtitles" : "SubDL";
+    const state = document.createElement("span");
+    state.className = `source-chip ${provider?.configured ? "source-chip--ready" : ""}`;
+    state.textContent = provider?.configured ? "Credential configured" : "Credential not configured";
+    const mappings = document.createElement("small");
+    const count = Array.isArray(provider?.languageMappings) ? provider.languageMappings.length : 0;
+    const origin = provider?.origin === "ui" ? "Saved in Pegarr" : provider?.origin === "deployment" ? "Deployment secret" : "No credential";
+    mappings.textContent = `${origin} · ${count} language ${count === 1 ? "mapping" : "mappings"}`;
+
+    const form = document.createElement("form");
+    form.className = "provider-settings-form";
+    const mappingLabel = document.createElement("label");
+    mappingLabel.textContent = "Language mappings";
+    const mappingInput = document.createElement("input");
+    mappingInput.type = "text";
+    mappingInput.maxLength = 1024;
+    mappingInput.autocomplete = "off";
+    mappingInput.spellcheck = false;
+    mappingInput.placeholder = "pt-BR:PT-BR, en:EN";
+    mappingInput.value = (provider?.languageMappings ?? []).map(({ policyCode, providerCode }) => `${policyCode}:${providerCode}`).join(", ");
+    mappingLabel.append(mappingInput);
+
+    const keyLabel = document.createElement("label");
+    keyLabel.textContent = "API key";
+    const keyInput = document.createElement("input");
+    keyInput.type = "password";
+    keyInput.maxLength = 4096;
+    keyInput.minLength = 16;
+    keyInput.autocomplete = "new-password";
+    keyInput.spellcheck = false;
+    keyInput.placeholder = provider?.configured ? "Leave blank to keep current key" : "Paste provider API key";
+    keyLabel.append(keyInput);
+
+    const save = document.createElement("button");
+    save.className = "secondary-button";
+    save.type = "submit";
+    save.textContent = provider?.configured ? "Update provider" : "Configure provider";
+    form.append(mappingLabel, keyLabel, save);
+    form.addEventListener("submit", (event) => saveProviderSettings(event, provider, mappingInput, keyInput, save));
+    card.append(name, state, mappings, form);
+    return card;
+  }));
+  setSubtitleSettingsStatus(
+    languages.length === 0 ? "Add at least one language before previewing subtitle coverage." : `Policy ready for ${languages.length} ${languages.length === 1 ? "language" : "languages"}.`,
+    languages.length === 0 ? "warning" : "success",
+  );
+}
+
+async function saveProviderSettings(event, provider, mappingInput, keyInput, button) {
+  event.preventDefault();
+  if (!libraryAuthorization?.startsWith("Basic ")) {
+    keyInput.value = "";
+    setSubtitleSettingsStatus("Sign in with the Pegarr username and password to configure providers.", "error");
+    return;
+  }
+  const providerId = provider?.provider;
+  if (providerId !== "subdl" && providerId !== "opensubtitles") return;
+  const apiKey = keyInput.value.trim();
+  keyInput.value = "";
+  if (!provider?.configured && apiKey.length === 0) {
+    setSubtitleSettingsStatus("Paste an API key the first time you configure a provider.", "error");
+    return;
+  }
+  let languageMappings;
+  try {
+    languageMappings = parseProviderMappings(mappingInput.value);
+  } catch {
+    setSubtitleSettingsStatus("Use comma-separated policy:provider pairs, such as pt-BR:PT-BR, en:EN.", "error");
+    return;
+  }
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/v1/settings/providers/${providerId}`, {
+      method: "PUT",
+      headers: { authorization: libraryAuthorization, "content-type": "application/json" },
+      body: JSON.stringify({ ...(apiKey.length === 0 ? {} : { apiKey }), languageMappings }),
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) throw new Error("provider_settings_update_failed");
+    renderSubtitleSettings(await response.json());
+    setSubtitleSettingsStatus(`${providerId === "subdl" ? "SubDL" : "OpenSubtitles"} is ready for pre-add coverage.`, "success");
+  } catch {
+    setSubtitleSettingsStatus("Pegarr could not save that provider. The previous configuration remains active.", "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function parseProviderMappings(value) {
+  const entries = value.split(",").map((entry) => entry.trim()).filter(Boolean);
+  if (entries.length > 64) throw new Error("too_many_mappings");
+  return entries.map((entry) => {
+    const parts = entry.split(":").map((part) => part.trim());
+    if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error("invalid_mapping");
+    return { policyCode: parts[0], providerCode: parts[1] };
+  });
+}
+
+async function saveSubtitleSettings(event) {
+  event.preventDefault();
+  if (!libraryAuthorization?.startsWith("Basic ")) {
+    setSubtitleSettingsStatus("Sign in with the Pegarr username and password to change settings.", "error");
+    return;
+  }
+  const codes = [...new Set(elements.subtitleLanguages.value.split(",").map((value) => value.trim()).filter(Boolean))];
+  if (codes.length < 1 || codes.length > 16) {
+    setSubtitleSettingsStatus("Enter between 1 and 16 comma-separated language codes.", "error");
+    return;
+  }
+  elements.subtitleSettingsSave.disabled = true;
+  try {
+    const response = await fetch("/api/v1/settings/subtitles", {
+      method: "PUT",
+      headers: { authorization: libraryAuthorization, "content-type": "application/json" },
+      body: JSON.stringify({ languages: codes.map((code) => ({ code, required: true, forced: false, hearingImpaired: "either" })) }),
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) throw new Error("settings_update_failed");
+    renderSubtitleSettings(await response.json());
+  } catch {
+    setSubtitleSettingsStatus("Pegarr could not save that policy. The previous settings remain active.", "error");
+  } finally {
+    elements.subtitleSettingsSave.disabled = false;
+  }
+}
+
+async function previewCatalogCoverage(item, button, output) {
+  const providerId = item?.application === "sonarr" ? "tvdb" : "tmdb";
+  const value = item?.ids?.[providerId];
+  if (typeof value !== "string") {
+    output.hidden = false;
+    output.textContent = `This result has no ${providerId.toUpperCase()} identity for a safe preview.`;
+    return;
+  }
+  button.disabled = true;
+  output.hidden = false;
+  output.textContent = "Checking configured subtitle providers…";
+  try {
+    const endpoint = `/api/v1/catalog/${item.application}/${encodeURIComponent(item.instanceId)}/${providerId}/${encodeURIComponent(value)}/coverage`;
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { authorization: libraryAuthorization },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error("coverage_unavailable");
+    if (result.status !== "ready") {
+      const messages = {
+        policy_unresolved: "Configure at least one subtitle language first.",
+        provider_unconfigured: "Configure a supported subtitle provider on the server first.",
+        item_not_found: "The catalog result is no longer available.",
+      };
+      output.textContent = messages[result.status] ?? "Subtitle coverage is unavailable.";
+      return;
+    }
+    output.replaceChildren(...result.languages.map((language) => {
+      const chip = document.createElement("span");
+      chip.className = `coverage-chip coverage-chip--${language.state}`;
+      chip.textContent = `${language.code}: ${language.state.replaceAll("_", " ")}${language.subtitleCount > 0 ? ` (${language.subtitleCount})` : ""}`;
+      return chip;
+    }));
+  } catch {
+    output.textContent = "Pegarr could not verify subtitle coverage. Availability remains Unknown.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function setSubtitleSettingsStatus(message, state) {
+  elements.subtitleSettingsStatus.textContent = message;
+  elements.subtitleSettingsStatus.dataset.state = state;
 }
 
 function setCatalogStatus(message, state) {
@@ -1515,6 +1742,7 @@ function setBusy(value) {
   elements.accessToken.disabled = value;
   elements.loginUsername.disabled = value;
   elements.loginPassword.disabled = value;
+  elements.subtitleSettingsSave.disabled = value;
   elements.dashboard?.setAttribute("aria-busy", String(value));
   elements.feasibilityPanel?.setAttribute("aria-busy", String(value));
   for (const button of document.querySelectorAll(".inventory-select")) button.disabled = value;

@@ -48,11 +48,27 @@ export const dashboardPage = `<!doctype html>
 
     <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
 
+    <section id="subtitle-settings" class="settings-panel" aria-labelledby="subtitle-settings-title" hidden>
+      <div>
+        <p class="eyebrow">Subtitle policy</p>
+        <h2 id="subtitle-settings-title">What subtitles do you want?</h2>
+        <p class="catalog-explainer">Set the default languages Pegarr should verify before a title is added, then connect SubDL or OpenSubtitles below. Provider credentials are written to private server-side files and are never returned here.</p>
+      </div>
+      <form id="subtitle-settings-form" class="settings-form">
+        <label for="subtitle-languages"><span>Language codes</span></label>
+        <input id="subtitle-languages" type="text" maxlength="256" placeholder="pt-BR, en" autocomplete="off" spellcheck="false">
+        <button id="subtitle-settings-save" class="secondary-button" type="submit">Save policy</button>
+      </form>
+      <p class="settings-hint">Comma-separated BCP 47 language codes. Each language is required by default; advanced forced and hearing-impaired preferences remain preserved by the API.</p>
+      <div id="provider-configuration" class="provider-configuration" aria-label="Subtitle provider configuration"></div>
+      <p id="subtitle-settings-status" class="status-message" role="status" aria-live="polite"></p>
+    </section>
+
     <section id="catalog" class="catalog-panel" aria-labelledby="catalog-title" hidden>
       <div>
         <p class="eyebrow">Sonarr and Radarr catalog</p>
         <h2 id="catalog-title">Search for something new</h2>
-        <p class="catalog-explainer">This first implementation slice performs safe catalog lookup. Subtitle coverage preview, provider settings, and the explicit add-and-continue action are the next P0 slices.</p>
+        <p class="catalog-explainer">Search safely, then preview title-level subtitle evidence using the policy and providers configured above. The explicit add-and-continue action remains the next P0 mutation slice.</p>
       </div>
       <form id="catalog-form" class="catalog-form">
         <label for="catalog-query"><span>Series or movie</span></label>

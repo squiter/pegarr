@@ -122,6 +122,10 @@ Safe route categories include health, readiness, dashboard, dashboard asset, int
 
 The live library and catalog routes are absent unless either username/password login or the legacy access token is configured. Pegarr rejects direct `PEGARR_PASSWORD` and `PEGARR_ACCESS_TOKEN` values. The current login foundation uses HTTP Basic credentials held only in page memory; use HTTPS or a trusted private network. A short-lived `HttpOnly` session is still required by the discovery-first roadmap before the login migration is complete.
 
+The dashboard's explicit default subtitle policy is written to `DATA_DIR/subtitle-settings.json`. Pegarr creates it atomically with mode `0600`, bounds it to 64 KiB and 16 unique languages, and stores no credentials or media evidence there.
+
+Username/password users may alternatively configure SubDL and OpenSubtitles from the dashboard. Pegarr writes non-secret mappings to `DATA_DIR/provider-settings.json`, provider keys to separate `DATA_DIR/provider-secrets/<provider>-api-key` files with mode `0600`, and restricts the secret directory to mode `0700`. The public API reports only configured state, origin, and mappings. A UI-managed key uses the provider's official HTTPS endpoint and takes precedence for pre-add catalog coverage immediately; deployment secret-file settings remain the source for packaged probes and the existing missing-item/report workflow. Keep `DATA_DIR` on a private persistent volume so UI-managed settings survive container recreation.
+
 ## Controlled Grab
 
 Controlled Grab is disabled by default. Enabling it requires the normal read-only access token plus a separate administrator secret and durable audit path.

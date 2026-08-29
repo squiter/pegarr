@@ -262,6 +262,91 @@ test("PEG-CATALOG-002 catalog search authenticates before bounded read-only work
   assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization })).statusCode, 405);
 });
 
+test("PEG-SETTINGS-003 subtitle settings are readable by API clients but writable only through login", async () => {
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  const token = "synthetic-access-token-value-0000000001";
+  const control = new AccessControl(new SecretValue(token), { username, password: new SecretValue(password) });
+  const basic = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  const bearer = `Bearer ${token}`;
+  let updates = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  services.updateSubtitleSettings = async (input) => {
+    updates += 1;
+    return {
+      kind: "subtitle-settings",
+      mode: "settings",
+      status: "configured",
+      revision: 1,
+      policy: { source: "explicit_default", profileId: "pegarr-default", profileName: "Pegarr default", languages: input.languages },
+      providers: [{ provider: "subdl", configured: true, origin: "deployment", languageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }] }],
+    };
+  };
+  const body = { languages: [{ code: "pt-BR", required: true, forced: false, hearingImpaired: "either" as const }] };
+
+  assert.equal((await resolveRoute("GET", "/api/v1/settings/subtitles", tmpdir(), services, { control, authorization: bearer })).statusCode, 200);
+  const forbidden = await resolveRoute("PUT", "/api/v1/settings/subtitles", tmpdir(), services, { control, authorization: bearer }, body);
+  assert.equal(forbidden.statusCode, 403);
+  assert.equal(updates, 0);
+  const updated = await resolveRoute("PUT", "/api/v1/settings/subtitles", tmpdir(), services, { control, authorization: basic }, body);
+  assert.equal(updated.statusCode, 200);
+  assert.equal(updates, 1);
+  assert.equal((await resolveRoute("PUT", "/api/v1/settings/subtitles", tmpdir(), services, { control, authorization: basic }, { languages: "unsafe" })).statusCode, 400);
+});
+
+test("PEG-PROVIDERSETTINGS-003 provider writes require login and never return credentials", async () => {
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  const token = "synthetic-access-token-value-0000000001";
+  const apiKey = "synthetic-provider-api-key-value";
+  const control = new AccessControl(new SecretValue(token), { username, password: new SecretValue(password) });
+  const basic = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  const bearer = `Bearer ${token}`;
+  let updates = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  services.updateProviderSettings = async (provider, input) => {
+    updates += 1;
+    assert.equal(provider, "subdl");
+    assert.equal(input.apiKey, apiKey);
+    return {
+      kind: "subtitle-settings",
+      mode: "settings",
+      status: "configured",
+      revision: 1,
+      policy: { source: "explicit_default", profileId: "pegarr-default", profileName: "Pegarr default", languages: [] },
+      providers: [{ provider: "subdl", configured: true, origin: "ui", languageMappings: input.languageMappings }],
+    };
+  };
+  const body = { apiKey, languageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }] };
+  const path = "/api/v1/settings/providers/subdl";
+
+  assert.equal((await resolveRoute("PUT", path, tmpdir(), services, { control, authorization: bearer }, body)).statusCode, 403);
+  assert.equal(updates, 0);
+  const response = await resolveRoute("PUT", path, tmpdir(), services, { control, authorization: basic }, body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(updates, 1);
+  assert.doesNotMatch(JSON.stringify(response), /synthetic-provider-api-key-value/u);
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control, authorization: basic })).statusCode, 405);
+  assert.equal((await resolveRoute("PUT", path, tmpdir(), services, { control, authorization: basic }, { apiKey })).statusCode, 400);
+});
+
+test("PEG-CATALOG-004 catalog coverage authenticates before provider work and rejects mutations", async () => {
+  const token = "synthetic-access-token-value-0000000001";
+  const control = new AccessControl(new SecretValue(token));
+  let previews = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  services.previewCatalogCoverage = async () => {
+    previews += 1;
+    return { kind: "catalog-subtitle-coverage", mode: "read_only", status: "policy_unresolved" };
+  };
+  const path = "/api/v1/catalog/sonarr/main/tvdb/42/coverage";
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control, authorization: "Bearer wrong-token-value-000000000000000" })).statusCode, 401);
+  assert.equal(previews, 0);
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control, authorization: `Bearer ${token}` })).statusCode, 200);
+  assert.equal(previews, 1);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: `Bearer ${token}` })).statusCode, 405);
+});
+
 test("PEG-INSTANCE-004 instance status is authenticated, bounded, and read-only", async () => {
   const token = "synthetic-access-token-value-0000000001";
   let reads = 0;
@@ -387,6 +472,28 @@ test("PEG-DASH-041 discovery and username/password login are page-memory-only as
   assert.match(String(page.body), /Discover before you add|login-username|login-password|catalog-query|Search for something new/u);
   assert.match(String(client.body), /libraryAuthorization|Basic|searchCatalog|\/api\/v1\/catalog\/search|renderCatalogItem/u);
   assert.match(String(styles.body), /catalog-panel|catalog-results|catalog-result/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-042 subtitle policy settings and pre-add coverage remain secret-safe assets", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, styles.body].join("\n");
+  assert.match(String(page.body), /What subtitles do you want|subtitle-languages|provider-configuration|Preview subtitles/u);
+  assert.match(String(client.body), /loadSubtitleSettings|saveSubtitleSettings|previewCatalogCoverage|catalog-subtitle-coverage|Credential configured/u);
+  assert.match(String(styles.body), /settings-panel|provider-configuration-card|catalog-coverage|coverage-chip--unknown/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-043 provider onboarding clears credentials and keeps them page-memory-only", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, styles.body].join("\n");
+  assert.match(String(page.body), /connect SubDL or OpenSubtitles|private server-side files/u);
+  assert.match(String(client.body), /saveProviderSettings|parseProviderMappings|new-password|keyInput\.value = ""|\/api\/v1\/settings\/providers\//u);
+  assert.match(String(styles.body), /provider-settings-form/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
@@ -708,6 +815,35 @@ function fakeServices(
       query,
       items: [],
       sources: [],
+    }),
+    readSubtitleSettings: async () => ({
+      kind: "subtitle-settings",
+      mode: "settings",
+      status: "unconfigured",
+      revision: 0,
+      policy: { source: "explicit_default", profileId: "pegarr-default", profileName: "Pegarr default", languages: [] },
+      providers: [],
+    }),
+    updateSubtitleSettings: async () => ({
+      kind: "subtitle-settings",
+      mode: "settings",
+      status: "unconfigured",
+      revision: 0,
+      policy: { source: "explicit_default", profileId: "pegarr-default", profileName: "Pegarr default", languages: [] },
+      providers: [],
+    }),
+    updateProviderSettings: async () => ({
+      kind: "subtitle-settings",
+      mode: "settings",
+      status: "unconfigured",
+      revision: 0,
+      policy: { source: "explicit_default", profileId: "pegarr-default", profileName: "Pegarr default", languages: [] },
+      providers: [],
+    }),
+    previewCatalogCoverage: async () => ({
+      kind: "catalog-subtitle-coverage",
+      mode: "read_only",
+      status: "policy_unresolved",
     }),
     readMissingInventory,
     readItemFeasibility: async (selection) => ({

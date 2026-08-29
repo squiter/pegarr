@@ -1,0 +1,68 @@
+# Subtitle settings and pre-add catalog coverage
+
+Pegarr now has a server-owned explicit default subtitle policy and a read-only pre-add coverage route. This is the second discovery-first implementation slice; it does not add a title or Grab a release.
+
+## Dashboard behavior
+
+After username/password sign-in, the dashboard lets the user enter up to 16 comma-separated language codes. The initial UI records each as required, non-forced, with either hearing-impaired preference. The API and persisted schema retain the full forced and hearing-impaired fields for later advanced controls.
+
+The settings panel reports whether SubDL and OpenSubtitles credentials are configured and how many explicit language mappings each provider has. A username/password login can paste or replace a provider API key and edit mappings directly in Pegarr. The key input clears immediately after submission, a stored key is never returned to the browser, and leaving the field blank preserves the current UI-managed or deployment-managed credential.
+
+UI-managed provider credentials use the official HTTPS service endpoints. They become available to pre-add catalog coverage immediately without a container restart. The existing deployment secret-file variables remain supported and remain the source for packaged probes, existing missing-item analysis, and one-shot report commands; extending the hot provider registry to those secondary workflows is a later unification step.
+
+Catalog results expose **Preview subtitles** when they have a safe TVDB identity for Sonarr or TMDB identity for Radarr. Pegarr re-runs an exact catalog lookup server-side before spending provider quota, then returns only aggregate language coverage and provider health.
+
+For series, the current preview is title-level SubDL evidence with no season or episode restriction. It proves that the provider has matching title evidence, not that every episode or cut is covered. Movie previews may use both configured providers. Exact release compatibility is still evaluated only after the explicit add-and-continue step creates an Arr internal ID.
+
+## API
+
+```text
+GET /api/v1/settings/subtitles
+PUT /api/v1/settings/subtitles
+PUT /api/v1/settings/providers/subdl
+PUT /api/v1/settings/providers/opensubtitles
+
+GET /api/v1/catalog/sonarr/<instance-id>/tvdb/<tvdb-id>/coverage
+GET /api/v1/catalog/radarr/<instance-id>/tmdb/<tmdb-id>/coverage
+```
+
+Settings reads and coverage previews accept any configured Pegarr library credential. Settings writes require username/password login; the legacy bearer token remains read-only. PUT accepts exactly:
+
+```json
+{
+  "languages": [
+    {
+      "code": "pt-BR",
+      "required": true,
+      "forced": false,
+      "hearingImpaired": "either"
+    }
+  ]
+}
+```
+
+The policy is stored atomically at `DATA_DIR/subtitle-settings.json` with mode `0600`. The file contains only normalized policy fields and a revision; no credential, authorization value, media title, identifier, release name, provider response, or URL is persisted there.
+
+Provider PUT accepts exactly a `languageMappings` array and an optional `apiKey`:
+
+```json
+{
+  "apiKey": "replace-with-a-provider-key",
+  "languageMappings": [
+    { "policyCode": "pt-BR", "providerCode": "PT-BR" }
+  ]
+}
+```
+
+Provider mapping metadata is stored in `DATA_DIR/provider-settings.json`. Credentials are stored separately at `DATA_DIR/provider-secrets/<provider>-api-key`; the directory is mode `0700` and each file is mode `0600`. Both writes are atomic. Public settings responses return only `configured`, `origin`, and language mappings. Provider PUT is username/password-only; a legacy bearer token receives `403 login_required`.
+
+## Honest coverage states
+
+- `available`: at least one configured provider returned subtitle evidence for the language.
+- `no_match_found`: a supported provider search succeeded and returned no evidence.
+- `unknown`: a provider failed, timed out, rejected authentication, or exhausted quota and no positive evidence was available.
+- `unsupported`: no configured provider mapping supports that policy language.
+
+The response includes aggregate subtitle counts and safe provider status/quota/cache evidence. It deliberately omits provider subtitle IDs and release names because exact release matching is not yet possible at this stage.
+
+`PEG-SETTINGS-001` through `PEG-SETTINGS-003`, `PEG-PROVIDERSETTINGS-001` through `PEG-PROVIDERSETTINGS-003`, `PEG-CATALOG-003` through `PEG-CATALOG-005`, and `PEG-DASH-042` through `PEG-DASH-043` are the deterministic evidence for this slice.
