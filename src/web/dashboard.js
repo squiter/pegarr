@@ -1,4 +1,4 @@
-import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows } from "/assets/dashboard-model.js";
+import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, subtitleLanguageRequirements } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -27,6 +27,7 @@ const elements = {
   subtitleSettings: document.querySelector("#subtitle-settings"),
   subtitleSettingsForm: document.querySelector("#subtitle-settings-form"),
   subtitleLanguages: document.querySelector("#subtitle-languages"),
+  subtitleLanguagePreferences: document.querySelector("#subtitle-language-preferences"),
   subtitleSettingsSave: document.querySelector("#subtitle-settings-save"),
   subtitleSettingsStatus: document.querySelector("#subtitle-settings-status"),
   providerConfiguration: document.querySelector("#provider-configuration"),
@@ -118,6 +119,7 @@ let administratorToken;
 let historyAdministratorToken;
 let reconciliationContext;
 let catalogAddEnabled = false;
+let subtitleLanguagePreferences = new Map();
 const feasibilityCache = new Map();
 const analysisByItem = new Map();
 const shortlistedReleaseIds = new Set();
@@ -145,6 +147,7 @@ elements.accessForm?.addEventListener("submit", async (event) => {
 
 elements.catalogForm?.addEventListener("submit", searchCatalog);
 elements.subtitleSettingsForm?.addEventListener("submit", saveSubtitleSettings);
+elements.subtitleLanguages?.addEventListener("input", renderSubtitleLanguagePreferences);
 elements.sessionLogout?.addEventListener("click", signOut);
 
 elements.refreshButton?.addEventListener("click", loadInventory);
@@ -851,6 +854,15 @@ async function loadSubtitleSettings() {
 function renderSubtitleSettings(settings) {
   const languages = Array.isArray(settings?.policy?.languages) ? settings.policy.languages : [];
   elements.subtitleLanguages.value = languages.map(({ code }) => code).filter((code) => typeof code === "string").join(", ");
+  subtitleLanguagePreferences = new Map(languages.flatMap((language) => typeof language?.code === "string"
+    ? [[languagePreferenceKey(language.code), {
+        code: language.code,
+        required: language.required !== false,
+        forced: language.forced === true,
+        hearingImpaired: ["required", "prefer", "avoid", "either"].includes(language.hearingImpaired) ? language.hearingImpaired : "either",
+      }]]
+    : []));
+  renderSubtitleLanguagePreferences();
   const providers = Array.isArray(settings?.providers) ? settings.providers : [];
   elements.providerConfiguration.replaceChildren(...providers.map((provider) => {
     const card = document.createElement("div");
@@ -902,6 +914,67 @@ function renderSubtitleSettings(settings) {
     languages.length === 0 ? "Add at least one language before previewing subtitle coverage." : `Policy ready for ${languages.length} ${languages.length === 1 ? "language" : "languages"}.`,
     languages.length === 0 ? "warning" : "success",
   );
+}
+
+function renderSubtitleLanguagePreferences() {
+  const codes = elements.subtitleLanguages.value.split(",").map((value) => value.trim()).filter(Boolean).slice(0, 16);
+  const nextPreferences = new Map();
+  const rows = codes.map((code) => {
+    const key = languagePreferenceKey(code);
+    const preference = subtitleLanguagePreferences.get(key) ?? {
+      code,
+      required: true,
+      forced: false,
+      hearingImpaired: "either",
+    };
+    nextPreferences.set(key, { ...preference, code });
+    const row = document.createElement("div");
+    row.className = "subtitle-language-preference";
+    const name = document.createElement("strong");
+    name.textContent = code;
+    const requiredLabel = document.createElement("label");
+    requiredLabel.className = "subtitle-language-check";
+    const required = document.createElement("input");
+    required.type = "checkbox";
+    required.checked = preference.required !== false;
+    requiredLabel.append(required, " Required");
+    const forcedLabel = document.createElement("label");
+    forcedLabel.className = "subtitle-language-check";
+    const forced = document.createElement("input");
+    forced.type = "checkbox";
+    forced.checked = preference.forced === true;
+    forcedLabel.append(forced, " Forced subtitles only");
+    const hearingLabel = document.createElement("label");
+    hearingLabel.className = "subtitle-hearing-preference";
+    const hearingText = document.createElement("span");
+    hearingText.textContent = "Hearing-impaired subtitles";
+    const hearing = document.createElement("select");
+    hearing.replaceChildren(
+      new Option("Either", "either"),
+      new Option("Prefer", "prefer"),
+      new Option("Require", "required"),
+      new Option("Avoid", "avoid"),
+    );
+    hearing.value = preference.hearingImpaired;
+    hearingLabel.append(hearingText, hearing);
+    const update = () => subtitleLanguagePreferences.set(key, {
+      code,
+      required: required.checked,
+      forced: forced.checked,
+      hearingImpaired: hearing.value,
+    });
+    required.addEventListener("change", update);
+    forced.addEventListener("change", update);
+    hearing.addEventListener("change", update);
+    row.append(name, requiredLabel, forcedLabel, hearingLabel);
+    return row;
+  });
+  subtitleLanguagePreferences = nextPreferences;
+  elements.subtitleLanguagePreferences.replaceChildren(...rows);
+}
+
+function languagePreferenceKey(value) {
+  return value.trim().replaceAll("_", "-").toLocaleLowerCase();
 }
 
 async function saveProviderSettings(event, provider, mappingInput, keyInput, button) {
@@ -963,9 +1036,11 @@ async function saveSubtitleSettings(event) {
     setSubtitleSettingsStatus("Sign in with the Pegarr username and password to change settings.", "error");
     return;
   }
-  const codes = [...new Set(elements.subtitleLanguages.value.split(",").map((value) => value.trim()).filter(Boolean))];
-  if (codes.length < 1 || codes.length > 16) {
-    setSubtitleSettingsStatus("Enter between 1 and 16 comma-separated language codes.", "error");
+  let languages;
+  try {
+    languages = subtitleLanguageRequirements(elements.subtitleLanguages.value, [...subtitleLanguagePreferences.values()]);
+  } catch {
+    setSubtitleSettingsStatus("Enter 1 to 16 unique comma-separated language codes.", "error");
     return;
   }
   elements.subtitleSettingsSave.disabled = true;
@@ -973,7 +1048,7 @@ async function saveSubtitleSettings(event) {
     const response = await fetch("/api/v1/settings/subtitles", {
       method: "PUT",
       headers: libraryHeaders({ "content-type": "application/json" }, true),
-      body: JSON.stringify({ languages: codes.map((code) => ({ code, required: true, forced: false, hearingImpaired: "either" })) }),
+      body: JSON.stringify({ languages }),
       cache: "no-store",
       credentials: "same-origin",
       redirect: "error",

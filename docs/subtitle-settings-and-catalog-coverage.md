@@ -4,7 +4,7 @@ Pegarr now has a server-owned explicit default subtitle policy and a read-only p
 
 ## Dashboard behavior
 
-After username/password sign-in, the dashboard lets the user enter up to 16 comma-separated language codes. The initial UI records each as required, non-forced, with either hearing-impaired preference. The API and persisted schema retain the full forced and hearing-impaired fields for later advanced controls.
+After username/password sign-in, the dashboard lets the user enter up to 16 comma-separated language codes. Each language gets explicit controls for required versus optional coverage, forced-only subtitles, and hearing-impaired subtitles with either, prefer, require, or avoid semantics. New languages start as required, non-forced, and either; saved values round-trip through the same server-owned policy model used by matching.
 
 The settings panel reports whether SubDL and OpenSubtitles credentials are configured and how many explicit language mappings each provider has. A username/password login can paste or replace a provider API key and edit mappings directly in Pegarr. The key input clears immediately after submission, a stored key is never returned to the browser, and leaving the field blank preserves the current UI-managed or deployment-managed credential.
 
@@ -65,4 +65,4 @@ Provider mapping metadata is stored in `DATA_DIR/provider-settings.json`. Creden
 
 The response includes aggregate subtitle counts and safe provider status/quota/cache evidence. It deliberately omits provider subtitle IDs and release names because exact release matching is not yet possible at this stage.
 
-`PEG-SETTINGS-001` through `PEG-SETTINGS-003`, `PEG-PROVIDERSETTINGS-001` through `PEG-PROVIDERSETTINGS-003`, `PEG-CATALOG-003` through `PEG-CATALOG-005`, and `PEG-DASH-042` through `PEG-DASH-043` are the deterministic evidence for this slice.
+`PEG-SETTINGS-001` through `PEG-SETTINGS-004`, `PEG-PROVIDERSETTINGS-001` through `PEG-PROVIDERSETTINGS-003`, `PEG-CATALOG-003` through `PEG-CATALOG-005`, `PEG-DASH-042` through `PEG-DASH-043`, and `PEG-DASH-049` are the deterministic evidence for this slice.

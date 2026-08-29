@@ -73,9 +73,10 @@ export const dashboardPage = `<!doctype html>
       <form id="subtitle-settings-form" class="settings-form">
         <label for="subtitle-languages"><span>Language codes</span></label>
         <input id="subtitle-languages" type="text" maxlength="256" placeholder="pt-BR, en" autocomplete="off" spellcheck="false">
+        <div id="subtitle-language-preferences" class="subtitle-language-preferences" aria-label="Language preferences"></div>
         <button id="subtitle-settings-save" class="secondary-button" type="submit">Save policy</button>
       </form>
-      <p class="settings-hint">Comma-separated BCP 47 language codes. Each language is required by default; advanced forced and hearing-impaired preferences remain preserved by the API.</p>
+      <p class="settings-hint">Enter comma-separated BCP 47 language codes, then choose whether each language is required, forced-only, or should prefer or avoid hearing-impaired subtitles.</p>
       <div id="provider-configuration" class="provider-configuration" aria-label="Subtitle provider configuration"></div>
       <p id="subtitle-settings-status" class="status-message" role="status" aria-live="polite"></p>
     </section>

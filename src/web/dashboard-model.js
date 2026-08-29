@@ -56,6 +56,33 @@ export function activeInventoryFilterCount(options = {}) {
   ].filter((value) => value !== "" && value !== "all").length;
 }
 
+export function subtitleLanguageRequirements(value, preferences = []) {
+  if (typeof value !== "string" || !Array.isArray(preferences)) throw new TypeError("Invalid subtitle language policy");
+  const codes = value.split(",").map((entry) => entry.trim()).filter(Boolean);
+  if (codes.length < 1 || codes.length > 16) throw new TypeError("Subtitle policy requires 1 through 16 languages");
+  const preferenceMap = new Map(preferences.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.code !== "string") return [];
+    return [[languagePreferenceKey(entry.code), entry]];
+  }));
+  const seen = new Set();
+  return codes.map((code) => {
+    if (code.length > 32 || /[\u0000-\u002c\u007f]/u.test(code)) throw new TypeError("Invalid subtitle language code");
+    const key = languagePreferenceKey(code);
+    if (seen.has(key)) throw new TypeError("Subtitle languages must be unique");
+    seen.add(key);
+    const preference = preferenceMap.get(key);
+    const hearingImpaired = hearingImpairedValues.includes(preference?.hearingImpaired)
+      ? preference.hearingImpaired
+      : "either";
+    return {
+      code,
+      required: preference?.required !== false,
+      forced: preference?.forced === true,
+      hearingImpaired,
+    };
+  });
+}
+
 export function rowsWithAnalysis(rows, analyses) {
   return rows.map((row) => {
     const analysis = analyses.get(row.key);
@@ -696,6 +723,10 @@ function episodeLabel(season, episode) {
 
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function languagePreferenceKey(value) {
+  return value.trim().replaceAll("_", "-").toLocaleLowerCase();
 }
 
 const confidenceValues = ["confirmed", "likely", "possible", "no_match_found", "unknown"];

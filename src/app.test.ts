@@ -884,6 +884,19 @@ test("PEG-DASH-048 first-run guidance distinguishes prerequisites, operator acti
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
+test("PEG-DASH-049 subtitle settings expose explicit per-language matching preferences", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, model.body, styles.body].join("\n");
+  assert.match(String(page.body), /Language preferences|required, forced-only|hearing-impaired subtitles/u);
+  assert.match(String(client.body), /renderSubtitleLanguagePreferences|Forced subtitles only|Hearing-impaired subtitles|subtitleLanguageRequirements/u);
+  assert.match(String(model.body), /export function subtitleLanguageRequirements|hearingImpairedValues|Subtitle languages must be unique/u);
+  assert.match(String(styles.body), /subtitle-language-preferences|subtitle-language-check|subtitle-hearing-preference/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
 test("PEG-DASH-010 analyzed-item cards and controls remain page-memory-only assets", async () => {
   const page = await resolveRoute("GET", "/", tmpdir());
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());

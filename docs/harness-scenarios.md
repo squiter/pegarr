@@ -171,6 +171,8 @@
 | PEG-ONBOARD-001 | Onboarding derives only safe discovery prerequisites and capabilities | `src/runtime.test.ts` |
 | PEG-ONBOARD-002 | Onboarding authenticates before work and projects access capabilities | `src/app.test.ts` |
 | PEG-DASH-048 | First-run guidance separates prerequisites, operator actions, and administrator Grab | `src/app.test.ts` |
+| PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
+| PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |

@@ -44,7 +44,7 @@ The current repository foundation includes:
 - a responsive missing-item dashboard with memory-only authentication and local search, filtering, and sorting;
 - a discovery-first catalog search for series and movies not yet added to Sonarr or Radarr;
 - a username/password sign-in foundation with legacy bearer-token compatibility;
-- an atomic server-side default subtitle policy configured from the dashboard;
+- an atomic server-side default subtitle policy with per-language required, forced, and hearing-impaired controls in the dashboard;
 - private server-side SubDL/OpenSubtitles credential and language-mapping setup from the dashboard, immediately usable by title-level pre-add coverage without returning stored keys;
 - authenticated episode and movie selection routes that derive private matching identity from server-owned inventory;
 - an interactive release table that preserves Arr decisions while explaining per-language subtitle confidence and provider state;

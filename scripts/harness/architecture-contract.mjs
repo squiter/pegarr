@@ -281,6 +281,10 @@ for (const contract of [
   'fetch("/api/v1/onboarding"',
   'access.role === "legacy_read_only"',
   'access.controlledGrab === "administrator_token_required"',
+  "subtitleLanguageRequirements",
+  "renderSubtitleLanguagePreferences",
+  "Forced subtitles only",
+  "Hearing-impaired subtitles",
   "/api/v1/catalog/continuations/",
 ]) {
   if (!dashboardClient.includes(contract)) {

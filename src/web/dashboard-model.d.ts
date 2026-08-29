@@ -37,6 +37,16 @@ export function selectRows(
 export function activeInventoryFilterCount(
   options: { readonly query?: string; readonly application?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly requiredCoverage?: string; readonly providerEvidence?: string; readonly profile?: string; readonly language?: string; readonly analysisAge?: string; readonly sort?: string },
 ): number;
+export interface SubtitleLanguageRequirementInput {
+  readonly code: string;
+  readonly required: boolean;
+  readonly forced: boolean;
+  readonly hearingImpaired: "required" | "prefer" | "avoid" | "either";
+}
+export function subtitleLanguageRequirements(
+  value: string,
+  preferences?: readonly SubtitleLanguageRequirementInput[],
+): readonly SubtitleLanguageRequirementInput[];
 export function rowsWithAnalysis(
   rows: readonly DashboardRow[],
   analyses: ReadonlyMap<string, DashboardAnalysisSummary>,

@@ -1663,6 +1663,18 @@
       "title": "First-run guidance separates prerequisites, operator actions, and administrator Grab",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
+    },
+    {
+      "id": "PEG-SETTINGS-004",
+      "title": "Per-language policy preferences remain explicit, unique, and bounded",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure dashboard policy serialization with synthetic language preferences"
+    },
+    {
+      "id": "PEG-DASH-049",
+      "title": "Subtitle settings expose required, forced, and hearing-impaired preferences",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with no browser storage, credentials, network, or mutation"
     }
   ],
   "manualGaps": [

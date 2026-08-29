@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases } from "./web/dashboard-model.js";
+import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases, subtitleLanguageRequirements } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -107,6 +107,22 @@ test("PEG-DASH-040 inventory keys remain unique across Arr instances", () => {
     "sonarr:sonarr-anime:episode:305",
   ]);
   assert.equal(new Set(rows.map(({ key }) => key)).size, 2);
+});
+
+test("PEG-SETTINGS-004 per-language policy preferences remain explicit and bounded", () => {
+  assert.deepEqual(subtitleLanguageRequirements("pt-BR, en", [
+    { code: "pt_br", required: true, forced: true, hearingImpaired: "avoid" },
+    { code: "EN", required: false, forced: false, hearingImpaired: "prefer" },
+  ]), [
+    { code: "pt-BR", required: true, forced: true, hearingImpaired: "avoid" },
+    { code: "en", required: false, forced: false, hearingImpaired: "prefer" },
+  ]);
+  assert.deepEqual(subtitleLanguageRequirements("fr", [{ code: "fr", required: true, forced: false, hearingImpaired: "unsafe" as never }]), [
+    { code: "fr", required: true, forced: false, hearingImpaired: "either" },
+  ]);
+  assert.throws(() => subtitleLanguageRequirements("pt-BR, PT_br"), /unique/u);
+  assert.throws(() => subtitleLanguageRequirements(new Array(17).fill(0).map((_, index) => `lang-${index}`).join(",")), /1 through 16/u);
+  assert.throws(() => subtitleLanguageRequirements("unsafe code"), /Invalid subtitle language code/u);
 });
 
 test("PEG-DASH-004 release view preserves Arr rejections and honest subtitle evidence", () => {
