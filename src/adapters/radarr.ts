@@ -5,6 +5,7 @@ import type {
   ArrReleaseEvidence,
   ArrGrabReceipt,
   ArrReleaseHandle,
+  CatalogMediaItem,
   MissingItemPage,
   MissingItemQuery,
   MissingMediaItem,
@@ -124,6 +125,26 @@ export class RadarrClient {
       return mapRadarrReleaseResponse(response.body, this.#instanceId);
     } catch {
       throw new RadarrAdapterError("invalid_response", "Radarr returned an invalid release response", {
+        status: response.status,
+      });
+    }
+  }
+
+  async lookupMovies(term: string): Promise<readonly CatalogMediaItem[]> {
+    const normalizedTerm = boundedLookupTerm(term);
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/movie/lookup",
+      query: { term: normalizedTerm },
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: this.#maxResponseBytes,
+    });
+    assertSuccessfulStatus(response, "movie catalog lookup");
+    try {
+      return mapRadarrCatalogResponse(response.body, this.#instanceId);
+    } catch {
+      throw new RadarrAdapterError("invalid_response", "Radarr returned an invalid catalog response", {
         status: response.status,
       });
     }
@@ -287,6 +308,36 @@ export function mapRadarrReleaseResponse(
   }
 
   return body.map((value, index) => mapRelease(value, index, instanceId));
+}
+
+export function mapRadarrCatalogResponse(
+  body: unknown,
+  instanceId = "radarr",
+): readonly CatalogMediaItem[] {
+  if (!Array.isArray(body)) throw new TypeError("Radarr catalog response must be an array");
+  return body.slice(0, 20).map((value, index) => {
+    const row = record(value, `movie lookup[${index}]`);
+    const tmdb = optionalNumericIdentifier(row.tmdbId, `movie lookup[${index}].tmdbId`);
+    const imdb = optionalImdbIdentifier(row.imdbId, `movie lookup[${index}].imdbId`);
+    if (tmdb === undefined && imdb === undefined) {
+      throw new TypeError(`movie lookup[${index}] must contain a stable identifier`);
+    }
+    const existingId = row.id === undefined || row.id === null || row.id === 0
+      ? undefined
+      : boundedInteger(requiredNumber(row.id, `movie lookup[${index}].id`), 1, Number.MAX_SAFE_INTEGER, `movie lookup[${index}].id`);
+    return {
+      application: "radarr",
+      instanceId,
+      kind: "movie",
+      title: boundedRequiredString(row.title, `movie lookup[${index}].title`),
+      ...optionalPositiveIntegerField("year", row.year, `movie lookup[${index}].year`),
+      ids: {
+        ...(tmdb === undefined ? {} : { tmdb }),
+        ...(imdb === undefined ? {} : { imdb }),
+      },
+      alreadyAdded: existingId !== undefined,
+    };
+  });
 }
 
 export function mapRadarrRevalidatedReleaseResponse(
@@ -529,6 +580,14 @@ function optionalTimestampField(
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function boundedLookupTerm(value: string): string {
+  const term = value.trim();
+  if (term.length < 2 || term.length > 200 || /[\u0000-\u001f\u007f]/u.test(term)) {
+    throw new TypeError("catalog lookup term must contain 2 through 200 safe characters");
+  }
+  return term;
 }
 
 function requiredNumber(value: unknown, field: string): number {

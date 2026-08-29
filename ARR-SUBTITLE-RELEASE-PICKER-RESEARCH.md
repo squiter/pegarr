@@ -11,19 +11,22 @@ Selected tagline: **Subtitle-aware release selection for Sonarr and Radarr.**
 
 The product should be a small, independent companion application for Sonarr, Radarr, and Bazarr.
 
-Its purpose is to improve manual release selection by showing whether each Sonarr or Radarr release candidate is likely to have subtitles matching the user's Bazarr language policy. The user can then select the exact release to grab.
+Its primary purpose is to let a user discover a series or movie before it is in the library, understand whether the desired subtitle policy is likely to be satisfiable, add the selected title to Sonarr or Radarr, and then choose an exact subtitle-aware release without leaving Pegarr.
+
+The missing-library and existing-item release picker remains useful, but it is a secondary entry point rather than the product definition.
 
 The core application should not depend on Jellyfin, Canopy, Jellyfin Enhanced, or Seerr. Those systems may become optional navigation or notification adapters later, but none is required to solve the problem.
 
 The minimum useful workflow is:
 
-1. List monitored or missing movies and episodes from Sonarr and Radarr.
-2. Let the user choose an item and run an interactive release search.
-3. Read the applicable subtitle requirements from Bazarr.
-4. Search supported subtitle providers for the requested languages.
-5. Compare subtitle release metadata with every video release candidate.
-6. Display a confidence level and explanation for each match.
-7. Let an authorized user tell Sonarr or Radarr to grab the selected release.
+1. Search the Sonarr and Radarr catalogs for a series or movie, including titles not yet added.
+2. Resolve the desired subtitle languages from Bazarr or an explicit Pegarr default configured in the UI.
+3. Search supported subtitle providers and show honest title, season, or episode coverage before add.
+4. Let an authorized user add the selected catalog title to Sonarr or Radarr with automatic search disabled.
+5. Use the returned internal Arr identity to run the supported interactive release search.
+6. Compare subtitle release metadata with every video release candidate.
+7. Display a confidence level and explanation for each match while preserving Arr decisions.
+8. Let an authorized user tell Sonarr or Radarr to grab the explicitly selected release.
 
 This is decision support, not a guarantee. Before the video file exists, subtitle matching normally relies on media identifiers and release-name metadata rather than a file hash.
 
@@ -43,7 +46,11 @@ The intended product closes that gap without replacing any existing *Arr applica
 
 ## Product objective
 
-For every release returned by Sonarr or Radarr Interactive Search, answer:
+Before a title is added, answer:
+
+> Does this title, season, or episode appear to have subtitles satisfying my configured policy, and is the provider evidence healthy enough to trust that assessment?
+
+After the user explicitly adds it, answer for every release returned by Sonarr or Radarr Interactive Search:
 
 > How likely is this exact release to have subtitles that satisfy the language and preference policy configured for this item?
 
@@ -66,9 +73,11 @@ Languages must not be hardcoded to Portuguese (Brazil). The application should o
 
 PT-BR is the motivating use case, but the design must support any Bazarr language profile, fallback language, forced-subtitle preference, hearing-impaired preference, and future profile option that can be represented safely.
 
-### Sonarr and Radarr remain authoritative for video releases
+### Sonarr and Radarr remain authoritative for catalog and video releases
 
-The application must not duplicate indexer, quality-profile, rejection, or download-client logic. It should consume the release candidates and decisions returned by Sonarr/Radarr, enrich them, and send the selected candidate back through the supported Grab operation.
+The application must use Sonarr/Radarr catalog lookup and add APIs rather than inventing a parallel media catalog. It must not duplicate indexer, quality-profile, rejection, or download-client logic. It should consume the release candidates and decisions returned by Sonarr/Radarr, enrich them, and send the selected candidate back through the supported Grab operation.
+
+The supported Arr interactive-release endpoints require internal Arr IDs. Pegarr therefore previews provider coverage before add, adds with automatic search disabled after explicit confirmation, and then continues to exact release selection. It must not claim that catalog lookup provides exact pre-add release rows.
 
 An *Arr-rejected release must remain visibly rejected. Subtitle availability must never silently override an *Arr rejection.
 
@@ -431,7 +440,11 @@ The matching engine must be deterministic and provider-independent. Provider ada
 Responsibilities:
 
 - Authentication and authorization
+- Username/password login and bounded server-side sessions
+- Catalog discovery for titles not yet added
+- Subtitle policy and provider configuration UI
 - Dashboard and item selection
+- Explicit add-to-Sonarr/Radarr workflow with automatic search disabled
 - Release table and evidence display
 - Search progress and partial results
 - Grab confirmation
@@ -462,7 +475,9 @@ Do not persist downloaded subtitle content in the first version.
 
 ## Security and operational requirements
 
-- Default to read-only behavior; Grab is the only initial mutation.
+- Default to read-only behavior; add-to-Arr and Grab are separate explicit opt-in mutations.
+- Adding a title must disable Sonarr/Radarr automatic search so Pegarr does not silently choose a release.
+- Store login and provider secrets server-side; never return configured secret values to the browser.
 - Restrict Grab to authorized administrators.
 - Require confirmation containing the exact release title and target item.
 - Use server-side API calls exclusively.
@@ -512,6 +527,10 @@ The implementation spike must quantify:
 | Item absent from Bazarr | Use an explicit configured default or require user selection |
 
 ## Implementation phases
+
+### Priority correction: discovery-first P0
+
+Before further release-candidate validation, implement the [discovery-first roadmap](docs/discovery-first-roadmap.md): username/password login, authenticated catalog lookup, subtitle policy/provider settings in the UI, explicit add-to-Arr with automatic search disabled, and continuation into exact release selection. The completed missing-library phases remain valid foundations but no longer define the landing workflow.
 
 ### Phase 0: API feasibility spike
 
@@ -617,7 +636,7 @@ Cover:
 
 - Replacing Sonarr/Radarr indexers or quality profiles
 - Replacing Bazarr subtitle downloads or synchronization
-- Automatically grabbing the highest-scored release
+- Automatically adding a title or grabbing the highest-scored release without explicit user selection
 - Downloading or translating subtitles
 - Managing qBittorrent directly
 - Becoming a Jellyfin enhancement suite

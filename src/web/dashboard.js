@@ -4,12 +4,21 @@ const elements = {
   accessPanel: document.querySelector("#access-panel"),
   accessForm: document.querySelector("#access-form"),
   accessToken: document.querySelector("#access-token"),
+  loginUsername: document.querySelector("#login-username"),
+  loginPassword: document.querySelector("#login-password"),
   activeFilterCount: document.querySelector("#active-filter-count"),
   analysisFilter: document.querySelector("#analysis-filter"),
   analysisAgeFilter: document.querySelector("#analysis-age-filter"),
   applicationFilter: document.querySelector("#application-filter"),
   bestConfidenceFilter: document.querySelector("#best-confidence-filter"),
   connectButton: document.querySelector("#connect-button"),
+  catalog: document.querySelector("#catalog"),
+  catalogApplication: document.querySelector("#catalog-application"),
+  catalogForm: document.querySelector("#catalog-form"),
+  catalogQuery: document.querySelector("#catalog-query"),
+  catalogResults: document.querySelector("#catalog-results"),
+  catalogStatus: document.querySelector("#catalog-status"),
+  catalogSubmit: document.querySelector("#catalog-submit"),
   clearInventoryFilters: document.querySelector("#clear-inventory-filters"),
   dashboard: document.querySelector("#dashboard"),
   emptyState: document.querySelector("#empty-state"),
@@ -86,7 +95,7 @@ const elements = {
   visibleLabel: document.querySelector("#visible-label"),
 };
 
-let accessToken;
+let libraryAuthorization;
 let inventoryRows = [];
 let selectedRow;
 let activeFeasibility;
@@ -101,15 +110,23 @@ const shortlistedReleaseIds = new Set();
 
 elements.accessForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const candidate = elements.accessToken?.value ?? "";
-  if (candidate.length < 32) {
-    setStatus("Enter the access token configured for this Pegarr server.", "error");
+  const username = elements.loginUsername?.value.trim() ?? "";
+  const password = elements.loginPassword?.value ?? "";
+  const legacyToken = elements.accessToken?.value ?? "";
+  if (username && password.length >= 32) {
+    libraryAuthorization = `Basic ${btoa(`${username}:${password}`)}`;
+  } else if (legacyToken.length >= 32) {
+    libraryAuthorization = `Bearer ${legacyToken}`;
+  } else {
+    setStatus("Enter your Pegarr username and password, or a legacy access token.", "error");
     return;
   }
-  accessToken = candidate;
+  elements.loginPassword.value = "";
   elements.accessToken.value = "";
   await loadInventory();
 });
+
+elements.catalogForm?.addEventListener("submit", searchCatalog);
 
 elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
@@ -152,8 +169,8 @@ for (const control of [elements.releaseSearchInput, elements.releaseDecisionFilt
 }
 
 async function loadInventory() {
-  if (accessToken === undefined) {
-    showAccess("Enter your access token to reconnect.");
+  if (libraryAuthorization === undefined) {
+    showAccess("Sign in to reconnect.");
     return;
   }
   setBusy(true);
@@ -161,20 +178,20 @@ async function loadInventory() {
   try {
     const response = await fetch("/api/v1/library/missing", {
       method: "GET",
-      headers: { authorization: `Bearer ${accessToken}` },
+      headers: { authorization: libraryAuthorization },
       cache: "no-store",
       credentials: "omit",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
     if (response.status === 401) {
-      accessToken = undefined;
+      libraryAuthorization = undefined;
       clearPageEvidence();
-      showAccess("That token was not accepted. Check the configured secret and try again.");
+      showAccess("Those credentials were not accepted. Check the configured login and try again.");
       return;
     }
     if (response.status === 404) {
-      accessToken = undefined;
+      libraryAuthorization = undefined;
       clearPageEvidence();
       showAccess("Private library access is not enabled on this Pegarr server.");
       return;
@@ -187,6 +204,7 @@ async function loadInventory() {
     if (selectedRow !== undefined && !inventoryRows.some(({ key }) => key === selectedRow.key)) closeFeasibility();
     renderSources(inventory);
     elements.accessPanel.hidden = true;
+    elements.catalog.hidden = false;
     elements.dashboard.hidden = false;
     renderInventory();
     setStatus(
@@ -208,7 +226,74 @@ function showAccess(message) {
   elements.dashboard.hidden = true;
   elements.accessPanel.hidden = false;
   setStatus(message, "error");
-  elements.accessToken?.focus();
+  elements.loginUsername?.focus();
+}
+
+async function searchCatalog(event) {
+  event.preventDefault();
+  if (libraryAuthorization === undefined) return showAccess("Sign in to search the catalog.");
+  const query = elements.catalogQuery.value.trim();
+  if (query.length < 2 || query.length > 200) {
+    setCatalogStatus("Enter at least two characters.", "error");
+    return;
+  }
+  elements.catalogSubmit.disabled = true;
+  setCatalogStatus("Searching Sonarr and Radarr…", "loading");
+  try {
+    const application = elements.catalogApplication.value;
+    const endpoint = `/api/v1/catalog/search?q=${encodeURIComponent(query)}${application === "all" ? "" : `&application=${encodeURIComponent(application)}`}`;
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { authorization: libraryAuthorization },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (response.status === 401) {
+      libraryAuthorization = undefined;
+      clearPageEvidence();
+      showAccess("Those credentials were not accepted. Sign in again.");
+      return;
+    }
+    if (!response.ok) throw new Error("catalog_unavailable");
+    const result = await response.json();
+    const items = Array.isArray(result?.items) ? result.items : [];
+    elements.catalogResults.replaceChildren(...items.map(renderCatalogItem));
+    setCatalogStatus(
+      items.length === 0
+        ? "No catalog matches were returned."
+        : `${items.length} catalog ${items.length === 1 ? "match" : "matches"}. Exact release search continues after an explicit add.`,
+      result?.status === "partial" ? "warning" : "success",
+    );
+  } catch {
+    elements.catalogResults.replaceChildren();
+    setCatalogStatus("Catalog search is unavailable. No title was added.", "error");
+  } finally {
+    elements.catalogSubmit.disabled = false;
+  }
+}
+
+function renderCatalogItem(item) {
+  const row = document.createElement("li");
+  row.className = "catalog-result";
+  const copy = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = typeof item?.title === "string" ? item.title : "Untitled result";
+  const detail = document.createElement("span");
+  const application = item?.application === "sonarr" ? "Sonarr series" : "Radarr movie";
+  detail.textContent = `${application}${Number.isInteger(item?.year) ? ` · ${item.year}` : ""} · ${item?.instanceId ?? "default"}`;
+  copy.append(title, detail);
+  const state = document.createElement("span");
+  state.className = `source-chip ${item?.alreadyAdded ? "source-chip--ready" : ""}`;
+  state.textContent = item?.alreadyAdded ? "Already added" : "Available to add";
+  row.append(copy, state);
+  return row;
+}
+
+function setCatalogStatus(message, state) {
+  elements.catalogStatus.textContent = message;
+  elements.catalogStatus.dataset.state = state;
 }
 
 function renderInventory() {
@@ -433,16 +518,16 @@ async function loadFeasibility(row, refresh = false) {
     const endpoint = `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/feasibility${refresh ? "?refresh=1" : ""}`;
     const response = await fetch(endpoint, {
       method: "GET",
-      headers: { authorization: `Bearer ${accessToken}` },
+      headers: { authorization: libraryAuthorization },
       cache: "no-store",
       credentials: "omit",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
     if (response.status === 401) {
-      accessToken = undefined;
+      libraryAuthorization = undefined;
       clearPageEvidence();
-      showAccess("That token was not accepted. Check the configured secret and try again.");
+      showAccess("Those credentials were not accepted. Check the configured login and try again.");
       return;
     }
     const result = feasibilityView(await response.json());
@@ -1428,6 +1513,8 @@ function setBusy(value) {
   elements.connectButton.disabled = value;
   elements.refreshButton.disabled = value;
   elements.accessToken.disabled = value;
+  elements.loginUsername.disabled = value;
+  elements.loginPassword.disabled = value;
   elements.dashboard?.setAttribute("aria-busy", String(value));
   elements.feasibilityPanel?.setAttribute("aria-busy", String(value));
   for (const button of document.querySelectorAll(".inventory-select")) button.disabled = value;

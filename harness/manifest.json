@@ -1335,6 +1335,12 @@
       "boundary": "Temporary paths and pure configuration parsing; no provider network"
     },
     {
+      "id": "PEG-CONFIG-013",
+      "title": "Arr and Bazarr credentials load from bounded application config files",
+      "evidence": "src/config.test.ts",
+      "boundary": "Sanitized temporary application configs; no process environment mutation or network"
+    },
+    {
       "id": "PEG-PROVIDER-001",
       "title": "Sufficient preferred evidence prevents fallback provider requests",
       "evidence": "src/provider-policy-search.test.ts",
@@ -1375,6 +1381,48 @@
       "title": "Runtime planner calls OpenSubtitles only after insufficient preferred evidence",
       "evidence": "src/runtime.test.ts",
       "boundary": "Injected multi-provider transports and sanitized synthetic responses; no network"
+    },
+    {
+      "id": "PEG-ACCESS-005",
+      "title": "Username and password login is bounded and constant-time comparable",
+      "evidence": "src/access-control.test.ts",
+      "boundary": "Pure authentication checks over synthetic credentials; no HTTP, persistence, or network"
+    },
+    {
+      "id": "PEG-CONFIG-014",
+      "title": "Pegarr login loads its password only from a bounded secret file",
+      "evidence": "src/config.test.ts",
+      "boundary": "Temporary synthetic password files; no process environment mutation or network"
+    },
+    {
+      "id": "PEG-SONARR-011",
+      "title": "Sonarr catalog lookup finds unadded series without private metadata",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Injected transport and sanitized synthetic catalog response; no network"
+    },
+    {
+      "id": "PEG-RADARR-010",
+      "title": "Radarr catalog lookup finds unadded movies without private metadata",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Injected transport and sanitized synthetic catalog response; no network"
+    },
+    {
+      "id": "PEG-CATALOG-001",
+      "title": "Catalog search fans out across Arr services and preserves partial availability",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected Sonarr success and Radarr outage responses; no network or mutation"
+    },
+    {
+      "id": "PEG-CATALOG-002",
+      "title": "Catalog search authenticates before bounded read-only work",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with synthetic login and upstream-call spy; no network or mutation"
+    },
+    {
+      "id": "PEG-DASH-041",
+      "title": "Discovery and username-password login remain page-memory-only assets",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
     }
   ],
   "manualGaps": [

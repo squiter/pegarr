@@ -8,7 +8,8 @@ Pegarr starts with every external integration disabled. Sonarr, Radarr, Bazarr, 
 | --- | --- | --- |
 | `PEGARR_SONARR_URL` | Yes | Sonarr base URL, including an existing URL base when used |
 | `PEGARR_SONARR_ALLOWED_HOSTS` | Yes | Comma-separated hostnames Pegarr may contact, without schemes, paths, credentials, or ports |
-| `PEGARR_SONARR_API_KEY_FILE` | Yes | Absolute in-container path to a file containing only the Sonarr API key |
+| `PEGARR_SONARR_API_KEY_FILE` | One credential source required | Absolute in-container path to a file containing only the Sonarr API key |
+| `PEGARR_SONARR_APP_CONFIG_FILE` | One credential source required | Alternative read-only path to Sonarr's existing `config.xml`; do not combine with `PEGARR_SONARR_API_KEY_FILE` |
 | `PEGARR_SONARR_INSTANCE_ID` | No | Safe non-secret label; defaults to `sonarr` |
 | `PEGARR_SONARR_ALLOW_INSECURE_HTTP` | No | Must be explicitly `true` to permit HTTP; defaults to `false` |
 
@@ -18,7 +19,8 @@ Pegarr starts with every external integration disabled. Sonarr, Radarr, Bazarr, 
 | --- | --- | --- |
 | `PEGARR_RADARR_URL` | Yes | Radarr base URL, including an existing URL base when used |
 | `PEGARR_RADARR_ALLOWED_HOSTS` | Yes | Comma-separated hostnames Pegarr may contact, without schemes, paths, credentials, or ports |
-| `PEGARR_RADARR_API_KEY_FILE` | Yes | Absolute in-container path to a file containing only the Radarr API key |
+| `PEGARR_RADARR_API_KEY_FILE` | One credential source required | Absolute in-container path to a file containing only the Radarr API key |
+| `PEGARR_RADARR_APP_CONFIG_FILE` | One credential source required | Alternative read-only path to Radarr's existing `config.xml`; do not combine with `PEGARR_RADARR_API_KEY_FILE` |
 | `PEGARR_RADARR_INSTANCE_ID` | No | Safe non-secret label; defaults to `radarr` |
 | `PEGARR_RADARR_ALLOW_INSECURE_HTTP` | No | Must be explicitly `true` to permit HTTP; defaults to `false` |
 
@@ -48,7 +50,8 @@ The `compose.sonarr-instances.yaml` and `compose.radarr-instances.yaml` overlays
 | --- | --- | --- |
 | `PEGARR_BAZARR_URL` | Yes | Bazarr base URL, including an existing URL base when used |
 | `PEGARR_BAZARR_ALLOWED_HOSTS` | Yes | Comma-separated hostnames Pegarr may contact, without schemes, paths, credentials, or ports |
-| `PEGARR_BAZARR_API_KEY_FILE` | Yes | Absolute in-container path to a file containing only the Bazarr API key |
+| `PEGARR_BAZARR_API_KEY_FILE` | One credential source required | Absolute in-container path to a file containing only the Bazarr API key |
+| `PEGARR_BAZARR_APP_CONFIG_FILE` | One credential source required | Alternative read-only path to Bazarr's existing `config/config.yaml`; do not combine with `PEGARR_BAZARR_API_KEY_FILE` |
 | `PEGARR_BAZARR_INSTANCE_ID` | No | Safe non-secret label; defaults to `bazarr` |
 | `PEGARR_BAZARR_ALLOW_INSECURE_HTTP` | No | Must be explicitly `true` to permit HTTP; defaults to `false` |
 
@@ -84,6 +87,8 @@ Following the [official OpenSubtitles REST search contract](https://opensubtitle
 
 Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, `PEGARR_BAZARR_API_KEY`, `PEGARR_SUBDL_API_KEY`, or `PEGARR_OPENSUBTITLES_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
 
+For a same-stack Portainer deployment, the Sonarr, Radarr, and Bazarr application-config alternatives avoid copying their API keys into Portainer. Mount only the named configuration file read-only and pass its in-container path through the corresponding `PEGARR_*_APP_CONFIG_FILE` variable. Pegarr reads at most 1 MiB, extracts only Sonarr/Radarr's single `<ApiKey>` value or Bazarr's single `auth.apikey` value, and never reads provider credentials from Bazarr. Separate subtitle-provider credentials and the Pegarr access token still require dedicated secret files.
+
 The base URL may use a Sonarr URL base, such as `https://media.example.invalid/sonarr`. The allowlist entry for that URL is only `media.example.invalid`.
 
 ## Provider cache settings
@@ -104,16 +109,18 @@ The database contains private normalized matching evidence such as media identif
 
 The server writes one JSON record for startup, shutdown, and each completed HTTP request. Request records contain only `event`, `service`, a bounded method, a safe route category, status code, and bounded duration. They never contain the raw URL, query string, item ID, title, authorization header, API key, access token, configured hostname, or upstream error detail. Logging failures cannot change the HTTP response.
 
-Safe route categories include health, readiness, dashboard, dashboard asset, integration status, missing inventory, item feasibility, synthetic demo, and not found. This keeps container logs useful for operations without turning them into library history.
+Safe route categories include health, readiness, dashboard, dashboard asset, integration status, catalog search, missing inventory, item feasibility, synthetic demo, and not found. This keeps container logs useful for operations without turning them into library or discovery history.
 
-## Read-only API access
+## Browser login and API access
 
 | Variable | Required when enabled | Meaning |
 | --- | --- | --- |
 | `PEGARR_ACCESS_TOKEN_FILE` | Yes | Absolute in-container path to one random bearer token of 32 through 4096 characters |
+| `PEGARR_USERNAME` | With password login | Safe Pegarr login name of 1 through 64 characters |
+| `PEGARR_PASSWORD_FILE` | With password login | Absolute in-container path to one password of 32 through 4096 characters |
 | `PEGARR_MISSING_PAGE_SIZE` | No | Missing items requested from each Arr instance; defaults to 50, maximum 100 |
 
-The live library route is absent unless the access token is configured. Pegarr rejects a direct `PEGARR_ACCESS_TOKEN` value. Use [the access-control overlay and guide](access-control.md) to mount the token without placing it in `.env`, browser storage, URLs, or logs.
+The live library and catalog routes are absent unless either username/password login or the legacy access token is configured. Pegarr rejects direct `PEGARR_PASSWORD` and `PEGARR_ACCESS_TOKEN` values. The current login foundation uses HTTP Basic credentials held only in page memory; use HTTPS or a trusted private network. A short-lived `HttpOnly` session is still required by the discovery-first roadmap before the login migration is complete.
 
 ## Controlled Grab
 

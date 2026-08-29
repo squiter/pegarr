@@ -1,0 +1,95 @@
+services:
+  pegarr:
+    image: ${PEGARR_IMAGE:-ghcr.io/squiter/pegarr@sha256:0f89f4eae779659e13157941ae209e4ba088e379593519d155ca843b0f2d4165}
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      PORT: 8080
+      TZ: ${TZ:-UTC}
+      PEGARR_ACCESS_TOKEN_FILE: /data/access_token
+      PEGARR_USERNAME: ${PEGARR_USERNAME:-pegarr}
+      PEGARR_PASSWORD_FILE: /data/password
+      PEGARR_MISSING_PAGE_SIZE: 50
+      PEGARR_PROVIDER_CACHE_FILE: /data/provider-search-cache.sqlite
+      PEGARR_PROVIDER_CACHE_POSITIVE_TTL_SECONDS: 86400
+      PEGARR_PROVIDER_CACHE_EMPTY_TTL_SECONDS: 900
+      PEGARR_PROVIDER_CACHE_MAX_ENTRIES: 5000
+      PEGARR_SONARR_URL: http://sonarr:8989
+      PEGARR_SONARR_ALLOWED_HOSTS: sonarr
+      PEGARR_SONARR_ALLOW_INSECURE_HTTP: "true"
+      PEGARR_SONARR_API_KEY_FILE: /tmp/pegarr-secrets/sonarr_api_key
+      PEGARR_RADARR_URL: http://radarr:7878
+      PEGARR_RADARR_ALLOWED_HOSTS: radarr
+      PEGARR_RADARR_ALLOW_INSECURE_HTTP: "true"
+      PEGARR_RADARR_API_KEY_FILE: /tmp/pegarr-secrets/radarr_api_key
+      PEGARR_BAZARR_URL: http://bazarr:6767
+      PEGARR_BAZARR_ALLOWED_HOSTS: bazarr
+      PEGARR_BAZARR_ALLOW_INSECURE_HTTP: "true"
+      PEGARR_BAZARR_API_KEY_FILE: /tmp/pegarr-secrets/bazarr_api_key
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        node --input-type=module <<'NODE'
+        import { randomBytes } from "node:crypto";
+        import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+
+        const read = (path) => readFileSync(path, "utf8");
+        const one = (values, name) => {
+          if (values.length !== 1) throw new Error(name + " configuration has no unique API key");
+          return values[0];
+        };
+        const arrKey = (path, name) => one(
+          [...read(path).matchAll(/<ApiKey>\s*([a-z0-9_-]{16,256})\s*<\/ApiKey>/giu)]
+            .map((match) => match[1]),
+          name,
+        );
+        const bazarrKey = (path) => {
+          let inAuth = false;
+          const values = [];
+          for (const line of read(path).replace(/\r\n?/gu, "\n").split("\n")) {
+            if (/^auth\s*:\s*(?:#.*)?$/iu.test(line)) {
+              inAuth = true;
+              continue;
+            }
+            if (/^[a-z0-9_-]+\s*:/iu.test(line)) inAuth = false;
+            if (!inAuth) continue;
+            const match = /^ +apikey\s*:\s*(.*?)\s*(?:#.*)?$/iu.exec(line);
+            if (match?.[1] === undefined) continue;
+            const value = match[1].trim().replace(/^['"]|['"]$/gu, "");
+            if (/^[a-z0-9_-]{16,256}$/iu.test(value)) values.push(value);
+          }
+          return one(values, "Bazarr");
+        };
+
+        mkdirSync("/tmp/pegarr-secrets", { mode: 0o700 });
+        writeFileSync("/tmp/pegarr-secrets/sonarr_api_key", arrKey("/run/upstream/sonarr-config.xml", "Sonarr"), { mode: 0o600 });
+        writeFileSync("/tmp/pegarr-secrets/radarr_api_key", arrKey("/run/upstream/radarr-config.xml", "Radarr"), { mode: 0o600 });
+        writeFileSync("/tmp/pegarr-secrets/bazarr_api_key", bazarrKey("/run/upstream/bazarr-config.yaml"), { mode: 0o600 });
+        if (!existsSync("/data/access_token")) {
+          writeFileSync("/data/access_token", randomBytes(32).toString("base64url"), { mode: 0o600 });
+        }
+        if (!existsSync("/data/password")) {
+          writeFileSync("/data/password", randomBytes(32).toString("base64url"), { mode: 0o600 });
+        }
+        NODE
+        exec node dist/index.js
+    ports:
+      - "${PEGARR_PORT:-8088}:8080"
+    volumes:
+      - pegarr-data:/data
+      - ${SONARR_CONFIG_PATH}/config.xml:/run/upstream/sonarr-config.xml:ro
+      - ${RADARR_CONFIG_PATH}/config.xml:/run/upstream/radarr-config.xml:ro
+      - ${BAZARR_CONFIG_PATH}/config/config.yaml:/run/upstream/bazarr-config.yaml:ro
+    networks:
+      - jellyfin_net
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  pegarr-data:

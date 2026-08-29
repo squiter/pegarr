@@ -14,6 +14,7 @@ import {
   mapRadarrReleaseResponse,
   mapRadarrMissingResponse,
   mapRadarrSystemStatus,
+  mapRadarrCatalogResponse,
   RadarrAdapterError,
   RadarrGrabError,
   RadarrClient,
@@ -70,6 +71,42 @@ test("PEG-RADARR-001 movie search is bounded, read-only, and authenticates by he
       ),
     /safe label/u,
   );
+});
+
+test("PEG-RADARR-010 catalog lookup finds unadded movies and discards private metadata", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: [{
+    title: "Synthetic New Movie",
+    year: 2025,
+    tmdbId: 54321,
+    imdbId: "tt7654321",
+    id: 0,
+    overview: "private overview",
+    folderName: "private-folder",
+    images: [{ remoteUrl: "https://private.example.invalid/poster.jpg" }],
+  }] };
+
+  const items = await client(transport).lookupMovies("  Synthetic New Movie  ");
+  assert.deepEqual(transport.requests[0], {
+    method: "GET",
+    path: "/api/v3/movie/lookup",
+    query: { term: "Synthetic New Movie" },
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  });
+  assert.deepEqual(items, [{
+    application: "radarr",
+    instanceId: "synthetic-radarr",
+    kind: "movie",
+    title: "Synthetic New Movie",
+    year: 2025,
+    ids: { tmdb: "54321", imdb: "tt7654321" },
+    alreadyAdded: false,
+  }]);
+  assert.doesNotMatch(JSON.stringify(items), /private|overview|folder|image|remoteUrl/iu);
+  await assert.rejects(client(transport).lookupMovies("x"), /2 through 200/u);
+  assert.equal(mapRadarrCatalogResponse([{ title: "Existing", tmdbId: 42, id: 9 }])[0]?.alreadyAdded, true);
 });
 
 test("PEG-RADARR-002 movie releases preserve Arr decisions, editions, and safe evidence", () => {

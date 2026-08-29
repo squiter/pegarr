@@ -246,7 +246,9 @@ for (const forbidden of ["localStorage", "sessionStorage", "document.cookie", "i
   }
 }
 for (const contract of [
-  'authorization: `Bearer ${accessToken}`',
+  "authorization: libraryAuthorization",
+  'libraryAuthorization = `Basic ${btoa(`${username}:${password}`)}`',
+  'libraryAuthorization = `Bearer ${legacyToken}`',
   'credentials: "omit"',
   "replaceChildren",
   "textContent",
@@ -259,6 +261,18 @@ for (const contract of [
 const accessCompose = readFileSync(resolve(repoRoot, "deploy/compose.access.yaml"), "utf8");
 if (!accessCompose.includes("PEGARR_ACCESS_TOKEN_FILE: /run/secrets/pegarr_access_token")) {
   issues.push("The access Compose overlay must mount the bearer token through a secret file");
+}
+
+const loginCompose = readFileSync(resolve(repoRoot, "deploy/compose.login.yaml"), "utf8");
+for (const contract of [
+  "PEGARR_USERNAME:",
+  "PEGARR_PASSWORD_FILE: /run/secrets/pegarr_password",
+  "pegarr_password:",
+]) {
+  if (!loginCompose.includes(contract)) issues.push(`The login Compose overlay must retain ${contract}`);
+}
+if (/PEGARR_PASSWORD\s*:/u.test(loginCompose)) {
+  issues.push("The login Compose overlay may not pass the password as an environment value");
 }
 if (/PEGARR_ACCESS_TOKEN\s*:/u.test(accessCompose)) {
   issues.push("The access Compose overlay may not pass the bearer token as an environment value");

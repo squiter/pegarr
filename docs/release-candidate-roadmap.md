@@ -1,6 +1,9 @@
 # Release-candidate roadmap
 
-Pegarr's API-feasibility milestone and implementation Phases 1 through 3 are complete. The next cycle is release-candidate validation: proving the packaged behavior against operator-owned services without weakening the default read-only boundary or claiming that synthetic coverage proves a production environment.
+> [!IMPORTANT]
+> Product discovery work revealed that the original sequence over-emphasized already-added missing items. The [discovery-first roadmap](discovery-first-roadmap.md) is now the P0 roadmap. Complete its authentication, catalog, subtitle-policy settings, and add-and-continue workflow before resuming the acceptance sequence below.
+
+Pegarr's API-feasibility milestone and implementation Phases 1 through 3 are complete. This document retains the release-candidate validation sequence, but that work follows the discovery-first P0 cycle: proving the product can find a not-yet-added title, preview subtitle coverage, add it explicitly with automatic search disabled, and continue to exact release selection inside Pegarr.
 
 At the start of this cycle, the repository has 228 deterministic automated scenarios and six explicit manual gaps. The implementation baseline is signed commit [`f1c1576`](https://github.com/squiter/pegarr/commit/f1c1576d57a12426cdaf0cd2a163946836580ff1). Treat the scenario manifest and phase ledgers as authoritative if those numbers later change.
 

@@ -51,6 +51,11 @@ export interface ControlledGrabRuntimeConfiguration {
   readonly auditFile: string;
 }
 
+export interface LoginRuntimeConfiguration {
+  readonly username: string;
+  readonly password: SecretValue;
+}
+
 export interface RuntimeConfiguration {
   readonly sonarr?: SonarrRuntimeConfiguration;
   readonly radarr?: RadarrRuntimeConfiguration;
@@ -60,6 +65,7 @@ export interface RuntimeConfiguration {
   readonly subdl?: SubdlRuntimeConfiguration;
   readonly opensubtitles?: OpenSubtitlesRuntimeConfiguration;
   readonly accessToken?: SecretValue;
+  readonly login?: LoginRuntimeConfiguration;
   readonly controlledGrab?: ControlledGrabRuntimeConfiguration;
   readonly missingPageSize?: number;
   readonly subdlLanguageMappings?: readonly ProviderLanguageMapping[];
@@ -67,6 +73,7 @@ export interface RuntimeConfiguration {
 }
 
 const maximumSecretBytes = 4_096;
+const maximumApplicationConfigBytes = 1_048_576;
 const maximumInstancesFileBytes = 65_536;
 const maximumArrInstances = 16;
 
@@ -75,6 +82,7 @@ interface IntegrationConfigurationSpec {
   readonly prefix: "PEGARR_SONARR" | "PEGARR_RADARR" | "PEGARR_BAZARR" | "PEGARR_SUBDL" | "PEGARR_OPENSUBTITLES";
   readonly defaultInstanceId: "sonarr" | "radarr" | "bazarr" | "subdl" | "opensubtitles";
   readonly secretFormat: "arr" | "bearer";
+  readonly applicationConfigFormat?: "arr_xml" | "bazarr_yaml";
 }
 
 export async function loadRuntimeConfiguration(
@@ -85,12 +93,14 @@ export async function loadRuntimeConfiguration(
     prefix: "PEGARR_SONARR",
     defaultInstanceId: "sonarr",
     secretFormat: "arr",
+    applicationConfigFormat: "arr_xml",
   } as const;
   const radarrSpec = {
     displayName: "Radarr",
     prefix: "PEGARR_RADARR",
     defaultInstanceId: "radarr",
     secretFormat: "arr",
+    applicationConfigFormat: "arr_xml",
   } as const;
   const sonarrInstances = await loadArrInstancesConfiguration(environment, sonarrSpec);
   const radarrInstances = await loadArrInstancesConfiguration(environment, radarrSpec);
@@ -101,6 +111,7 @@ export async function loadRuntimeConfiguration(
     prefix: "PEGARR_BAZARR",
     defaultInstanceId: "bazarr",
     secretFormat: "arr",
+    applicationConfigFormat: "bazarr_yaml",
   });
   const subdl = await loadIntegrationConfiguration(environment, {
     displayName: "SubDL",
@@ -115,10 +126,11 @@ export async function loadRuntimeConfiguration(
     secretFormat: "bearer",
   });
   const accessToken = await loadAccessToken(environment);
+  const login = await loadLoginConfiguration(environment);
   const controlledGrab = await loadControlledGrabConfiguration(environment);
-  if (controlledGrab !== undefined && accessToken === undefined) {
+  if (controlledGrab !== undefined && accessToken === undefined && login === undefined) {
     throw new ConfigurationError(
-      "Controlled Grab requires PEGARR_ACCESS_TOKEN_FILE for the read-only library boundary",
+      "Controlled Grab requires PEGARR_ACCESS_TOKEN_FILE or Pegarr username/password login for the library boundary",
     );
   }
   if (controlledGrab !== undefined && accessToken?.reveal() === controlledGrab.adminToken.reveal()) {
@@ -149,6 +161,7 @@ export async function loadRuntimeConfiguration(
     ...(subdl === undefined ? {} : { subdl }),
     ...(opensubtitles === undefined ? {} : { opensubtitles }),
     ...(accessToken === undefined ? {} : { accessToken }),
+    ...(login === undefined ? {} : { login }),
     ...(controlledGrab === undefined ? {} : { controlledGrab }),
     ...(missingPageSize === undefined ? {} : { missingPageSize }),
     ...(subdlLanguageMappings === undefined ? {} : { subdlLanguageMappings }),
@@ -173,6 +186,7 @@ async function loadArrInstancesConfiguration(
   if (path === undefined) return undefined;
   const legacyNames = [
     `${spec.prefix}_URL`, `${spec.prefix}_ALLOWED_HOSTS`, `${spec.prefix}_API_KEY_FILE`,
+    `${spec.prefix}_APP_CONFIG_FILE`,
     `${spec.prefix}_INSTANCE_ID`, `${spec.prefix}_ALLOW_INSECURE_HTTP`, `${spec.prefix}_API_KEY`,
   ];
   if (legacyNames.some((name) => present(environment[name]))) {
@@ -317,6 +331,29 @@ async function loadAccessToken(
   return readSecret(path, "Pegarr", "PEGARR_ACCESS_TOKEN_FILE", "access");
 }
 
+async function loadLoginConfiguration(
+  environment: Readonly<Record<string, string | undefined>>,
+): Promise<LoginRuntimeConfiguration | undefined> {
+  if (present(environment.PEGARR_PASSWORD)) {
+    throw new ConfigurationError(
+      "Direct Pegarr passwords are not supported; use PEGARR_PASSWORD_FILE",
+    );
+  }
+  const username = optional(environment.PEGARR_USERNAME);
+  const passwordFile = optional(environment.PEGARR_PASSWORD_FILE);
+  if (username === undefined && passwordFile === undefined) return undefined;
+  if (username === undefined || passwordFile === undefined) {
+    throw new ConfigurationError(
+      "Pegarr login requires PEGARR_USERNAME and PEGARR_PASSWORD_FILE",
+    );
+  }
+  if (!/^[a-z0-9][a-z0-9._-]{0,63}$/iu.test(username)) {
+    throw new ConfigurationError("PEGARR_USERNAME must be a safe login name");
+  }
+  const password = await readSecret(passwordFile, "Pegarr", "PEGARR_PASSWORD_FILE", "password");
+  return { username, password };
+}
+
 async function loadIntegrationConfiguration(
   environment: Readonly<Record<string, string | undefined>>,
   spec: IntegrationConfigurationSpec,
@@ -325,6 +362,7 @@ async function loadIntegrationConfiguration(
   const urlName = `${spec.prefix}_URL`;
   const allowedHostsName = `${spec.prefix}_ALLOWED_HOSTS`;
   const apiKeyFileName = `${spec.prefix}_API_KEY_FILE`;
+  const applicationConfigFileName = `${spec.prefix}_APP_CONFIG_FILE`;
   const instanceIdName = `${spec.prefix}_INSTANCE_ID`;
   const allowInsecureHttpName = `${spec.prefix}_ALLOW_INSECURE_HTTP`;
 
@@ -337,7 +375,19 @@ async function loadIntegrationConfiguration(
   const baseUrl = optional(environment[urlName]);
   const allowedHostsValue = optional(environment[allowedHostsName]);
   const apiKeyFile = optional(environment[apiKeyFileName]);
-  const configuredValues = [baseUrl, allowedHostsValue, apiKeyFile].filter(
+  const applicationConfigFile = optional(environment[applicationConfigFileName]);
+  if (apiKeyFile !== undefined && applicationConfigFile !== undefined) {
+    throw new ConfigurationError(
+      `${spec.displayName} configuration must use exactly one of ${apiKeyFileName} or ${applicationConfigFileName}`,
+    );
+  }
+  if (applicationConfigFile !== undefined && spec.applicationConfigFormat === undefined) {
+    throw new ConfigurationError(
+      `${applicationConfigFileName} is not supported for ${spec.displayName}`,
+    );
+  }
+  const credentialFile = apiKeyFile ?? applicationConfigFile;
+  const configuredValues = [baseUrl, allowedHostsValue, credentialFile].filter(
     (value) => value !== undefined,
   );
 
@@ -345,8 +395,11 @@ async function loadIntegrationConfiguration(
     return undefined;
   }
   if (configuredValues.length !== 3) {
+    const credentialRequirement = spec.applicationConfigFormat === undefined
+      ? apiKeyFileName
+      : `exactly one of ${apiKeyFileName} or ${applicationConfigFileName}`;
     throw new ConfigurationError(
-      `${spec.displayName} configuration requires ${urlName}, ${allowedHostsName}, and ${apiKeyFileName}`,
+      `${spec.displayName} configuration requires ${urlName}, ${allowedHostsName}, and ${credentialRequirement}`,
     );
   }
 
@@ -359,12 +412,19 @@ async function loadIntegrationConfiguration(
     environment[allowInsecureHttpName],
     allowInsecureHttpName,
   );
-  const apiKey = await readSecret(
-    apiKeyFile as string,
-    spec.displayName,
-    apiKeyFileName,
-    spec.secretFormat,
-  );
+  const apiKey = applicationConfigFile === undefined
+    ? await readSecret(
+        apiKeyFile as string,
+        spec.displayName,
+        apiKeyFileName,
+        spec.secretFormat,
+      )
+    : await readApplicationConfigSecret(
+        applicationConfigFile,
+        spec.displayName,
+        applicationConfigFileName,
+        spec.applicationConfigFormat as "arr_xml" | "bazarr_yaml",
+      );
 
   return {
     instanceId,
@@ -373,6 +433,84 @@ async function loadIntegrationConfiguration(
     allowInsecureHttp,
     apiKey,
   };
+}
+
+async function readApplicationConfigSecret(
+  path: string,
+  displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL" | "OpenSubtitles",
+  configurationFileName: string,
+  format: "arr_xml" | "bazarr_yaml",
+): Promise<SecretValue> {
+  if (!isAbsolute(path)) {
+    throw new ConfigurationError(`${configurationFileName} must be an absolute path`);
+  }
+
+  let handle;
+  try {
+    handle = await open(path, "r");
+    const buffer = Buffer.alloc(maximumApplicationConfigBytes + 1);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.byteLength, 0);
+    if (bytesRead > maximumApplicationConfigBytes) {
+      throw new ConfigurationError(
+        `${displayName} application configuration exceeds the 1048576-byte limit`,
+      );
+    }
+    const content = buffer.subarray(0, bytesRead).toString("utf8");
+    const value = format === "arr_xml"
+      ? extractArrXmlApiKey(content)
+      : extractBazarrYamlApiKey(content);
+    if (value === undefined || !/^[a-z0-9_-]{16,256}$/iu.test(value)) {
+      throw new ConfigurationError(
+        `${displayName} application configuration does not contain one valid API key`,
+      );
+    }
+    return new SecretValue(value);
+  } catch (error) {
+    if (error instanceof ConfigurationError) {
+      throw error;
+    }
+    throw new ConfigurationError(
+      `${displayName} application configuration could not be read`,
+    );
+  } finally {
+    await handle?.close();
+  }
+}
+
+function extractArrXmlApiKey(content: string): string | undefined {
+  const matches = [...content.matchAll(/<ApiKey>\s*([a-z0-9_-]{16,256})\s*<\/ApiKey>/giu)];
+  return matches.length === 1 ? matches[0]?.[1] : undefined;
+}
+
+function extractBazarrYamlApiKey(content: string): string | undefined {
+  const lines = content.replace(/\r\n?/gu, "\n").split("\n");
+  let inAuthSection = false;
+  const matches: string[] = [];
+
+  for (const line of lines) {
+    if (/^auth\s*:\s*(?:#.*)?$/iu.test(line)) {
+      inAuthSection = true;
+      continue;
+    }
+    if (/^[a-z0-9_-]+\s*:/iu.test(line)) {
+      inAuthSection = false;
+    }
+    if (!inAuthSection) continue;
+    const match = /^ +apikey\s*:\s*(.*?)\s*(?:#.*)?$/iu.exec(line);
+    if (match?.[1] === undefined) continue;
+    const value = unquoteSimpleYamlScalar(match[1].trim());
+    if (value !== undefined) matches.push(value);
+  }
+
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+function unquoteSimpleYamlScalar(value: string): string | undefined {
+  if ((value.startsWith("'") && value.endsWith("'")) ||
+      (value.startsWith('"') && value.endsWith('"'))) {
+    return value.slice(1, -1);
+  }
+  return value.length > 0 ? value : undefined;
 }
 
 function present(value: string | undefined): boolean {
@@ -430,7 +568,7 @@ async function readSecret(
   path: string,
   displayName: "Sonarr" | "Radarr" | "Bazarr" | "SubDL" | "OpenSubtitles" | "Pegarr",
   apiKeyFileName: string,
-  secretFormat: "arr" | "bearer" | "access" | "admin",
+  secretFormat: "arr" | "bearer" | "access" | "admin" | "password",
 ): Promise<SecretValue> {
   if (!isAbsolute(path)) {
     throw new ConfigurationError(`${apiKeyFileName} must be an absolute path`);
@@ -447,13 +585,15 @@ async function readSecret(
     const value = buffer.subarray(0, bytesRead).toString("utf8").trim();
     const valid = secretFormat === "arr"
       ? /^[a-z0-9_-]{16,256}$/iu.test(value)
-      : secretFormat === "access" || secretFormat === "admin"
+      : secretFormat === "access" || secretFormat === "admin" || secretFormat === "password"
         ? /^[a-z0-9._~+/=-]{32,4096}$/iu.test(value)
         : /^[a-z0-9._~+/=-]{16,4096}$/iu.test(value);
     if (!valid) {
       throw new ConfigurationError(
-        secretFormat === "access" || secretFormat === "admin"
-          ? `Pegarr ${secretFormat === "admin" ? "administrator" : "access"} token file does not contain one valid token`
+        secretFormat === "access" || secretFormat === "admin" || secretFormat === "password"
+          ? secretFormat === "password"
+            ? "Pegarr password file does not contain one valid password of at least 32 characters"
+            : `Pegarr ${secretFormat === "admin" ? "administrator" : "access"} token file does not contain one valid token`
           : `${displayName} API key file does not contain one valid API key`,
       );
     }
@@ -463,8 +603,10 @@ async function readSecret(
       throw error;
     }
     throw new ConfigurationError(
-      secretFormat === "access" || secretFormat === "admin"
-        ? `Pegarr ${secretFormat === "admin" ? "administrator" : "access"} token file could not be read`
+      secretFormat === "access" || secretFormat === "admin" || secretFormat === "password"
+        ? secretFormat === "password"
+          ? "Pegarr password file could not be read"
+          : `Pegarr ${secretFormat === "admin" ? "administrator" : "access"} token file could not be read`
         : `${displayName} API key file could not be read`,
     );
   } finally {

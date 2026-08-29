@@ -125,6 +125,13 @@
 | PEG-CACHE-007 | The cache prunes the oldest windows at its configured bound | `src/provider-search-cache.test.ts` |
 | PEG-CACHE-008 | Corrupt cache rows are discarded and fetched again | `src/provider-search-cache.test.ts` |
 | PEG-ACCESS-001 | Bearer authentication uses one bounded in-memory token | `src/access-control.test.ts` |
+| PEG-ACCESS-005 | Username and password login is bounded and constant-time comparable | `src/access-control.test.ts` |
+| PEG-CONFIG-014 | Pegarr login loads its password only from a bounded secret file | `src/config.test.ts` |
+| PEG-SONARR-011 | Sonarr catalog lookup finds unadded series without private metadata | `src/adapters/sonarr.test.ts` |
+| PEG-RADARR-010 | Radarr catalog lookup finds unadded movies without private metadata | `src/adapters/radarr.test.ts` |
+| PEG-CATALOG-001 | Catalog search fans out and preserves partial Arr availability | `src/runtime.test.ts` |
+| PEG-CATALOG-002 | Catalog search authenticates before bounded read-only work | `src/app.test.ts` |
+| PEG-DASH-041 | Discovery and username-password login stay page-memory-only | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |
@@ -227,6 +234,7 @@
 | PEG-OPENSUBTITLES-005 | OpenSubtitles stable search windows are single-flight and cached | `src/adapters/opensubtitles.test.ts` |
 | PEG-CONFIG-011 | OpenSubtitles language mappings are explicit and independent | `src/config.test.ts` |
 | PEG-CONFIG-012 | Provider cache TTLs are bounded, asymmetric, and legacy-compatible | `src/provider-cache-configuration.test.ts` |
+| PEG-CONFIG-013 | Arr and Bazarr credentials load from bounded application config files | `src/config.test.ts` |
 | PEG-PROVIDER-001 | Sufficient preferred evidence prevents fallback provider requests | `src/provider-policy-search.test.ts` |
 | PEG-PROVIDER-002 | Partial preferred evidence calls fallback only until coverage is sufficient | `src/provider-policy-search.test.ts` |
 | PEG-PROVIDER-003 | Preferred-provider quota failures remain Unknown and allow bounded fallback | `src/provider-policy-search.test.ts` |

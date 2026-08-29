@@ -125,8 +125,12 @@ h1 {
 .access-panel h2 { margin-bottom: .65rem; font-size: 1.65rem; }
 .access-panel p { max-width: 58ch; margin-bottom: 0; color: var(--muted); line-height: 1.6; }
 .access-form { align-self: center; }
+.access-form > input { margin-bottom: .8rem; }
 label > span, .access-form > label { display: block; margin-bottom: .45rem; color: var(--muted); font-size: .78rem; font-weight: 700; }
 .token-row { display: flex; gap: .65rem; }
+.legacy-access { margin-top: .85rem; color: var(--muted); font-size: .78rem; }
+.legacy-access summary { cursor: pointer; }
+.legacy-access label { display: block; margin: .65rem 0 .35rem; }
 input, select {
   width: 100%;
   min-height: 2.9rem;
@@ -158,6 +162,21 @@ button:disabled { cursor: wait; opacity: .55; }
 .status-message[data-state="success"] { color: var(--accent); }
 
 .dashboard { margin-top: 3.25rem; }
+.catalog-panel {
+  margin-top: 3.25rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+}
+.catalog-panel h2 { margin-bottom: .5rem; font-size: 2rem; }
+.catalog-explainer { max-width: 70ch; color: var(--muted); line-height: 1.6; }
+.catalog-form { display: grid; grid-template-columns: minmax(14rem, 2fr) minmax(10rem, 1fr) auto; gap: .65rem; align-items: end; }
+.catalog-form label { display: none; }
+.catalog-results { display: grid; gap: .55rem; margin: .75rem 0 0; padding: 0; list-style: none; }
+.catalog-result { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: .9rem 1rem; background: var(--surface-raised); border: 1px solid var(--border); border-radius: .8rem; }
+.catalog-result strong, .catalog-result span { display: block; }
+.catalog-result div > span { margin-top: .25rem; color: var(--muted); font-size: .8rem; }
 .summary-row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
 .summary-row h2 { margin-bottom: 0; font-size: 2rem; letter-spacing: -.03em; }
 .source-status { display: flex; flex: 1; flex-wrap: wrap; gap: .45rem; justify-content: center; }
@@ -405,6 +424,7 @@ footer {
   .shell { margin-top: 2.5rem; }
   .access-panel { grid-template-columns: 1fr; gap: 1.5rem; }
   .token-row { align-items: stretch; flex-direction: column; }
+  .catalog-form { grid-template-columns: 1fr; }
   .summary-row { align-items: flex-start; flex-direction: column; }
   .source-status { justify-content: flex-start; }
   .controls { grid-template-columns: 1fr; }

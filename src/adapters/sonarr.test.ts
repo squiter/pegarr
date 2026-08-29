@@ -15,6 +15,7 @@ import {
   mapSonarrReleaseResponse,
   mapSonarrMissingResponse,
   mapSonarrSystemStatus,
+  mapSonarrCatalogResponse,
   SonarrAdapterError,
   SonarrGrabError,
   SonarrClient,
@@ -71,6 +72,43 @@ test("PEG-SONARR-001 episode search is bounded, read-only, and authenticates by 
       ),
     /safe label/u,
   );
+});
+
+test("PEG-SONARR-011 catalog lookup finds unadded series and discards private metadata", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: [{
+    title: "Synthetic New Series",
+    year: 2026,
+    tvdbId: 12345,
+    tmdbId: 98765,
+    imdbId: "tt1234567",
+    id: 0,
+    overview: "private overview",
+    path: "/private/series",
+    images: [{ remoteUrl: "https://private.example.invalid/poster.jpg" }],
+  }] };
+
+  const items = await client(transport).lookupSeries("  Synthetic New Series  ");
+  assert.deepEqual(transport.requests[0], {
+    method: "GET",
+    path: "/api/v3/series/lookup",
+    query: { term: "Synthetic New Series" },
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  });
+  assert.deepEqual(items, [{
+    application: "sonarr",
+    instanceId: "synthetic-sonarr",
+    kind: "series",
+    title: "Synthetic New Series",
+    year: 2026,
+    ids: { tvdb: "12345", tmdb: "98765", imdb: "tt1234567" },
+    alreadyAdded: false,
+  }]);
+  assert.doesNotMatch(JSON.stringify(items), /private|overview|path|image|remoteUrl/iu);
+  await assert.rejects(client(transport).lookupSeries("x"), /2 through 200/u);
+  assert.deepEqual(mapSonarrCatalogResponse([{ title: "Existing", tvdbId: 42, id: 9 }])[0]?.alreadyAdded, true);
 });
 
 test("PEG-SONARR-002 releases preserve Arr decisions and safe evidence", () => {

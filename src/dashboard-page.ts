@@ -4,42 +4,70 @@ export const dashboardPage = `<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>Pegarr — Missing releases</title>
+  <title>Pegarr — Discover subtitle-ready media</title>
   <link rel="stylesheet" href="/assets/dashboard.css">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to missing items</a>
+  <a class="skip-link" href="#main">Skip to discovery</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Pegarr home">
       <span class="brand-mark" aria-hidden="true">P</span>
       <span><strong>Pegarr</strong><small>Subtitle-aware release selection</small></span>
     </a>
-    <span class="phase-badge">Phase 2 · controlled Grab</span>
+    <span class="phase-badge">Discovery-first P0</span>
   </header>
 
   <main id="main" class="shell">
     <section class="hero" aria-labelledby="page-title">
-      <p class="eyebrow">Your missing library</p>
-      <h1 id="page-title">Choose what to investigate next.</h1>
-      <p class="lede">See monitored episodes and movies waiting for a file. Analyze an item once, then use its confidence and freshness here without making new requests.</p>
+      <p class="eyebrow">Discover before you add</p>
+      <h1 id="page-title">Find the version with your subtitles.</h1>
+      <p class="lede">Search the Sonarr and Radarr catalogs for a new series or movie. Pegarr is building the complete path from subtitle coverage preview to explicit add and exact release selection.</p>
     </section>
 
     <section id="access-panel" class="access-panel" aria-labelledby="access-title">
       <div>
         <p class="eyebrow">Private access</p>
-        <h2 id="access-title">Connect to your library</h2>
-        <p>Enter the Pegarr access token configured on this server. It stays only in this page's memory and clears when you reload or close it.</p>
+        <h2 id="access-title">Sign in to Pegarr</h2>
+        <p>Use the Pegarr username and password configured on this server. They stay only in this page's memory and clear when you reload or close it.</p>
       </div>
       <form id="access-form" class="access-form">
-        <label for="access-token">Access token</label>
+        <label for="login-username">Username</label>
+        <input id="login-username" name="username" type="text" maxlength="64" autocomplete="username" spellcheck="false">
+        <label for="login-password">Password</label>
         <div class="token-row">
-          <input id="access-token" name="access-token" type="password" minlength="32" required autocomplete="off" spellcheck="false">
-          <button id="connect-button" class="primary-button" type="submit">Connect</button>
+          <input id="login-password" name="password" type="password" minlength="32" autocomplete="current-password" spellcheck="false">
+          <button id="connect-button" class="primary-button" type="submit">Sign in</button>
         </div>
+        <details class="legacy-access">
+          <summary>Use a legacy access token</summary>
+          <label for="access-token">Access token</label>
+          <input id="access-token" name="access-token" type="password" minlength="32" autocomplete="off" spellcheck="false">
+        </details>
       </form>
     </section>
 
     <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
+
+    <section id="catalog" class="catalog-panel" aria-labelledby="catalog-title" hidden>
+      <div>
+        <p class="eyebrow">Sonarr and Radarr catalog</p>
+        <h2 id="catalog-title">Search for something new</h2>
+        <p class="catalog-explainer">This first implementation slice performs safe catalog lookup. Subtitle coverage preview, provider settings, and the explicit add-and-continue action are the next P0 slices.</p>
+      </div>
+      <form id="catalog-form" class="catalog-form">
+        <label for="catalog-query"><span>Series or movie</span></label>
+        <input id="catalog-query" type="search" minlength="2" maxlength="200" required placeholder="For example: Severance" autocomplete="off">
+        <label for="catalog-application"><span>Catalog</span></label>
+        <select id="catalog-application">
+          <option value="all">Sonarr and Radarr</option>
+          <option value="sonarr">Series in Sonarr</option>
+          <option value="radarr">Movies in Radarr</option>
+        </select>
+        <button id="catalog-submit" class="primary-button" type="submit">Search</button>
+      </form>
+      <p id="catalog-status" class="status-message" role="status" aria-live="polite"></p>
+      <ol id="catalog-results" class="catalog-results" aria-label="Catalog results"></ol>
+    </section>
 
     <section id="dashboard" class="dashboard" aria-labelledby="inventory-title" hidden>
       <div class="summary-row">

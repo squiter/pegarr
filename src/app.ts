@@ -37,7 +37,7 @@ export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -91,7 +91,8 @@ export async function resolveRoute(
   const grabSelection = parseGrabPath(pathname);
   const grabHistory = pathname === "/api/v1/grabs/history";
   const grabReconciliation = parseGrabReconciliationPath(pathname);
-  const protectedLibraryRoute = pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
+  const catalogSearch = pathname === "/api/v1/catalog/search";
+  const protectedLibraryRoute = catalogSearch || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
@@ -107,6 +108,7 @@ export async function resolveRoute(
     "/api/v1/integrations/sonarr/status",
     "/api/v1/integrations/radarr/status",
     "/api/v1/library/instances",
+    "/api/v1/catalog/search",
     "/api/v1/library/missing",
     ...dashboardAssetRoutes.keys(),
   ]);
@@ -229,6 +231,36 @@ export async function resolveRoute(
     }
   }
 
+  if (catalogSearch) {
+    const rejection = authorizeLibraryRoute(access);
+    if (rejection !== undefined) return rejection;
+    const query = parsedUrl.searchParams.get("q")?.trim() ?? "";
+    const applicationValue = parsedUrl.searchParams.get("application");
+    if (applicationValue !== null && applicationValue !== "sonarr" && applicationValue !== "radarr") {
+      return { statusCode: 400, body: { service: "pegarr", mode: "read_only", status: "invalid_request" } };
+    }
+    if (query.length < 2 || query.length > 200 || /[\u0000-\u001f\u007f]/u.test(query)) {
+      return { statusCode: 400, body: { service: "pegarr", mode: "read_only", status: "invalid_request" } };
+    }
+    try {
+      return {
+        statusCode: 200,
+        body: await (services?.searchCatalog(query, applicationValue ?? undefined) ?? Promise.resolve({
+          kind: "catalog-search" as const,
+          mode: "read_only" as const,
+          status: "disabled" as const,
+          query: query.trim(),
+          items: [],
+          sources: [],
+        })),
+      };
+    } catch (error) {
+      return error instanceof TypeError
+        ? { statusCode: 400, body: { service: "pegarr", mode: "read_only", status: "invalid_request" } }
+        : { statusCode: 503, body: { service: "pegarr", mode: "read_only", status: "unavailable" } };
+    }
+  }
+
   if (itemSelection !== undefined) {
     const rejection = authorizeLibraryRoute(access);
     if (rejection !== undefined) return rejection;
@@ -330,7 +362,7 @@ function authorizeLibraryRoute(access: RouteAccess | undefined): RouteResult | u
   if (access.control.authorize(access.authorization)) return undefined;
   return {
     statusCode: 401,
-    headers: { "www-authenticate": 'Bearer realm="pegarr", charset="UTF-8"' },
+    headers: { "www-authenticate": access.control.challenge },
     body: { service: "pegarr", status: "unauthorized" },
   };
 }
@@ -610,6 +642,7 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (pathname === "/api/v1/integrations/sonarr/status") return "sonarr_status";
   if (pathname === "/api/v1/integrations/radarr/status") return "radarr_status";
   if (pathname === "/api/v1/library/instances") return "arr_instances";
+  if (pathname === "/api/v1/catalog/search") return "catalog_search";
   if (pathname === "/api/v1/library/missing") return "missing_inventory";
   if (parseItemFeasibilityPath(pathname) !== undefined) return "item_feasibility";
   const grab = parseGrabPath(pathname);

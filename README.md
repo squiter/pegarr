@@ -6,14 +6,14 @@
 [![Container](https://github.com/squiter/pegarr/actions/workflows/container.yml/badge.svg)](https://github.com/squiter/pegarr/actions/workflows/container.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. It compares interactive-search releases with subtitle-provider evidence, explains the confidence of each match, and can optionally let an administrator Grab one explicitly confirmed release.
+Pegarr is a self-hosted companion for Sonarr, Radarr, and Bazarr. Its primary workflow is discovering a series or movie before it is added, previewing whether the desired subtitles exist, adding the selected title to Sonarr or Radarr, and choosing an exact subtitle-aware release without leaving Pegarr.
 
 > [!IMPORTANT]
 > Pegarr's Phase 1 read-only MVP, Phase 2 controlled Grab, and Phase 3 reliability/provider expansion are complete, while read-only remains the default. Controlled Grab stays behind a separate opt-in setting and administrator secret, revalidates twice, requires exact confirmation, audits every attempt, and never runs automatically. Live Grab compatibility remains a manual test boundary.
 
 ## Why Pegarr?
 
-Sonarr and Radarr make strong video-release decisions. Bazarr manages subtitles after a file is imported. Pegarr targets the gap between them: helping a person understand subtitle availability before choosing a release.
+Sonarr and Radarr make strong catalog and video-release decisions. Bazarr manages subtitles after a file is imported. Pegarr targets the gap between them: helping a person understand subtitle availability before adding a title and before choosing a release.
 
 Pegarr will keep these decisions separate and visible:
 
@@ -26,7 +26,7 @@ Provider failures are never treated as proof that subtitles do not exist.
 
 ## Project status
 
-The API-feasibility milestone and Phases 1 through 3 are complete. Pegarr now has instance-safe Arr identity and runtime fan-out, two quota-aware subtitle-provider adapters, bounded asymmetric caching, season-pack semantics, preference-aware matching, and expanded real-world release parsing. The implementation is synthetic-test proven; live Sonarr/Radarr mutation behavior, authenticated subtitle-provider compatibility, and NAS compatibility remain explicit manual gaps. The active next cycle is the local-first [release-candidate roadmap](docs/release-candidate-roadmap.md). See the [controlled Grab guide](docs/controlled-grab.md), [Phase 1 completion record](docs/phase-1-completion.md), [Phase 2 completion record](docs/phase-2-completion.md), [Phase 3 completion record](docs/phase-3.md), and [research proposal](ARR-SUBTITLE-RELEASE-PICKER-RESEARCH.md).
+The API-feasibility milestone and Phases 1 through 3 are complete. Pegarr now has instance-safe Arr identity and runtime fan-out, two quota-aware subtitle-provider adapters, bounded asymmetric caching, season-pack semantics, preference-aware matching, and expanded real-world release parsing. Product review identified that the existing missing-item dashboard is a secondary workflow, not the intended product entry point. The active P0 cycle is the [discovery-first roadmap](docs/discovery-first-roadmap.md): username/password login, catalog search for unadded titles, subtitle settings and pre-add coverage, then an explicit add-and-continue flow. The [release-candidate roadmap](docs/release-candidate-roadmap.md) resumes after that correction.
 
 The current repository foundation includes:
 
@@ -89,7 +89,7 @@ The demo maps a sanitized synthetic Sonarr v3 response into four release candida
 
 Pegarr uses a deterministic, repository-owned harness as its completion authority. Run `npm run check:affected` before proposing a change. The gate selects the relevant type, build, test, contract, and container sensors and stores complete evidence under `.artifacts/harness/` while keeping terminal failures concise. Every harness mode preserves the completed [Phase 1 criteria ledger](harness/phase-1.json), completed [Phase 2 criteria ledger](harness/phase-2.json), and completed [Phase 3 criteria ledger](harness/phase-3.json), including the explicit live-service gaps.
 
-See the [release-candidate roadmap](docs/release-candidate-roadmap.md), [controlled Grab guide](docs/controlled-grab.md), [Phase 1 completion record](docs/phase-1-completion.md), [Phase 2 completion record](docs/phase-2-completion.md), [Phase 3 completion record](docs/phase-3.md), [Phase 3 supporting backlog](docs/phase-3-backlog.md), [harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [access-control guide](docs/access-control.md), [missing-item dashboard guide](docs/missing-item-dashboard.md), [item feasibility API](docs/item-feasibility-api.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), and the versioned integration contracts. Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
+See the [discovery-first roadmap](docs/discovery-first-roadmap.md), [release-candidate roadmap](docs/release-candidate-roadmap.md), [controlled Grab guide](docs/controlled-grab.md), [Phase 1 completion record](docs/phase-1-completion.md), [Phase 2 completion record](docs/phase-2-completion.md), [Phase 3 completion record](docs/phase-3.md), [Phase 3 supporting backlog](docs/phase-3-backlog.md), [harness guide](docs/harness.md), [scenario catalog](docs/harness-scenarios.md), [runtime configuration](docs/configuration.md), [access-control guide](docs/access-control.md), [missing-item dashboard guide](docs/missing-item-dashboard.md), [item feasibility API](docs/item-feasibility-api.md), [provider search cache guide](docs/provider-search-cache.md), [missing-item inventory guide](docs/missing-item-inventory.md), [episode feasibility report guide](docs/episode-feasibility-report.md), [season feasibility report guide](docs/season-feasibility-report.md), [movie feasibility report guide](docs/movie-feasibility-report.md), and the versioned integration contracts. Automated scenarios use synthetic fixtures and never call live Sonarr, Radarr, Bazarr, or subtitle providers.
 
 To use Docker instead:
 
@@ -108,7 +108,7 @@ docker compose -f deploy/compose.nas.yaml up -d
 docker compose -f deploy/compose.nas.yaml ps
 ```
 
-For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [access](deploy/compose.access.yaml), [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), [SubDL](deploy/compose.subdl.yaml), [OpenSubtitles](deploy/compose.opensubtitles.yaml), and [controlled Grab](deploy/compose.grab.yaml) Compose overlays mount credentials as Docker secrets; follow the [configuration guide](docs/configuration.md), and never put a token or key in `.env`.
+For repeatable deployments, set `PEGARR_IMAGE` to a version tag instead of `latest`. The optional [username/password login](deploy/compose.login.yaml), [legacy token access](deploy/compose.access.yaml), [Sonarr](deploy/compose.sonarr.yaml), [Radarr](deploy/compose.radarr.yaml), [Bazarr](deploy/compose.bazarr.yaml), [SubDL](deploy/compose.subdl.yaml), [OpenSubtitles](deploy/compose.opensubtitles.yaml), and [controlled Grab](deploy/compose.grab.yaml) Compose overlays mount credentials as Docker secrets; follow the [configuration guide](docs/configuration.md), and never put a password, token, or key in `.env`. An existing same-network Portainer media stack can instead use the [Jellyfin-stack overlay and runbook](docs/portainer-jellyfin-stack.md) to reuse read-only application config files without copying API keys into Portainer.
 
 ## Container publishing
 

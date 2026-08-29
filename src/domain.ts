@@ -29,6 +29,16 @@ export interface MissingItemQuery {
   readonly pageSize?: number;
 }
 
+export interface CatalogMediaItem {
+  readonly application: "sonarr" | "radarr";
+  readonly instanceId: string;
+  readonly kind: "series" | "movie";
+  readonly title: string;
+  readonly year?: number;
+  readonly ids: Readonly<Record<string, string>>;
+  readonly alreadyAdded: boolean;
+}
+
 export interface MissingMediaItem {
   readonly application: "sonarr" | "radarr";
   readonly instanceId: string;

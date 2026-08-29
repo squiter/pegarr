@@ -5,6 +5,7 @@ import type {
   ArrReleaseEvidence,
   ArrGrabReceipt,
   ArrReleaseHandle,
+  CatalogMediaItem,
   MissingItemPage,
   MissingItemQuery,
   MissingMediaItem,
@@ -124,6 +125,26 @@ export class SonarrClient {
       return mapSonarrReleaseResponse(response.body, this.#instanceId);
     } catch {
       throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid release response", {
+        status: response.status,
+      });
+    }
+  }
+
+  async lookupSeries(term: string): Promise<readonly CatalogMediaItem[]> {
+    const normalizedTerm = boundedLookupTerm(term);
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/series/lookup",
+      query: { term: normalizedTerm },
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: this.#maxResponseBytes,
+    });
+    assertSuccessfulStatus(response, "series catalog lookup");
+    try {
+      return mapSonarrCatalogResponse(response.body, this.#instanceId);
+    } catch {
+      throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid catalog response", {
         status: response.status,
       });
     }
@@ -319,6 +340,38 @@ export function mapSonarrReleaseResponse(
   }
 
   return body.map((value, index) => mapRelease(value, index, instanceId));
+}
+
+export function mapSonarrCatalogResponse(
+  body: unknown,
+  instanceId = "sonarr",
+): readonly CatalogMediaItem[] {
+  if (!Array.isArray(body)) throw new TypeError("Sonarr catalog response must be an array");
+  return body.slice(0, 20).map((value, index) => {
+    const row = record(value, `series lookup[${index}]`);
+    const tvdb = optionalNumericIdentifier(row.tvdbId, `series lookup[${index}].tvdbId`);
+    const tmdb = optionalNumericIdentifier(row.tmdbId, `series lookup[${index}].tmdbId`);
+    const imdb = optionalImdbIdentifier(row.imdbId, `series lookup[${index}].imdbId`);
+    if (tvdb === undefined && tmdb === undefined && imdb === undefined) {
+      throw new TypeError(`series lookup[${index}] must contain a stable identifier`);
+    }
+    const existingId = row.id === undefined || row.id === null || row.id === 0
+      ? undefined
+      : boundedInteger(requiredNumber(row.id, `series lookup[${index}].id`), 1, Number.MAX_SAFE_INTEGER, `series lookup[${index}].id`);
+    return {
+      application: "sonarr",
+      instanceId,
+      kind: "series",
+      title: boundedRequiredString(row.title, `series lookup[${index}].title`),
+      ...optionalPositiveIntegerField("year", row.year, `series lookup[${index}].year`),
+      ids: {
+        ...(tvdb === undefined ? {} : { tvdb }),
+        ...(tmdb === undefined ? {} : { tmdb }),
+        ...(imdb === undefined ? {} : { imdb }),
+      },
+      alreadyAdded: existingId !== undefined,
+    };
+  });
 }
 
 export function mapSonarrRevalidatedReleaseResponse(
@@ -568,6 +621,14 @@ function optionalTimestampField(
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function boundedLookupTerm(value: string): string {
+  const term = value.trim();
+  if (term.length < 2 || term.length > 200 || /[\u0000-\u001f\u007f]/u.test(term)) {
+    throw new TypeError("catalog lookup term must contain 2 through 200 safe characters");
+  }
+  return term;
 }
 
 function requiredNumber(value: unknown, field: string): number {

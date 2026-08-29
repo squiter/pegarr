@@ -217,6 +217,29 @@ test("PEG-CONFIG-006 browser API access uses only a bounded secret file", async 
   );
 });
 
+test("PEG-CONFIG-014 Pegarr login loads a bounded password only from a secret file", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-login-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const passwordPath = join(directory, "password");
+  const password = "synthetic-password-value-00000000001";
+  await writeFile(passwordPath, password, { mode: 0o600 });
+
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_USERNAME: "pegarr-user",
+    PEGARR_PASSWORD_FILE: passwordPath,
+  });
+  assert.equal(configuration.login?.username, "pegarr-user");
+  assert.equal(configuration.login?.password.reveal(), password);
+  assert.doesNotMatch(JSON.stringify(configuration), new RegExp(password, "u"));
+
+  await assert.rejects(loadRuntimeConfiguration({ PEGARR_USERNAME: "pegarr-user" }), /PEGARR_PASSWORD_FILE/u);
+  await assert.rejects(loadRuntimeConfiguration({ PEGARR_PASSWORD: password }), /PEGARR_PASSWORD_FILE/u);
+  await assert.rejects(loadRuntimeConfiguration({ PEGARR_USERNAME: "unsafe user", PEGARR_PASSWORD_FILE: passwordPath }), /safe login name/u);
+});
+
 test("PEG-CONFIG-007 runtime SubDL language mappings are explicit, bounded, and canonical", async () => {
   const configuration = await loadRuntimeConfiguration({
     PEGARR_SUBDL_LANGUAGE_MAPPINGS: "en:EN, pt-BR:PT-BR, es:ES",
@@ -386,4 +409,91 @@ test("PEG-CONFIG-011 OpenSubtitles language mappings are explicit and independen
     }),
     /PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS contains an invalid or duplicate pair/u,
   );
+});
+
+test("PEG-CONFIG-013 Arr and Bazarr credentials load from bounded application config files", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-app-config-"));
+  context.after(async () => {
+    const { rm } = await import("node:fs/promises");
+    await rm(directory, { recursive: true });
+  });
+  const sonarrConfigPath = join(directory, "sonarr-config.xml");
+  const radarrConfigPath = join(directory, "radarr-config.xml");
+  const bazarrConfigPath = join(directory, "bazarr-config.yaml");
+  const sonarrSecret = "synthetic-sonarr-config-key";
+  const radarrSecret = "synthetic-radarr-config-key";
+  const bazarrSecret = "synthetic-bazarr-config-key";
+  const unrelatedProviderSecret = "synthetic-provider-config-secret";
+
+  await Promise.all([
+    writeFile(sonarrConfigPath, `<Config><Port>8989</Port><ApiKey>${sonarrSecret}</ApiKey></Config>`, { mode: 0o600 }),
+    writeFile(radarrConfigPath, `<Config>\r\n  <ApiKey>${radarrSecret}</ApiKey>\r\n</Config>`, { mode: 0o600 }),
+    writeFile(bazarrConfigPath, [
+      "subdl:",
+      `  api_key: ${unrelatedProviderSecret}`,
+      "auth:",
+      `  apikey: '${bazarrSecret}'`,
+      "  type: form",
+      "general:",
+      "  port: 6767",
+    ].join("\n"), { mode: 0o600 }),
+  ]);
+
+  const configuration = await loadRuntimeConfiguration({
+    PEGARR_SONARR_URL: "http://sonarr:8989",
+    PEGARR_SONARR_ALLOWED_HOSTS: "sonarr",
+    PEGARR_SONARR_ALLOW_INSECURE_HTTP: "true",
+    PEGARR_SONARR_APP_CONFIG_FILE: sonarrConfigPath,
+    PEGARR_RADARR_URL: "http://radarr:7878",
+    PEGARR_RADARR_ALLOWED_HOSTS: "radarr",
+    PEGARR_RADARR_ALLOW_INSECURE_HTTP: "true",
+    PEGARR_RADARR_APP_CONFIG_FILE: radarrConfigPath,
+    PEGARR_BAZARR_URL: "http://bazarr:6767",
+    PEGARR_BAZARR_ALLOWED_HOSTS: "bazarr",
+    PEGARR_BAZARR_ALLOW_INSECURE_HTTP: "true",
+    PEGARR_BAZARR_APP_CONFIG_FILE: bazarrConfigPath,
+  });
+
+  assert.equal(configuration.sonarr?.apiKey.reveal(), sonarrSecret);
+  assert.equal(configuration.radarr?.apiKey.reveal(), radarrSecret);
+  assert.equal(configuration.bazarr?.apiKey.reveal(), bazarrSecret);
+  assert.doesNotMatch(
+    JSON.stringify(configuration),
+    /synthetic-(?:sonarr|radarr|bazarr|provider)-config/iu,
+  );
+
+  const separateSecretPath = join(directory, "separate-key");
+  await writeFile(separateSecretPath, "synthetic-separate-api-key", { mode: 0o600 });
+  await assert.rejects(loadRuntimeConfiguration({
+    PEGARR_SONARR_URL: "http://sonarr:8989",
+    PEGARR_SONARR_ALLOWED_HOSTS: "sonarr",
+    PEGARR_SONARR_API_KEY_FILE: separateSecretPath,
+    PEGARR_SONARR_APP_CONFIG_FILE: sonarrConfigPath,
+  }), /exactly one/u);
+
+  const malformedBazarrPath = join(directory, "malformed-bazarr-config.yaml");
+  await writeFile(malformedBazarrPath, [
+    "subdl:",
+    `  api_key: ${unrelatedProviderSecret}`,
+    "auth:",
+    "  type: form",
+  ].join("\n"), { mode: 0o600 });
+  await assert.rejects(loadRuntimeConfiguration({
+    PEGARR_BAZARR_URL: "http://bazarr:6767",
+    PEGARR_BAZARR_ALLOWED_HOSTS: "bazarr",
+    PEGARR_BAZARR_APP_CONFIG_FILE: malformedBazarrPath,
+  }), (error: unknown) => {
+    assert.ok(error instanceof ConfigurationError);
+    assert.doesNotMatch(error.message, new RegExp(unrelatedProviderSecret, "u"));
+    assert.match(error.message, /does not contain one valid API key/u);
+    return true;
+  });
+
+  const oversizedConfigPath = join(directory, "oversized-config.xml");
+  await writeFile(oversizedConfigPath, "x".repeat(1_048_577), { mode: 0o600 });
+  await assert.rejects(loadRuntimeConfiguration({
+    PEGARR_RADARR_URL: "http://radarr:7878",
+    PEGARR_RADARR_ALLOWED_HOSTS: "radarr",
+    PEGARR_RADARR_APP_CONFIG_FILE: oversizedConfigPath,
+  }), /1048576-byte limit/u);
 });

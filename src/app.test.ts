@@ -227,6 +227,41 @@ test("PEG-ACCESS-004 item feasibility is hidden, authenticated before work, and 
   assert.equal((await resolveRoute("GET", "/api/v1/library/items/sonarr/movie/305/feasibility", tmpdir(), services, access)).statusCode, 404);
 });
 
+test("PEG-CATALOG-002 catalog search authenticates before bounded read-only work", async () => {
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  const control = new AccessControl(undefined, { username, password: new SecretValue(password) });
+  const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  let searches = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  services.searchCatalog = async (query, application) => {
+    searches += 1;
+    return {
+      kind: "catalog-search",
+      mode: "read_only",
+      status: "available",
+      query,
+      items: [{ application: application ?? "sonarr", instanceId: "main", kind: application === "radarr" ? "movie" : "series", title: "Synthetic Discovery", ids: { tmdb: "42" }, alreadyAdded: false }],
+      sources: [{ application: application ?? "sonarr", instanceId: "main", status: "available" }],
+    };
+  };
+
+  const path = "/api/v1/catalog/search?q=Synthetic%20Discovery&application=sonarr";
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control: new AccessControl(undefined) })).statusCode, 404);
+  const unauthorized = await resolveRoute("GET", path, tmpdir(), services, { control, authorization: "Basic invalid" });
+  assert.equal(unauthorized.statusCode, 401);
+  assert.deepEqual(unauthorized.headers, { "www-authenticate": 'Basic realm="pegarr", charset="UTF-8"' });
+  assert.equal(searches, 0);
+
+  const response = await resolveRoute("GET", path, tmpdir(), services, { control, authorization });
+  assert.equal(response.statusCode, 200);
+  assert.match(JSON.stringify(response.body), /Synthetic Discovery/u);
+  assert.equal(searches, 1);
+  assert.equal((await resolveRoute("GET", "/api/v1/catalog/search?q=x", tmpdir(), services, { control, authorization })).statusCode, 400);
+  assert.equal((await resolveRoute("GET", "/api/v1/catalog/search?q=valid&application=unsafe", tmpdir(), services, { control, authorization })).statusCode, 400);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization })).statusCode, 405);
+});
+
 test("PEG-INSTANCE-004 instance status is authenticated, bounded, and read-only", async () => {
   const token = "synthetic-access-token-value-0000000001";
   let reads = 0;
@@ -341,6 +376,18 @@ test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe"
     /localStor(?:age)|sessionStor(?:age)|document\.cookie|innerHTML|PEGARR_ACCESS_TOKEN/iu,
   );
   assert.equal((await resolveRoute("POST", "/", tmpdir())).statusCode, 405);
+});
+
+test("PEG-DASH-041 discovery and username/password login are page-memory-only assets", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [page.body, client.body, styles.body].join("\n");
+
+  assert.match(String(page.body), /Discover before you add|login-username|login-password|catalog-query|Search for something new/u);
+  assert.match(String(client.body), /libraryAuthorization|Basic|searchCatalog|\/api\/v1\/catalog\/search|renderCatalogItem/u);
+  assert.match(String(styles.body), /catalog-panel|catalog-results|catalog-result/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
 test("PEG-DASH-010 analyzed-item cards and controls remain page-memory-only assets", async () => {
@@ -653,6 +700,14 @@ function fakeServices(
       mode: "read_only",
       configured: false,
       state: "disabled",
+    }),
+    searchCatalog: async (query) => ({
+      kind: "catalog-search",
+      mode: "read_only",
+      status: "disabled",
+      query,
+      items: [],
+      sources: [],
     }),
     readMissingInventory,
     readItemFeasibility: async (selection) => ({

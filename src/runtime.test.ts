@@ -146,6 +146,57 @@ test("PEG-RUNTIME-004 concurrent and repeated status reads use one bounded probe
   assert.equal(refreshed.state, "available");
 });
 
+test("PEG-CATALOG-001 catalog search fans out and preserves partial availability", async () => {
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+    radarr: {
+      instanceId: "synthetic-radarr",
+      baseUrl: "https://radarr.example.invalid",
+      allowedHosts: ["radarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-radarr-key-value"),
+    },
+  };
+  const requests: string[] = [];
+  const services = createRuntimeServices(configuration, {
+    fetchImplementation: async (input) => {
+      const url = new URL(input);
+      requests.push(`${url.hostname}${url.pathname}${url.search}`);
+      if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/series/lookup") {
+        return new Response(JSON.stringify([{ title: "Synthetic Discovery", year: 2026, tvdbId: 42, id: 0 }]), { status: 200 });
+      }
+      return new Response("private radarr outage", { status: 503 });
+    },
+  });
+
+  const result = await services.searchCatalog("Synthetic Discovery");
+  assert.equal(result.status, "partial");
+  assert.deepEqual(result.items, [{
+    application: "sonarr",
+    instanceId: "synthetic-sonarr",
+    kind: "series",
+    title: "Synthetic Discovery",
+    year: 2026,
+    ids: { tvdb: "42" },
+    alreadyAdded: false,
+  }]);
+  assert.deepEqual(result.sources, [
+    { application: "sonarr", instanceId: "synthetic-sonarr", status: "available" },
+    { application: "radarr", instanceId: "synthetic-radarr", status: "unavailable" },
+  ]);
+  assert.deepEqual(requests.toSorted(), [
+    "radarr.example.invalid/api/v3/movie/lookup?term=Synthetic+Discovery",
+    "sonarr.example.invalid/api/v3/series/lookup?term=Synthetic+Discovery",
+  ]);
+  assert.doesNotMatch(JSON.stringify(result), /private|example\.invalid|key-value/iu);
+});
+
 test("PEG-RUNTIME-005 configured Radarr status returns measured browser-safe evidence", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-synthetic-radarr-runtime-"));
   context.after(async () => rm(directory, { recursive: true }));

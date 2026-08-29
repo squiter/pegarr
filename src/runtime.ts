@@ -40,6 +40,7 @@ import {
 } from "./controlled-grab.js";
 import type { GrabReconciliationOutcome } from "./grab-audit.js";
 import { GrabAuditStore } from "./grab-audit.js";
+import type { CatalogMediaItem } from "./domain.js";
 
 export type ArrIntegrationState =
   | "disabled"
@@ -74,10 +75,24 @@ export type ArrInstanceIntegrationStatus =
   | (SonarrIntegrationStatus & { readonly instanceId: string; readonly configured: true })
   | (RadarrIntegrationStatus & { readonly instanceId: string; readonly configured: true });
 
+export interface CatalogSearchResult {
+  readonly kind: "catalog-search";
+  readonly mode: "read_only";
+  readonly status: "available" | "partial" | "disabled" | "unavailable";
+  readonly query: string;
+  readonly items: readonly CatalogMediaItem[];
+  readonly sources: readonly {
+    readonly application: "sonarr" | "radarr";
+    readonly instanceId: string;
+    readonly status: "available" | "unavailable";
+  }[];
+}
+
 export interface RuntimeServices {
   readSonarrStatus(): Promise<SonarrIntegrationStatus>;
   readRadarrStatus(): Promise<RadarrIntegrationStatus>;
   readonly readArrInstanceStatuses?: () => Promise<readonly ArrInstanceIntegrationStatus[]>;
+  searchCatalog(query: string, application?: "sonarr" | "radarr"): Promise<CatalogSearchResult>;
   readMissingInventory(): Promise<MissingInventoryResult>;
   readItemFeasibility(
     selection: ItemFeasibilitySelection,
@@ -141,6 +156,7 @@ export function createRuntimeServices(
 ): RuntimeServices {
   const {
     accessToken: _accessToken,
+    login: _login,
     controlledGrab: _controlledGrab,
     ...inventoryConfiguration
   } = configuration;
@@ -393,6 +409,40 @@ export function createRuntimeServices(
       ...sonarrInstanceStatusReaders.map(async ({ instanceId, read }) => ({ ...(await read()), instanceId, configured: true as const })),
       ...radarrInstanceStatusReaders.map(async ({ instanceId, read }) => ({ ...(await read()), instanceId, configured: true as const })),
     ]),
+    searchCatalog: async (query, application) => {
+      const normalizedQuery = boundedCatalogQuery(query);
+      const sources = [
+        ...(application === "radarr" ? [] : [...sonarrClients].map(([instanceId, client]) => ({
+          application: "sonarr" as const,
+          instanceId,
+          read: () => client.lookupSeries(normalizedQuery),
+        }))),
+        ...(application === "sonarr" ? [] : [...radarrClients].map(([instanceId, client]) => ({
+          application: "radarr" as const,
+          instanceId,
+          read: () => client.lookupMovies(normalizedQuery),
+        }))),
+      ];
+      if (sources.length === 0) {
+        return { kind: "catalog-search", mode: "read_only", status: "disabled", query: normalizedQuery, items: [], sources: [] };
+      }
+      const settled = await Promise.allSettled(sources.map(({ read }) => read()));
+      const sourceStatus = sources.map(({ application: sourceApplication, instanceId }, index) => ({
+        application: sourceApplication,
+        instanceId,
+        status: settled[index]?.status === "fulfilled" ? "available" as const : "unavailable" as const,
+      }));
+      const items = settled.flatMap((result) => result.status === "fulfilled" ? [...result.value] : []);
+      const availableCount = sourceStatus.filter(({ status }) => status === "available").length;
+      return {
+        kind: "catalog-search",
+        mode: "read_only",
+        status: availableCount === sources.length ? "available" : availableCount === 0 ? "unavailable" : "partial",
+        query: normalizedQuery,
+        items,
+        sources: sourceStatus,
+      };
+    },
     readMissingInventory,
     readItemFeasibility: (selection, readOptions) => itemFeasibility.read(selection, readOptions),
     ...(controlledGrab === undefined
@@ -411,6 +461,14 @@ export function createRuntimeServices(
       managedOpenSubtitles?.close();
     },
   };
+}
+
+function boundedCatalogQuery(value: string): string {
+  const query = value.trim();
+  if (query.length < 2 || query.length > 200 || /[\u0000-\u001f\u007f]/u.test(query)) {
+    throw new TypeError("catalog query must contain 2 through 200 safe characters");
+  }
+  return query;
 }
 
 function createMissingInventoryReader(

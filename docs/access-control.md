@@ -1,24 +1,56 @@
 # Read-only API access control
 
-Pegarr's live library API is disabled unless `PEGARR_ACCESS_TOKEN_FILE` points to a valid secret file. When disabled, protected routes return the same generic `404` response as an unknown route and perform no Sonarr or Radarr work.
+Pegarr's live catalog and library APIs are disabled unless either `PEGARR_USERNAME` plus `PEGARR_PASSWORD_FILE`, or the legacy `PEGARR_ACCESS_TOKEN_FILE`, is configured. When disabled, protected routes return the same generic `404` response as an unknown route and perform no Sonarr or Radarr work.
 
 The protected read-only routes are:
 
 ```text
+GET /api/v1/catalog/search?q=<title>&application=<optional sonarr or radarr>
+Authorization: Basic <Pegarr username and password>
+
 GET /api/v1/library/missing
-Authorization: Bearer <access token>
+Authorization: Basic <Pegarr username and password>
 
 GET /api/v1/library/instances
-Authorization: Bearer <access token>
+Authorization: Basic <Pegarr username and password>
 
 GET /api/v1/library/items/sonarr/<instance-id>/episode/<episode-id>/feasibility
 GET /api/v1/library/items/radarr/<instance-id>/movie/<movie-id>/feasibility
-Authorization: Bearer <access token>
+Authorization: Basic <Pegarr username and password>
 ```
+
+Legacy API clients may continue to send `Authorization: Bearer <access token>` when `PEGARR_ACCESS_TOKEN_FILE` is configured.
 
 A missing, malformed, query-string, or incorrect token returns `401` before any upstream request. Mutation methods return `405`. Successful responses use `Cache-Control: no-store`, contain an explicit `read_only` mode, and retain only the private library evidence required by the current dashboard.
 
-## Secret boundary
+## Username and password boundary
+
+Configure a safe username and mount a random password from a restricted secret file:
+
+```dotenv
+PEGARR_USERNAME=pegarr
+PEGARR_PASSWORD_FILE=/run/secrets/pegarr_password
+```
+
+For Compose, set only the non-secret username and host secret-file path, then include the login overlay:
+
+```dotenv
+PEGARR_USERNAME=pegarr
+PEGARR_PASSWORD_HOST_FILE=/absolute/private/path/pegarr_password
+```
+
+```console
+docker compose \
+  -f deploy/compose.nas.yaml \
+  -f deploy/compose.login.yaml \
+  -f deploy/compose.sonarr.yaml \
+  -f deploy/compose.radarr.yaml \
+  up -d
+```
+
+Pegarr rejects a direct `PEGARR_PASSWORD`, incomplete login pairs, unsafe usernames, passwords shorter than 32 characters, and secret files larger than 4096 bytes. The dashboard holds the resulting Basic authorization value only in page memory and requires login again after reload. Basic authentication does not encrypt traffic, so HTTPS or a trusted private network is mandatory. The planned final boundary replaces repeated Basic headers with a bounded server-side `HttpOnly`, `SameSite=Strict` session.
+
+## Legacy token boundary
 
 Generate a random token of at least 32 characters, store it outside the repository, and restrict the file to the account managing the container:
 
@@ -33,7 +65,7 @@ Set only its host path in `.env`:
 PEGARR_ACCESS_TOKEN_HOST_FILE=/absolute/private/path/pegarr_access_token
 ```
 
-Enable the access overlay with the Arr overlays whose missing items should appear:
+Legacy installations can enable the token overlay with the Arr overlays whose missing items should appear:
 
 ```console
 docker compose \
@@ -56,4 +88,4 @@ Authorized inventory reads request at most one configured page from each Arr ins
 
 Authorized item reads resolve the requested instance and ID from that server-owned inventory before starting release, Bazarr, or provider work. Legacy unscoped URLs remain available only when the item identity is unambiguous. Successful item reports share a 30-second bounded in-memory window. See [item feasibility API](item-feasibility-api.md).
 
-`PEG-ACCESS-001` through `PEG-ACCESS-004`, `PEG-CONFIG-006`, `PEG-INVENTORY-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-011`, and `PEG-DOCKER-013` are the deterministic evidence for this boundary.
+`PEG-ACCESS-001` through `PEG-ACCESS-005`, `PEG-CONFIG-006`, `PEG-CONFIG-014`, `PEG-CATALOG-001`, `PEG-CATALOG-002`, `PEG-SONARR-011`, `PEG-RADARR-010`, `PEG-INVENTORY-004`, `PEG-ITEM-001` through `PEG-ITEM-004`, `PEG-DOCKER-011`, and `PEG-DOCKER-013` are the deterministic evidence for this boundary.
