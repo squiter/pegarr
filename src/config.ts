@@ -70,6 +70,7 @@ export interface RuntimeConfiguration {
   readonly opensubtitles?: OpenSubtitlesRuntimeConfiguration;
   readonly accessToken?: SecretValue;
   readonly login?: LoginRuntimeConfiguration;
+  readonly sessionCookieSecure?: true;
   readonly catalogAdd?: CatalogAddRuntimeConfiguration;
   readonly controlledGrab?: ControlledGrabRuntimeConfiguration;
   readonly missingPageSize?: number;
@@ -132,6 +133,10 @@ export async function loadRuntimeConfiguration(
   });
   const accessToken = await loadAccessToken(environment);
   const login = await loadLoginConfiguration(environment);
+  const sessionCookieSecure = parseBoolean(environment.PEGARR_SESSION_COOKIE_SECURE, "PEGARR_SESSION_COOKIE_SECURE");
+  if (sessionCookieSecure && login === undefined) {
+    throw new ConfigurationError("Secure session cookies require Pegarr username/password login");
+  }
   const catalogAdd = loadCatalogAddConfiguration(environment);
   const controlledGrab = await loadControlledGrabConfiguration(environment);
   if (catalogAdd !== undefined && login === undefined) {
@@ -171,6 +176,7 @@ export async function loadRuntimeConfiguration(
     ...(opensubtitles === undefined ? {} : { opensubtitles }),
     ...(accessToken === undefined ? {} : { accessToken }),
     ...(login === undefined ? {} : { login }),
+    ...(sessionCookieSecure ? { sessionCookieSecure: true as const } : {}),
     ...(catalogAdd === undefined ? {} : { catalogAdd }),
     ...(controlledGrab === undefined ? {} : { controlledGrab }),
     ...(missingPageSize === undefined ? {} : { missingPageSize }),

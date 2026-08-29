@@ -250,14 +250,17 @@ test("PEG-CONFIG-014 Pegarr login loads a bounded password only from a secret fi
   const configuration = await loadRuntimeConfiguration({
     PEGARR_USERNAME: "pegarr-user",
     PEGARR_PASSWORD_FILE: passwordPath,
+    PEGARR_SESSION_COOKIE_SECURE: "true",
   });
   assert.equal(configuration.login?.username, "pegarr-user");
   assert.equal(configuration.login?.password.reveal(), password);
+  assert.equal(configuration.sessionCookieSecure, true);
   assert.doesNotMatch(JSON.stringify(configuration), new RegExp(password, "u"));
 
   await assert.rejects(loadRuntimeConfiguration({ PEGARR_USERNAME: "pegarr-user" }), /PEGARR_PASSWORD_FILE/u);
   await assert.rejects(loadRuntimeConfiguration({ PEGARR_PASSWORD: password }), /PEGARR_PASSWORD_FILE/u);
   await assert.rejects(loadRuntimeConfiguration({ PEGARR_USERNAME: "unsafe user", PEGARR_PASSWORD_FILE: passwordPath }), /safe login name/u);
+  await assert.rejects(loadRuntimeConfiguration({ PEGARR_SESSION_COOKIE_SECURE: "true" }), /require Pegarr username\/password login/u);
 });
 
 test("PEG-CONFIG-007 runtime SubDL language mappings are explicit, bounded, and canonical", async () => {

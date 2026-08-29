@@ -7,6 +7,7 @@ import { AccessControl } from "./access-control.js";
 import { SecretValue } from "./config.js";
 import { healthResponse, readinessResponse, requestLogEntry, resolveRoute } from "./app.js";
 import type { RuntimeServices } from "./runtime.js";
+import { SessionStore } from "./session-store.js";
 
 test("PEG-OPS-001 liveness is healthy", () => {
   assert.deepEqual(healthResponse(), {
@@ -52,6 +53,66 @@ test("PEG-OPS-003 structured request logs are bounded and redact URLs, IDs, and 
     statusCode: 500,
     durationMs: 0,
   });
+});
+
+test("PEG-SESSION-002 login, restore, CSRF mutation, and logout use a bounded HttpOnly server session", async () => {
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  let sequence = 0;
+  const sessionStore = new SessionStore({
+    now: () => 1_000,
+    randomToken: () => `session_${String(++sequence).padStart(40, "0")}`,
+  });
+  const control = new AccessControl(undefined, { username, password: new SecretValue(password) });
+  let updates = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  Object.assign(services, {
+    updateSubtitleSettings: async () => {
+      updates += 1;
+      return {
+        kind: "subtitle-settings", mode: "settings", status: "configured", revision: 1,
+        policy: { source: "explicit_default", profileId: "pegarr-default", profileName: "Pegarr default", languages: [{ code: "pt-BR", required: true, forced: false, hearingImpaired: "either" }] },
+        providers: [],
+      } as const;
+    },
+  });
+  const baseAccess = { control, sessionStore, secureSessionCookie: true };
+
+  const rejected = await resolveRoute("POST", "/api/v1/session/login", tmpdir(), services, baseAccess, { username, password: "wrong-password-value-000000000000" });
+  assert.equal(rejected.statusCode, 401);
+  const login = await resolveRoute("POST", "/api/v1/session/login", tmpdir(), services, baseAccess, { username, password });
+  assert.equal(login.statusCode, 200);
+  const setCookie = login.headers?.["set-cookie"] ?? "";
+  assert.match(setCookie, /^pegarr_session=[A-Za-z0-9_-]{32,128}; Path=\/; HttpOnly; SameSite=Strict; Secure; Expires=/u);
+  const sessionToken = /^pegarr_session=([^;]+)/u.exec(setCookie)?.[1];
+  assert.ok(sessionToken);
+  const loginBody = login.body as { csrfToken: string; expiresAt: string };
+  assert.equal(sessionStore.authorizeMutation(sessionToken, loginBody.csrfToken), true);
+  assert.doesNotMatch(JSON.stringify(login.body), /synthetic-password/u);
+  assert.equal(JSON.stringify(login.body).includes(sessionToken), false);
+
+  const authenticatedAccess = { ...baseAccess, sessionToken, sessionAuthenticated: true, sessionMutationAuthorized: false };
+  assert.equal((await resolveRoute("GET", "/api/v1/library/missing", tmpdir(), services, authenticatedAccess)).statusCode, 200);
+  assert.equal((await resolveRoute("PUT", "/api/v1/settings/subtitles", tmpdir(), services, authenticatedAccess, {
+    languages: [{ code: "pt-BR", required: true, forced: false, hearingImpaired: "either" }],
+  })).statusCode, 403);
+  assert.equal(updates, 0);
+
+  const restored = await resolveRoute("GET", "/api/v1/session", tmpdir(), services, authenticatedAccess);
+  assert.equal(restored.statusCode, 200);
+  const restoredCsrf = (restored.body as { csrfToken: string }).csrfToken;
+  assert.equal(sessionStore.authorizeMutation(sessionToken, loginBody.csrfToken), false);
+  assert.equal(sessionStore.authorizeMutation(sessionToken, restoredCsrf), true);
+  const mutationAccess = { ...authenticatedAccess, sessionMutationAuthorized: true };
+  assert.equal((await resolveRoute("PUT", "/api/v1/settings/subtitles", tmpdir(), services, mutationAccess, {
+    languages: [{ code: "pt-BR", required: true, forced: false, hearingImpaired: "either" }],
+  })).statusCode, 200);
+  assert.equal(updates, 1);
+
+  const logout = await resolveRoute("POST", "/api/v1/session/logout", tmpdir(), services, mutationAccess);
+  assert.equal(logout.statusCode, 200);
+  assert.match(logout.headers?.["set-cookie"] ?? "", /HttpOnly; SameSite=Strict; Secure; Max-Age=0/u);
+  assert.equal(sessionStore.authenticate(sessionToken), false);
 });
 
 test("PEG-API-001 health routes reject mutations", async () => {
@@ -668,14 +729,16 @@ test("PEG-DASH-003 dashboard routes are accessible, responsive, and secret-safe"
   assert.equal((await resolveRoute("POST", "/", tmpdir())).statusCode, 405);
 });
 
-test("PEG-DASH-041 discovery and username/password login are page-memory-only assets", async () => {
+test("PEG-DASH-041 PEG-SESSION-003 discovery login uses a restorable server session without browser storage", async () => {
   const page = await resolveRoute("GET", "/", tmpdir());
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
   const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
   const assets = [page.body, client.body, styles.body].join("\n");
 
   assert.match(String(page.body), /Discover before you add|login-username|login-password|catalog-query|Search for something new/u);
-  assert.match(String(client.body), /libraryAuthorization|Basic|searchCatalog|\/api\/v1\/catalog\/search|renderCatalogItem/u);
+  assert.match(String(client.body), /establishSession|restoreSession|signOut|\/api\/v1\/session\/login|\/api\/v1\/catalog\/search|renderCatalogItem/u);
+  assert.match(String(client.body), /sessionCsrfToken|x-pegarr-csrf|credentials: "same-origin"|libraryHeaders/u);
+  assert.match(String(page.body), /private, expiring server session|session-logout/u);
   assert.match(String(styles.body), /catalog-panel|catalog-results|catalog-result/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
@@ -708,7 +771,7 @@ test("PEG-DASH-044 catalog add is an explicit login-only mutation and never offe
   const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
   const assets = [page.body, client.body, styles.body].join("\n");
   assert.match(String(page.body), /explicitly add with automatic search disabled|never downloads a release/u);
-  assert.match(String(client.body), /catalogAddEnabled|startsWith\("Basic "\)|loadCatalogAddOptions|renderCatalogAddForm|submitCatalogAdd/u);
+  assert.match(String(client.body), /catalogAddEnabled|sessionCsrfToken !== undefined|loadCatalogAddOptions|renderCatalogAddForm|submitCatalogAdd/u);
   assert.match(String(client.body), /Automatic search stays off|no release will be downloaded|timeout.*Unknown/iu);
   assert.match(String(client.body), /\/add-options|\/add`|exact release analysis/u);
   assert.match(String(styles.body), /catalog-add-panel|catalog-add-form|catalog-add-warning/u);

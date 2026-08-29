@@ -5,6 +5,7 @@ import { JsonTransportError } from "./adapters/http.js";
 import { createRequestHandler } from "./app.js";
 import { ConfigurationError, loadRuntimeConfiguration } from "./config.js";
 import { createRuntimeServices } from "./runtime.js";
+import { SessionStore } from "./session-store.js";
 
 const port = parsePort(process.env.PORT);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -15,8 +16,11 @@ async function start(): Promise<void> {
   const services = createRuntimeServices(configuration, { environment: process.env, dataDirectory });
   const accessControl = new AccessControl(configuration.accessToken, configuration.login);
   const adminAccessControl = new AccessControl(configuration.controlledGrab?.adminToken);
+  const sessionStore = configuration.login === undefined ? undefined : new SessionStore();
   const server = createServer(createRequestHandler(dataDirectory, services, accessControl, {
     adminAccessControl,
+    ...(sessionStore === undefined ? {} : { sessionStore }),
+    secureSessionCookie: configuration.sessionCookieSecure === true,
     log: (entry) => process.stdout.write(`${JSON.stringify(entry)}\n`),
   }));
 

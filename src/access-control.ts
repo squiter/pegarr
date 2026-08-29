@@ -17,6 +17,10 @@ export class AccessControl {
     return this.#expectedDigest !== undefined || this.#expectedUsernameDigest !== undefined;
   }
 
+  get loginConfigured(): boolean {
+    return this.#expectedUsernameDigest !== undefined && this.#expectedPasswordDigest !== undefined;
+  }
+
   get challenge(): string {
     return this.#expectedUsernameDigest === undefined
       ? 'Bearer realm="pegarr", charset="UTF-8"'

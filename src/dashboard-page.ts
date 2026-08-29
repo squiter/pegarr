@@ -14,7 +14,10 @@ export const dashboardPage = `<!doctype html>
       <span class="brand-mark" aria-hidden="true">P</span>
       <span><strong>Pegarr</strong><small>Subtitle-aware release selection</small></span>
     </a>
-    <span class="phase-badge">Discovery-first P0</span>
+    <div class="topbar-actions">
+      <span class="phase-badge">Discovery-first P0</span>
+      <button id="session-logout" class="quiet-button" type="button" hidden>Sign out</button>
+    </div>
   </header>
 
   <main id="main" class="shell">
@@ -28,7 +31,7 @@ export const dashboardPage = `<!doctype html>
       <div>
         <p class="eyebrow">Private access</p>
         <h2 id="access-title">Sign in to Pegarr</h2>
-        <p>Use the Pegarr username and password configured on this server. They stay only in this page's memory and clear when you reload or close it.</p>
+        <p>Use the Pegarr username and password configured on this server. Pegarr exchanges them for a private, expiring server session and clears the password immediately.</p>
       </div>
       <form id="access-form" class="access-form">
         <label for="login-username">Username</label>

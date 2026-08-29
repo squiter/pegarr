@@ -254,6 +254,11 @@ for (const contract of ['createHash("sha256")', "timingSafeEqual", "authorizatio
   }
 }
 
+const sessionStore = readFileSync(resolve(repoRoot, "src/session-store.ts"), "utf8");
+for (const contract of ["randomBytes(32)", "createHash(\"sha256\")", "timingSafeEqual", "#prune(now)", "maxSessions", "csrfDigest"]) {
+  if (!sessionStore.includes(contract)) issues.push(`The bounded session store must retain ${contract}`);
+}
+
 const dashboardClient = readFileSync(resolve(repoRoot, "src/web/dashboard.js"), "utf8");
 for (const forbidden of ["localStorage", "sessionStorage", "document.cookie", "innerHTML"]) {
   if (dashboardClient.includes(forbidden)) {
@@ -261,8 +266,11 @@ for (const forbidden of ["localStorage", "sessionStorage", "document.cookie", "i
   }
 }
 for (const contract of [
-  "authorization: libraryAuthorization",
-  'libraryAuthorization = `Basic ${btoa(`${username}:${password}`)}`',
+  "libraryHeaders",
+  "sessionCsrfToken",
+  'fetch("/api/v1/session/login"',
+  'fetch("/api/v1/session"',
+  'credentials: "same-origin"',
   'libraryAuthorization = `Bearer ${legacyToken}`',
   'credentials: "omit"',
   "replaceChildren",
@@ -285,6 +293,7 @@ const loginCompose = readFileSync(resolve(repoRoot, "deploy/compose.login.yaml")
 for (const contract of [
   "PEGARR_USERNAME:",
   "PEGARR_PASSWORD_FILE: /run/secrets/pegarr_password",
+  "PEGARR_SESSION_COOKIE_SECURE:",
   "pegarr_password:",
 ]) {
   if (!loginCompose.includes(contract)) issues.push(`The login Compose overlay must retain ${contract}`);
@@ -499,6 +508,9 @@ if (/^phase-(?:2|3)-/u.test(manifest.phase)) {
     "parsePrepareGrabBody",
     "parseExecuteGrabBody",
     "parseCatalogContinuationGrabPath",
+    'pathname === "/api/v1/session/login"',
+    "sessionMutationAuthorized",
+    "SameSite=Strict",
     "parseReconcileGrabBody",
     'pathname === "/api/v1/grabs/history"',
     "readBoundedJsonBody(request)",

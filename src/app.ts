@@ -15,6 +15,7 @@ import type {
 import { SonarrAddError } from "./adapters/sonarr.js";
 import { RadarrAddError } from "./adapters/radarr.js";
 import type { ItemFeasibilitySelection } from "./item-feasibility.js";
+import { SessionStore } from "./session-store.js";
 
 export interface RouteResult {
   readonly statusCode: number;
@@ -33,13 +34,18 @@ export interface RouteAccess {
   readonly control: AccessControl;
   readonly adminControl?: AccessControl;
   readonly authorization?: string;
+  readonly sessionStore?: SessionStore;
+  readonly sessionToken?: string;
+  readonly sessionAuthenticated?: boolean;
+  readonly sessionMutationAuthorized?: boolean;
+  readonly secureSessionCookie?: boolean;
 }
 
 export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "catalog_continuation" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "session_status" | "session_login" | "session_logout" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "catalog_continuation" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -48,6 +54,8 @@ export interface RequestHandlerOptions {
   readonly now?: () => number;
   readonly log?: (entry: RequestLogEntry) => void;
   readonly adminAccessControl?: AccessControl;
+  readonly sessionStore?: SessionStore;
+  readonly secureSessionCookie?: boolean;
 }
 
 const dashboardAssetRoutes = new Map<string, DashboardAssetName>([
@@ -100,6 +108,12 @@ export async function resolveRoute(
   const catalogContinuationGrab = parseCatalogContinuationGrabPath(pathname);
   const subtitleSettings = pathname === "/api/v1/settings/subtitles";
   const providerSettings = parseProviderSettingsPath(pathname);
+  const sessionLogin = pathname === "/api/v1/session/login";
+  const sessionLogout = pathname === "/api/v1/session/logout";
+  const sessionStatus = pathname === "/api/v1/session";
+  if ((sessionStatus || sessionLogin || sessionLogout) && (access?.sessionStore === undefined || access.control.loginConfigured !== true)) {
+    return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+  }
   const protectedLibraryRoute = catalogSearch || catalogCoverage !== undefined || catalogAdd !== undefined || catalogContinuation !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
@@ -145,6 +159,12 @@ export async function resolveRoute(
   }
   if (catalogContinuationGrab !== undefined && method !== "POST") {
     return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if ((sessionLogin || sessionLogout) && method !== "POST") {
+    return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (sessionStatus && method !== "GET") {
+    return { statusCode: 405, headers: { allow: "GET" }, body: { service: "pegarr", status: "method_not_allowed" } };
   }
   if (subtitleSettings && method !== "GET" && method !== "PUT") {
     return { statusCode: 405, headers: { allow: "GET, PUT" }, body: { service: "pegarr", status: "method_not_allowed" } };
@@ -202,6 +222,47 @@ export async function resolveRoute(
 
   if (pathname === "/health/ready") {
     return readinessResponse(dataDirectory);
+  }
+
+  if (sessionStatus) {
+    if (access?.sessionAuthenticated !== true) return { statusCode: 401, body: { service: "pegarr", status: "unauthorized" } };
+    const session = access.sessionStore?.refresh(access.sessionToken);
+    return session === undefined
+      ? { statusCode: 401, body: { service: "pegarr", status: "unauthorized" } }
+      : { statusCode: 200, body: { kind: "session", status: "authenticated", ...session } };
+  }
+
+  if (sessionLogin) {
+    try {
+      const body = parseSessionLoginBody(requestBody);
+      const authorization = `Basic ${Buffer.from(`${body.username}:${body.password}`, "utf8").toString("base64")}`;
+      if (!access?.control.authorizeLogin(authorization)) {
+        return { statusCode: 401, body: { service: "pegarr", status: "unauthorized" } };
+      }
+      const session = access.sessionStore?.create();
+      if (session === undefined) return { statusCode: 503, body: { service: "pegarr", status: "session_unavailable" } };
+      return {
+        statusCode: 200,
+        headers: { "set-cookie": sessionCookie(session.token, session.expiresAt, access.secureSessionCookie === true) },
+        body: { kind: "session", status: "authenticated", csrfToken: session.csrfToken, expiresAt: session.expiresAt },
+      };
+    } catch (error) {
+      return error instanceof InvalidRequestBodyError
+        ? { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } }
+        : { statusCode: 503, body: { service: "pegarr", status: "session_unavailable" } };
+    }
+  }
+
+  if (sessionLogout) {
+    if (access?.sessionAuthenticated === true && access.sessionMutationAuthorized !== true) {
+      return { statusCode: 403, body: { service: "pegarr", status: "csrf_required" } };
+    }
+    access?.sessionStore?.destroy(access.sessionToken);
+    return {
+      statusCode: 200,
+      headers: { "set-cookie": expiredSessionCookie(access?.secureSessionCookie === true) },
+      body: { kind: "session", status: "signed_out" },
+    };
   }
 
   if (pathname === "/api/v1/feasibility/demo") {
@@ -524,7 +585,7 @@ function authorizeLibraryRoute(access: RouteAccess | undefined): RouteResult | u
   if (access === undefined) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
-  if (access.control.authorize(access.authorization)) return undefined;
+  if (access.sessionAuthenticated === true || access.control.authorize(access.authorization)) return undefined;
   return {
     statusCode: 401,
     headers: { "www-authenticate": access.control.challenge },
@@ -547,6 +608,11 @@ function authorizeAdministratorRoute(access: RouteAccess | undefined): RouteResu
 function authorizeSettingsMutation(access: RouteAccess | undefined): RouteResult | undefined {
   if (access === undefined) return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   if (access.control.authorizeLogin(access.authorization)) return undefined;
+  if (access.sessionAuthenticated === true) {
+    return access.sessionMutationAuthorized === true
+      ? undefined
+      : { statusCode: 403, body: { service: "pegarr", status: "csrf_required" } };
+  }
   if (access.control.authorize(access.authorization)) {
     return { statusCode: 403, body: { service: "pegarr", status: "login_required" } };
   }
@@ -671,6 +737,14 @@ function parseCatalogContinuationGrabPath(pathname: string): {
 
 class InvalidRequestBodyError extends Error {}
 
+function parseSessionLoginBody(value: unknown): { readonly username: string; readonly password: string } {
+  const body = requestRecord(value, ["username", "password"]);
+  return {
+    username: requestString(body.username, "username", 64),
+    password: requestString(body.password, "password", 4_096),
+  };
+}
+
 function parsePrepareGrabBody(value: unknown): { readonly releaseId: string } {
   const body = requestRecord(value, ["releaseId"]);
   return { releaseId: requestString(body.releaseId, "releaseId", 64) };
@@ -766,6 +840,23 @@ function requestPositiveInteger(value: unknown, field: string): number {
   return value;
 }
 
+const sessionCookieName = "pegarr_session";
+function expiredSessionCookie(secure: boolean): string {
+  return `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Strict${secure ? "; Secure" : ""}; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+}
+
+function sessionCookie(token: string, expiresAt: string, secure: boolean): string {
+  return `${sessionCookieName}=${token}; Path=/; HttpOnly; SameSite=Strict${secure ? "; Secure" : ""}; Expires=${new Date(expiresAt).toUTCString()}`;
+}
+
+function sessionTokenFromCookie(value: string | undefined): string | undefined {
+  if (value === undefined || value.length > 8_192) return undefined;
+  const matches = value.split(";").map((part) => part.trim()).filter((part) => part.startsWith(`${sessionCookieName}=`));
+  if (matches.length !== 1) return undefined;
+  const token = matches[0]?.slice(sessionCookieName.length + 1);
+  return token !== undefined && token.length >= 32 && token.length <= 128 && /^[A-Za-z0-9_-]+$/u.test(token) ? token : undefined;
+}
+
 function boundedHistoryLimit(value: string | null): number {
   if (value === null) return 50;
   if (!/^\d{1,3}$/u.test(value)) throw new InvalidRequestBodyError();
@@ -819,10 +910,15 @@ export function createRequestHandler(
     const now = options.now ?? Date.now;
     const startedAt = now();
     const authorization = request.headers.authorization;
+    const sessionToken = sessionTokenFromCookie(request.headers.cookie);
+    const csrfHeader = request.headers["x-pegarr-csrf"];
+    const csrfToken = typeof csrfHeader === "string" ? csrfHeader : undefined;
+    const sessionAuthenticated = options.sessionStore?.authenticate(sessionToken) === true;
+    const sessionMutationAuthorized = options.sessionStore?.authorizeMutation(sessionToken, csrfToken) === true;
     let result: RouteResult;
     try {
       const safeRoute = safeRequestRoute(request.url);
-      const requestBody = (request.method === "POST" && (safeRoute.startsWith("grab_") || safeRoute === "catalog_add")) || (request.method === "PUT" && (safeRoute === "subtitle_settings" || safeRoute === "provider_settings"))
+      const requestBody = (request.method === "POST" && (safeRoute.startsWith("grab_") || safeRoute === "catalog_add" || safeRoute === "session_login")) || (request.method === "PUT" && (safeRoute === "subtitle_settings" || safeRoute === "provider_settings"))
         ? await readBoundedJsonBody(request)
         : undefined;
       result = await resolveRoute(
@@ -838,6 +934,15 @@ export function createRequestHandler(
                 ? {}
                 : { adminControl: options.adminAccessControl }),
               ...(typeof authorization === "string" ? { authorization } : {}),
+              ...(options.sessionStore === undefined
+                ? {}
+                : {
+                    sessionStore: options.sessionStore,
+                    ...(sessionToken === undefined ? {} : { sessionToken }),
+                    sessionAuthenticated,
+                    sessionMutationAuthorized,
+                    secureSessionCookie: options.secureSessionCookie === true,
+                  }),
             },
         requestBody,
       );
@@ -937,6 +1042,9 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (dashboardAssetRoutes.has(pathname)) return "dashboard_asset";
   if (pathname === "/health") return "health";
   if (pathname === "/health/ready") return "readiness";
+  if (pathname === "/api/v1/session/login") return "session_login";
+  if (pathname === "/api/v1/session/logout") return "session_logout";
+  if (pathname === "/api/v1/session") return "session_status";
   if (pathname === "/api/v1/feasibility/demo") return "demo_feasibility";
   if (pathname === "/api/v1/integrations/sonarr/status") return "sonarr_status";
   if (pathname === "/api/v1/integrations/radarr/status") return "radarr_status";

@@ -126,12 +126,15 @@
 | PEG-CACHE-008 | Corrupt cache rows are discarded and fetched again | `src/provider-search-cache.test.ts` |
 | PEG-ACCESS-001 | Bearer authentication uses one bounded in-memory token | `src/access-control.test.ts` |
 | PEG-ACCESS-005 | Username and password login is bounded and constant-time comparable | `src/access-control.test.ts` |
+| PEG-SESSION-001 | Server sessions are opaque, bounded, expiring, and CSRF-bound | `src/session-store.test.ts` |
+| PEG-SESSION-002 | Session login, restore, mutation, and logout preserve authentication boundaries | `src/app.test.ts` |
 | PEG-CONFIG-014 | Pegarr login loads its password only from a bounded secret file | `src/config.test.ts` |
 | PEG-SONARR-011 | Sonarr catalog lookup finds unadded series without private metadata | `src/adapters/sonarr.test.ts` |
 | PEG-RADARR-010 | Radarr catalog lookup finds unadded movies without private metadata | `src/adapters/radarr.test.ts` |
 | PEG-CATALOG-001 | Catalog search fans out and preserves partial Arr availability | `src/runtime.test.ts` |
 | PEG-CATALOG-002 | Catalog search authenticates before bounded read-only work | `src/app.test.ts` |
-| PEG-DASH-041 | Discovery and username-password login stay page-memory-only | `src/app.test.ts` |
+| PEG-DASH-041 | Discovery and username-password login stay secret-safe | `src/app.test.ts` |
+| PEG-SESSION-003 | Dashboard sessions restore and sign out without browser-stored credentials | `src/app.test.ts` |
 | PEG-SETTINGS-001 | Subtitle policy persists atomically without provider secrets | `src/subtitle-settings.test.ts` |
 | PEG-SETTINGS-002 | Invalid, duplicate, oversized, and corrupt policy fails closed | `src/subtitle-settings.test.ts` |
 | PEG-SETTINGS-003 | Settings reads support API clients while writes require login | `src/app.test.ts` |

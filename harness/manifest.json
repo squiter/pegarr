@@ -1395,6 +1395,18 @@
       "boundary": "Pure authentication checks over synthetic credentials; no HTTP, persistence, or network"
     },
     {
+      "id": "PEG-SESSION-001",
+      "title": "Server sessions are opaque, bounded, expiring, and CSRF-bound",
+      "evidence": "src/session-store.test.ts",
+      "boundary": "Deterministic clock and synthetic opaque tokens in process memory only; no HTTP, persistence, or network"
+    },
+    {
+      "id": "PEG-SESSION-002",
+      "title": "Session login, restore, mutation, and logout preserve authentication boundaries",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process routes with synthetic credentials, cookies, and service spies; no browser, network, or external mutation"
+    },
+    {
       "id": "PEG-CONFIG-014",
       "title": "Pegarr login loads its password only from a bounded secret file",
       "evidence": "src/config.test.ts",
@@ -1426,9 +1438,15 @@
     },
     {
       "id": "PEG-DASH-041",
-      "title": "Discovery and username-password login remain page-memory-only assets",
+      "title": "Discovery and username-password login remain secret-safe assets",
       "evidence": "src/app.test.ts",
-      "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
+      "boundary": "Static dashboard assets with no script-readable cookie or browser storage, network, or mutation"
+    },
+    {
+      "id": "PEG-SESSION-003",
+      "title": "Dashboard sessions restore, expire, and sign out without browser-stored credentials",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with page-memory CSRF state and no script-readable cookie, browser storage, network, or mutation"
     },
     {
       "id": "PEG-SETTINGS-001",

@@ -94,6 +94,7 @@ const elements = {
   releaseVisibleCount: document.querySelector("#release-visible-count"),
   requiredCoverageFilter: document.querySelector("#required-coverage-filter"),
   searchInput: document.querySelector("#search-input"),
+  sessionLogout: document.querySelector("#session-logout"),
   sortOrder: document.querySelector("#sort-order"),
   sourceStatus: document.querySelector("#source-status"),
   statusMessage: document.querySelector("#status-message"),
@@ -102,6 +103,7 @@ const elements = {
 };
 
 let libraryAuthorization;
+let sessionCsrfToken;
 let inventoryRows = [];
 let selectedRow;
 let activeFeasibility;
@@ -121,9 +123,12 @@ elements.accessForm?.addEventListener("submit", async (event) => {
   const password = elements.loginPassword?.value ?? "";
   const legacyToken = elements.accessToken?.value ?? "";
   if (username && password.length >= 32) {
-    libraryAuthorization = `Basic ${btoa(`${username}:${password}`)}`;
+    const authenticated = await establishSession(username, password);
+    elements.loginPassword.value = "";
+    if (!authenticated) return;
   } else if (legacyToken.length >= 32) {
     libraryAuthorization = `Bearer ${legacyToken}`;
+    sessionCsrfToken = undefined;
   } else {
     setStatus("Enter your Pegarr username and password, or a legacy access token.", "error");
     return;
@@ -135,6 +140,7 @@ elements.accessForm?.addEventListener("submit", async (event) => {
 
 elements.catalogForm?.addEventListener("submit", searchCatalog);
 elements.subtitleSettingsForm?.addEventListener("submit", saveSubtitleSettings);
+elements.sessionLogout?.addEventListener("click", signOut);
 
 elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
@@ -176,8 +182,93 @@ for (const control of [elements.releaseSearchInput, elements.releaseDecisionFilt
   control?.addEventListener("change", renderReleaseSelection);
 }
 
+void restoreSession();
+
+async function establishSession(username, password) {
+  try {
+    const response = await fetch("/api/v1/session/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username, password }),
+      cache: "no-store",
+      credentials: "same-origin",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    const result = await response.json();
+    if (!response.ok || typeof result?.csrfToken !== "string") {
+      showAccess("Those credentials were not accepted. Check the configured login and try again.");
+      return false;
+    }
+    libraryAuthorization = undefined;
+    sessionCsrfToken = result.csrfToken;
+    return true;
+  } catch {
+    showAccess("Pegarr could not start a private session. Try again when the server is available.");
+    return false;
+  }
+}
+
+async function restoreSession() {
+  try {
+    const response = await fetch("/api/v1/session", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) return;
+    const result = await response.json();
+    if (typeof result?.csrfToken !== "string") return;
+    sessionCsrfToken = result.csrfToken;
+    await loadInventory();
+  } catch {
+    // An absent or expired session leaves the normal sign-in form available.
+  }
+}
+
+async function signOut() {
+  const csrfToken = sessionCsrfToken;
+  libraryAuthorization = undefined;
+  sessionCsrfToken = undefined;
+  if (csrfToken !== undefined) {
+    try {
+      await fetch("/api/v1/session/logout", {
+        method: "POST",
+        headers: { "x-pegarr-csrf": csrfToken },
+        cache: "no-store",
+        credentials: "same-origin",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+      });
+    } catch {
+      // Local page evidence is still cleared even if the server is unavailable.
+    }
+  }
+  clearPageEvidence();
+  showAccess("Signed out. Sign in again when you are ready.");
+}
+
+function libraryHeaders(extra = {}, mutation = false) {
+  return {
+    ...(libraryAuthorization === undefined ? {} : { authorization: libraryAuthorization }),
+    ...(mutation && sessionCsrfToken !== undefined ? { "x-pegarr-csrf": sessionCsrfToken } : {}),
+    ...extra,
+  };
+}
+
+function hasLibraryAccess() {
+  return libraryAuthorization !== undefined || sessionCsrfToken !== undefined;
+}
+
+function clearLibraryAuthentication() {
+  libraryAuthorization = undefined;
+  sessionCsrfToken = undefined;
+}
+
 async function loadInventory() {
-  if (libraryAuthorization === undefined) {
+  if (!hasLibraryAccess()) {
     showAccess("Sign in to reconnect.");
     return;
   }
@@ -186,20 +277,20 @@ async function loadInventory() {
   try {
     const response = await fetch("/api/v1/library/missing", {
       method: "GET",
-      headers: { authorization: libraryAuthorization },
+      headers: libraryHeaders(),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
     if (response.status === 401) {
-      libraryAuthorization = undefined;
+      clearLibraryAuthentication();
       clearPageEvidence();
       showAccess("Those credentials were not accepted. Check the configured login and try again.");
       return;
     }
     if (response.status === 404) {
-      libraryAuthorization = undefined;
+      clearLibraryAuthentication();
       clearPageEvidence();
       showAccess("Private library access is not enabled on this Pegarr server.");
       return;
@@ -215,6 +306,7 @@ async function loadInventory() {
     elements.catalog.hidden = false;
     elements.subtitleSettings.hidden = false;
     elements.dashboard.hidden = false;
+    elements.sessionLogout.hidden = false;
     await loadSubtitleSettings();
     renderInventory();
     setStatus(
@@ -234,6 +326,9 @@ async function loadInventory() {
 
 function showAccess(message) {
   elements.dashboard.hidden = true;
+  elements.catalog.hidden = true;
+  elements.subtitleSettings.hidden = true;
+  elements.sessionLogout.hidden = true;
   elements.accessPanel.hidden = false;
   setStatus(message, "error");
   elements.loginUsername?.focus();
@@ -241,7 +336,7 @@ function showAccess(message) {
 
 async function searchCatalog(event) {
   event.preventDefault();
-  if (libraryAuthorization === undefined) return showAccess("Sign in to search the catalog.");
+  if (!hasLibraryAccess()) return showAccess("Sign in to search the catalog.");
   const query = elements.catalogQuery.value.trim();
   if (query.length < 2 || query.length > 200) {
     setCatalogStatus("Enter at least two characters.", "error");
@@ -254,14 +349,14 @@ async function searchCatalog(event) {
     const endpoint = `/api/v1/catalog/search?q=${encodeURIComponent(query)}${application === "all" ? "" : `&application=${encodeURIComponent(application)}`}`;
     const response = await fetch(endpoint, {
       method: "GET",
-      headers: { authorization: libraryAuthorization },
+      headers: libraryHeaders(),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
     if (response.status === 401) {
-      libraryAuthorization = undefined;
+      clearLibraryAuthentication();
       clearPageEvidence();
       showAccess("Those credentials were not accepted. Sign in again.");
       return;
@@ -312,7 +407,7 @@ function renderCatalogItem(item) {
   const addPanel = document.createElement("div");
   addPanel.className = "catalog-add-panel";
   addPanel.hidden = true;
-  if (!item?.alreadyAdded && catalogAddEnabled && libraryAuthorization?.startsWith("Basic ")) {
+  if (!item?.alreadyAdded && catalogAddEnabled && sessionCsrfToken !== undefined) {
     const add = document.createElement("button");
     add.className = "primary-button catalog-add-button";
     add.type = "button";
@@ -337,9 +432,9 @@ async function loadCatalogAddOptions(item, button, panel) {
   try {
     const response = await fetch(`${catalogItemEndpoint(item, identity)}/add-options`, {
       method: "GET",
-      headers: { authorization: libraryAuthorization },
+      headers: libraryHeaders(),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
@@ -431,10 +526,10 @@ async function submitCatalogAdd(event, context) {
   try {
     const response = await fetch(`${catalogItemEndpoint(context.item, context.identity)}/add`, {
       method: "POST",
-      headers: { authorization: libraryAuthorization, "content-type": "application/json" },
+      headers: libraryHeaders({ "content-type": "application/json" }, true),
       body: JSON.stringify(body),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
@@ -472,9 +567,9 @@ async function loadCatalogSeriesScopes(continuationId, item, receipt, status) {
   try {
     const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/scopes`, {
       method: "GET",
-      headers: { authorization: libraryAuthorization },
+      headers: libraryHeaders(),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
@@ -563,14 +658,14 @@ async function loadCatalogContinuationAnalysis(continuationId, item, receipt, st
   try {
     const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis${scopePath}`, {
       method: "GET",
-      headers: { authorization: libraryAuthorization },
+      headers: libraryHeaders(),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
     if (response.status === 401) {
-      libraryAuthorization = undefined;
+      clearLibraryAuthentication();
       clearPageEvidence();
       showAccess("Those credentials were not accepted. Sign in again.");
       return;
@@ -636,9 +731,9 @@ async function loadSubtitleSettings() {
   try {
     const response = await fetch("/api/v1/settings/subtitles", {
       method: "GET",
-      headers: { authorization: libraryAuthorization },
+      headers: libraryHeaders(),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
@@ -707,7 +802,7 @@ function renderSubtitleSettings(settings) {
 
 async function saveProviderSettings(event, provider, mappingInput, keyInput, button) {
   event.preventDefault();
-  if (!libraryAuthorization?.startsWith("Basic ")) {
+  if (sessionCsrfToken === undefined) {
     keyInput.value = "";
     setSubtitleSettingsStatus("Sign in with the Pegarr username and password to configure providers.", "error");
     return;
@@ -731,10 +826,10 @@ async function saveProviderSettings(event, provider, mappingInput, keyInput, but
   try {
     const response = await fetch(`/api/v1/settings/providers/${providerId}`, {
       method: "PUT",
-      headers: { authorization: libraryAuthorization, "content-type": "application/json" },
+      headers: libraryHeaders({ "content-type": "application/json" }, true),
       body: JSON.stringify({ ...(apiKey.length === 0 ? {} : { apiKey }), languageMappings }),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
@@ -760,7 +855,7 @@ function parseProviderMappings(value) {
 
 async function saveSubtitleSettings(event) {
   event.preventDefault();
-  if (!libraryAuthorization?.startsWith("Basic ")) {
+  if (sessionCsrfToken === undefined) {
     setSubtitleSettingsStatus("Sign in with the Pegarr username and password to change settings.", "error");
     return;
   }
@@ -773,10 +868,10 @@ async function saveSubtitleSettings(event) {
   try {
     const response = await fetch("/api/v1/settings/subtitles", {
       method: "PUT",
-      headers: { authorization: libraryAuthorization, "content-type": "application/json" },
+      headers: libraryHeaders({ "content-type": "application/json" }, true),
       body: JSON.stringify({ languages: codes.map((code) => ({ code, required: true, forced: false, hearingImpaired: "either" })) }),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
@@ -804,9 +899,9 @@ async function previewCatalogCoverage(item, button, output) {
     const endpoint = `/api/v1/catalog/${item.application}/${encodeURIComponent(item.instanceId)}/${providerId}/${encodeURIComponent(value)}/coverage`;
     const response = await fetch(endpoint, {
       method: "GET",
-      headers: { authorization: libraryAuthorization },
+      headers: libraryHeaders(),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
@@ -1066,14 +1161,14 @@ async function loadFeasibility(row, refresh = false) {
     const endpoint = `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/feasibility${refresh ? "?refresh=1" : ""}`;
     const response = await fetch(endpoint, {
       method: "GET",
-      headers: { authorization: libraryAuthorization },
+      headers: libraryHeaders(),
       cache: "no-store",
-      credentials: "omit",
+      credentials: "same-origin",
       redirect: "error",
       referrerPolicy: "no-referrer",
     });
     if (response.status === 401) {
-      libraryAuthorization = undefined;
+      clearLibraryAuthentication();
       clearPageEvidence();
       showAccess("Those credentials were not accepted. Check the configured login and try again.");
       return;

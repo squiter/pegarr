@@ -54,6 +54,7 @@ button, select { cursor: pointer; }
   margin: 0 auto;
   padding: 1.25rem 1.5rem;
 }
+.topbar-actions { display: flex; gap: .65rem; align-items: center; }
 
 .brand {
   display: inline-flex;

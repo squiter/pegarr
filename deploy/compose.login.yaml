@@ -3,6 +3,7 @@ services:
     environment:
       PEGARR_USERNAME: ${PEGARR_USERNAME:-pegarr}
       PEGARR_PASSWORD_FILE: /run/secrets/pegarr_password
+      PEGARR_SESSION_COOKIE_SECURE: ${PEGARR_SESSION_COOKIE_SECURE:-false}
       PEGARR_MISSING_PAGE_SIZE: ${PEGARR_MISSING_PAGE_SIZE:-50}
     secrets:
       - pegarr_password
