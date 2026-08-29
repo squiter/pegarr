@@ -153,3 +153,52 @@ test("PEG-INSTANCE-003 duplicate protection is isolated by Arr instance", async 
   assert.equal(store.recentBlocking(anime, releaseId, 0), undefined);
   store.close();
 });
+
+test("PEG-GRAB-010 legacy audit schema migrates before season-pack identities are recorded", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-grab-season-migration-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  const path = join(directory, "audit.sqlite");
+  const legacy = new DatabaseSync(path);
+  legacy.exec(`
+    CREATE TABLE grab_audit (
+      event_id TEXT PRIMARY KEY,
+      idempotency_key TEXT NOT NULL UNIQUE,
+      application TEXT NOT NULL CHECK (application IN ('sonarr', 'radarr')),
+      kind TEXT NOT NULL CHECK (kind IN ('episode', 'movie')),
+      item_id INTEGER NOT NULL CHECK (item_id > 0),
+      target_label TEXT NOT NULL,
+      release_id TEXT NOT NULL,
+      release_title TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('in_progress', 'grabbed', 'revalidation_failed', 'timeout_unknown', 'upstream_failure')),
+      detail_code TEXT,
+      requested_at_ms INTEGER NOT NULL CHECK (requested_at_ms >= 0),
+      completed_at_ms INTEGER
+    ) STRICT;
+    INSERT INTO grab_audit VALUES (
+      'event_legacy_0001', 'idempotency_legacy_0001', 'sonarr', 'episode', 305,
+      'Synthetic Show S03E05', 'sonarr-0123456789abcdef01234567',
+      'Synthetic.Show.S03E05.1080p', 'grabbed', 'arr_accepted_grab', 1000, 1010
+    );
+  `);
+  legacy.close();
+
+  const store = new GrabAuditStore(path);
+  assert.equal(store.byEventId("event_legacy_0001")?.instanceId, "sonarr");
+  const season = store.begin({
+    eventId: "event_season_0001",
+    idempotencyKey: "idempotency_season_0001",
+    selection: { application: "sonarr", instanceId: "sonarr-main", kind: "season", itemId: 91, seasonNumber: 3 },
+    targetLabel: "Synthetic Show Season 3",
+    releaseId: "sonarr-fedcba9876543210fedcba98",
+    releaseTitle: "Synthetic.Show.S03.1080p",
+    requestedAtMs: 2_000,
+  });
+  assert.equal(season.kind, "season");
+  assert.equal(season.seasonNumber, 3);
+  assert.equal(store.recentBlocking(
+    { application: "sonarr", instanceId: "sonarr-main", kind: "season", itemId: 91, seasonNumber: 3 },
+    "sonarr-fedcba9876543210fedcba98",
+    0,
+  )?.eventId, "event_season_0001");
+  store.close();
+});

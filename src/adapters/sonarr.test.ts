@@ -449,3 +449,22 @@ test("PEG-SONARR-010 controlled Grab revalidates and POSTs only the server-side 
     (error: unknown) => error instanceof SonarrGrabError && error.code === "timeout" && !/private/u.test(error.message),
   );
 });
+
+test("PEG-SONARR-015 season-pack Grab revalidation preserves the exact issued season scope", async () => {
+  const transport = new FakeTransport();
+  transport.response = { status: 200, headers: {}, body: syntheticSonarrSeasonReleaseResponse };
+  const releaseId = mapSonarrReleaseResponse(syntheticSonarrSeasonReleaseResponse, "synthetic-sonarr")[0]!.id;
+  const revalidated = await client(transport).revalidateSeasonRelease(91, 3, releaseId);
+
+  assert.equal(revalidated?.candidate.id, releaseId);
+  assert.deepEqual(revalidated?.handle, { guid: "synthetic-season-guid-1", indexerId: 11 });
+  assert.deepEqual(transport.requests, [{
+    method: "GET",
+    path: "/api/v3/release",
+    query: { seriesId: "91", seasonNumber: "3" },
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500,
+    maxResponseBytes: 64_000,
+  }]);
+  assert.doesNotMatch(JSON.stringify(revalidated?.candidate), /synthetic-season-guid/iu);
+});

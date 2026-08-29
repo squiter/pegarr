@@ -1,7 +1,7 @@
 import { isAbsolute } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import type { ItemFeasibilitySelection } from "./item-feasibility.js";
+import type { ControlledGrabSelection } from "./grab-selection.js";
 
 export type GrabAuditStatus =
   | "in_progress"
@@ -17,8 +17,9 @@ export interface GrabAuditEntry {
   readonly idempotencyKey: string;
   readonly application: "sonarr" | "radarr";
   readonly instanceId: string;
-  readonly kind: "episode" | "movie";
+  readonly kind: "episode" | "movie" | "season";
   readonly itemId: number;
+  readonly seasonNumber?: number;
   readonly targetLabel: string;
   readonly releaseId: string;
   readonly releaseTitle: string;
@@ -33,12 +34,33 @@ export interface GrabAuditEntry {
 export interface BeginGrabAudit {
   readonly eventId: string;
   readonly idempotencyKey: string;
-  readonly selection: ItemFeasibilitySelection;
+  readonly selection: ControlledGrabSelection;
   readonly targetLabel: string;
   readonly releaseId: string;
   readonly releaseTitle: string;
   readonly requestedAtMs: number;
 }
+
+const grabAuditTableSql = `
+  CREATE TABLE IF NOT EXISTS grab_audit (
+    event_id TEXT PRIMARY KEY,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    application TEXT NOT NULL CHECK (application IN ('sonarr', 'radarr')),
+    instance_id TEXT,
+    kind TEXT NOT NULL CHECK (kind IN ('episode', 'movie', 'season')),
+    item_id INTEGER NOT NULL CHECK (item_id > 0),
+    season_number INTEGER CHECK (season_number IS NULL OR (season_number >= 0 AND season_number <= 10000)),
+    target_label TEXT NOT NULL,
+    release_id TEXT NOT NULL,
+    release_title TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('in_progress', 'grabbed', 'revalidation_failed', 'timeout_unknown', 'upstream_failure')),
+    detail_code TEXT,
+    requested_at_ms INTEGER NOT NULL CHECK (requested_at_ms >= 0),
+    completed_at_ms INTEGER,
+    reconciliation_outcome TEXT CHECK (reconciliation_outcome IN ('grabbed', 'not_grabbed')),
+    reconciled_at_ms INTEGER CHECK (reconciled_at_ms >= 0)
+  ) STRICT;
+`;
 
 export class GrabAuditStore {
   readonly #database: DatabaseSync;
@@ -47,26 +69,7 @@ export class GrabAuditStore {
     if (!isAbsolute(databasePath)) throw new TypeError("Grab audit database path must be absolute");
     this.#database = new DatabaseSync(databasePath);
     this.#database.exec("PRAGMA busy_timeout = 5000");
-    this.#database.exec(`
-      CREATE TABLE IF NOT EXISTS grab_audit (
-        event_id TEXT PRIMARY KEY,
-        idempotency_key TEXT NOT NULL UNIQUE,
-        application TEXT NOT NULL CHECK (application IN ('sonarr', 'radarr')),
-        kind TEXT NOT NULL CHECK (kind IN ('episode', 'movie')),
-        item_id INTEGER NOT NULL CHECK (item_id > 0),
-        target_label TEXT NOT NULL,
-        release_id TEXT NOT NULL,
-        release_title TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('in_progress', 'grabbed', 'revalidation_failed', 'timeout_unknown', 'upstream_failure')),
-        detail_code TEXT,
-        requested_at_ms INTEGER NOT NULL CHECK (requested_at_ms >= 0),
-        completed_at_ms INTEGER
-      ) STRICT;
-      CREATE INDEX IF NOT EXISTS grab_audit_target_recent
-        ON grab_audit(application, kind, item_id, release_id, requested_at_ms DESC);
-      CREATE INDEX IF NOT EXISTS grab_audit_recent
-        ON grab_audit(requested_at_ms DESC, event_id DESC);
-    `);
+    this.#database.exec(grabAuditTableSql);
     const columns = this.#database.prepare("PRAGMA table_info(grab_audit)").all() as unknown as Array<{ readonly name: string }>;
     if (!columns.some(({ name }) => name === "instance_id")) {
       this.#database.exec("ALTER TABLE grab_audit ADD COLUMN instance_id TEXT");
@@ -78,9 +81,36 @@ export class GrabAuditStore {
     if (!columns.some(({ name }) => name === "reconciled_at_ms")) {
       this.#database.exec("ALTER TABLE grab_audit ADD COLUMN reconciled_at_ms INTEGER CHECK (reconciled_at_ms >= 0)");
     }
+    if (!columns.some(({ name }) => name === "season_number")) {
+      this.#database.exec("ALTER TABLE grab_audit ADD COLUMN season_number INTEGER CHECK (season_number IS NULL OR (season_number >= 0 AND season_number <= 10000))");
+    }
+    const tableSql = (this.#database.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'grab_audit'").get() as { readonly sql?: string } | undefined)?.sql ?? "";
+    if (!tableSql.includes("'season'")) {
+      this.#database.exec(`
+        DROP INDEX IF EXISTS grab_audit_target_recent;
+        DROP INDEX IF EXISTS grab_audit_recent;
+        DROP INDEX IF EXISTS grab_audit_instance_target_recent;
+        ALTER TABLE grab_audit RENAME TO grab_audit_before_seasons;
+        ${grabAuditTableSql}
+        INSERT INTO grab_audit(
+          event_id, idempotency_key, application, instance_id, kind, item_id, season_number,
+          target_label, release_id, release_title, status, detail_code, requested_at_ms,
+          completed_at_ms, reconciliation_outcome, reconciled_at_ms
+        )
+        SELECT event_id, idempotency_key, application, instance_id, kind, item_id, season_number,
+          target_label, release_id, release_title, status, detail_code, requested_at_ms,
+          completed_at_ms, reconciliation_outcome, reconciled_at_ms
+        FROM grab_audit_before_seasons;
+        DROP TABLE grab_audit_before_seasons;
+      `);
+    }
     this.#database.exec(`
+      CREATE INDEX IF NOT EXISTS grab_audit_target_recent
+        ON grab_audit(application, kind, item_id, season_number, release_id, requested_at_ms DESC);
+      CREATE INDEX IF NOT EXISTS grab_audit_recent
+        ON grab_audit(requested_at_ms DESC, event_id DESC);
       CREATE INDEX IF NOT EXISTS grab_audit_instance_target_recent
-        ON grab_audit(application, instance_id, kind, item_id, release_id, requested_at_ms DESC)
+        ON grab_audit(application, instance_id, kind, item_id, season_number, release_id, requested_at_ms DESC)
     `);
     const recoveredAtMs = now();
     safeEpoch(recoveredAtMs, "recoveredAtMs");
@@ -97,9 +127,9 @@ export class GrabAuditStore {
     validateBegin(entry);
     this.#database.prepare(`
       INSERT INTO grab_audit(
-        event_id, idempotency_key, application, instance_id, kind, item_id,
+        event_id, idempotency_key, application, instance_id, kind, item_id, season_number,
         target_label, release_id, release_title, status, requested_at_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?)
     `).run(
       entry.eventId,
       entry.idempotencyKey,
@@ -107,6 +137,7 @@ export class GrabAuditStore {
       entry.selection.instanceId ?? entry.selection.application,
       entry.selection.kind,
       entry.selection.itemId,
+      entry.selection.kind === "season" ? entry.selection.seasonNumber : null,
       entry.targetLabel,
       entry.releaseId,
       entry.releaseTitle,
@@ -165,7 +196,7 @@ export class GrabAuditStore {
   }
 
   recentBlocking(
-    selection: ItemFeasibilitySelection,
+    selection: ControlledGrabSelection,
     releaseId: string,
     sinceMs: number,
   ): GrabAuditEntry | undefined {
@@ -174,7 +205,7 @@ export class GrabAuditStore {
     safeEpoch(sinceMs, "sinceMs");
     const row = this.#database.prepare(`
       SELECT * FROM grab_audit
-      WHERE application = ? AND instance_id = ? AND kind = ? AND item_id = ? AND release_id = ?
+      WHERE application = ? AND instance_id = ? AND kind = ? AND item_id = ? AND season_number IS ? AND release_id = ?
         AND (
           (status = 'timeout_unknown' AND reconciliation_outcome IS NULL)
           OR (status IN ('in_progress', 'grabbed') AND requested_at_ms >= ?)
@@ -182,7 +213,7 @@ export class GrabAuditStore {
         )
       ORDER BY requested_at_ms DESC, event_id DESC
       LIMIT 1
-    `).get(selection.application, selection.instanceId ?? selection.application, selection.kind, selection.itemId, releaseId, sinceMs, sinceMs) as AuditRow | undefined;
+    `).get(selection.application, selection.instanceId ?? selection.application, selection.kind, selection.itemId, selection.kind === "season" ? selection.seasonNumber : null, releaseId, sinceMs, sinceMs) as AuditRow | undefined;
     return row === undefined ? undefined : mapRow(row);
   }
 
@@ -212,8 +243,9 @@ interface AuditRow {
   readonly idempotency_key: string;
   readonly application: "sonarr" | "radarr";
   readonly instance_id: string | null;
-  readonly kind: "episode" | "movie";
+  readonly kind: "episode" | "movie" | "season";
   readonly item_id: number;
+  readonly season_number: number | null;
   readonly target_label: string;
   readonly release_id: string;
   readonly release_title: string;
@@ -233,6 +265,7 @@ function mapRow(row: AuditRow): GrabAuditEntry {
     instanceId: row.instance_id ?? row.application,
     kind: row.kind,
     itemId: row.item_id,
+    ...(row.season_number === null ? {} : { seasonNumber: row.season_number }),
     targetLabel: row.target_label,
     releaseId: row.release_id,
     releaseTitle: row.release_title,
@@ -259,9 +292,11 @@ function validateBegin(entry: BeginGrabAudit): void {
   safeEpoch(entry.requestedAtMs, "requestedAtMs");
 }
 
-function validateSelection(selection: ItemFeasibilitySelection): void {
+function validateSelection(selection: ControlledGrabSelection): void {
   if (!Number.isSafeInteger(selection.itemId) || selection.itemId < 1) throw new TypeError("itemId must be positive");
-  if ((selection.application === "sonarr") !== (selection.kind === "episode")) throw new TypeError("selection is inconsistent");
+  if (selection.application === "sonarr" && selection.kind !== "episode" && selection.kind !== "season") throw new TypeError("selection is inconsistent");
+  if (selection.application === "radarr" && selection.kind !== "movie") throw new TypeError("selection is inconsistent");
+  if (selection.kind === "season" && (!Number.isSafeInteger(selection.seasonNumber) || selection.seasonNumber < 0 || selection.seasonNumber > 10_000)) throw new TypeError("seasonNumber is invalid");
   if (selection.instanceId !== undefined && !/^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(selection.instanceId)) throw new TypeError("instanceId is invalid");
 }
 

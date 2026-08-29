@@ -545,7 +545,7 @@ test("PEG-CONTINUE-002 PEG-CONTINUE-007 Radarr continuation analysis can prepare
   services.close();
 });
 
-test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 Sonarr continuation accepts only issued scopes and exact episodes can use controlled Grab", async (context) => {
+test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 Sonarr continuation accepts only issued scopes for episode or season-pack controlled Grab", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-sonarr-continuation-"));
   context.after(async () => rm(directory, { recursive: true }));
   await new SubtitleSettingsStore(directory).update({ languages: [
@@ -635,22 +635,35 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 Sonarr continuation acc
   assert.equal(season.report.item.kind, "season");
   assert.equal(season.report.item.season, 3);
   assert.equal(season.report.policy.source, "explicit_default");
-  assert.deepEqual(season.capabilities, { controlledGrab: false });
+  assert.deepEqual(season.capabilities, { controlledGrab: true });
   const episode = await services.catalogContinuation.analyze(added.next.continuationId, { kind: "episode", episodeId: 305 });
   assert.equal(episode.status, "ready");
   if (episode.status !== "ready") return;
   assert.equal(episode.report.item.kind, "episode");
   assert.equal(episode.report.item.episode, 5);
   assert.deepEqual(episode.capabilities, { controlledGrab: true });
-  const releaseId = episode.report.releases.find(({ video }) => video.downloadAllowed)?.releaseId;
-  assert.ok(releaseId);
+  const seasonReleaseId = season.report.releases.find(({ video }) => video.downloadAllowed)?.releaseId;
+  assert.ok(seasonReleaseId);
   const seasonPrepare = await services.catalogContinuation.prepareGrab(
     added.next.continuationId,
-    releaseId,
+    seasonReleaseId,
     { kind: "season", seasonNumber: 3 },
   );
-  assert.equal(seasonPrepare.status, "item_unavailable");
-  assert.equal("detailCode" in seasonPrepare ? seasonPrepare.detailCode : undefined, "scope_not_grabbable");
+  assert.equal(seasonPrepare.status, "confirmation_required");
+  if (seasonPrepare.status !== "confirmation_required") return;
+  assert.equal(seasonPrepare.kind, "season");
+  assert.equal(seasonPrepare.seasonNumber, 3);
+  assert.equal(seasonPrepare.confirmation, `GRAB ${seasonPrepare.releaseTitle} FOR Synthetic Show Season 3`);
+  const seasonGrabbed = await services.catalogContinuation.executeGrab(
+    added.next.continuationId,
+    seasonPrepare.challengeId,
+    seasonPrepare.confirmation,
+    "continuation_runtime_season_0001",
+    { kind: "season", seasonNumber: 3 },
+  );
+  assert.equal(seasonGrabbed.status, "grabbed");
+  const releaseId = episode.report.releases.find(({ video }) => video.downloadAllowed)?.releaseId;
+  assert.ok(releaseId);
   const prepared = await services.catalogContinuation.prepareGrab(
     added.next.continuationId,
     releaseId,
@@ -663,13 +676,17 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 Sonarr continuation acc
     added.next.continuationId,
     prepared.challengeId,
     prepared.confirmation,
-    "continuation_runtime_0001",
+    "continuation_runtime_episode_0001",
     { kind: "episode", episodeId: 305 },
   );
   assert.equal(grabbed.status, "grabbed");
-  assert.equal(releasePosts, 1);
+  assert.equal(releasePosts, 2);
   assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/episode").length, 1);
-  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/release").length, 5);
+  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/release").length, 8);
+  assert.deepEqual(services.controlledGrab?.history().map(({ kind, itemId, seasonNumber }) => ({ kind, itemId, seasonNumber })).toSorted((left, right) => left.kind.localeCompare(right.kind)), [
+    { kind: "episode", itemId: 305, seasonNumber: undefined },
+    { kind: "season", itemId: 91, seasonNumber: 3 },
+  ]);
   assert.doesNotMatch(JSON.stringify({ scopes, season, episode }), /private|api.?key|example\.invalid|download.*handle/iu);
   services.close();
 });

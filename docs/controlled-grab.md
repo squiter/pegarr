@@ -6,7 +6,7 @@ Controlled Grab is Pegarr's opt-in Phase 2 mutation boundary and is disabled by 
 
 A Grab is never automatic. Pegarr requires all of the following for every attempt:
 
-1. the selected episode or movie is either still present in Pegarr's bounded missing inventory or is an exact server-owned catalog-continuation target;
+1. the selected episode or movie is either still present in Pegarr's bounded missing inventory, or an exact movie, episode, or season is selected through a server-owned catalog continuation;
 2. Sonarr or Radarr returns the same release again and still accepts it;
 3. the user opens the administrator dialog for that exact release;
 4. the user supplies the independent administrator token;
@@ -55,13 +55,13 @@ All endpoints use `Authorization: Bearer <administrator token>`. The regular lib
 
 - `POST /api/v1/library/items/{application}/{instanceId}/{kind}/{itemId}/grab/prepare` accepts only `{ "releaseId": "..." }` and returns a short-lived, instance-bound challenge after revalidation.
 - `POST /api/v1/library/items/{application}/{instanceId}/{kind}/{itemId}/grab/execute` accepts only the returned `challengeId`, the exact `confirmation`, and a client-generated `idempotencyKey`.
-- `POST /api/v1/catalog/continuations/{opaque-id}/analysis[/episode/{episode-id}]/grab/prepare` and `/execute` provide the same flow for a newly added exact movie or episode. The continuation supplies the target identity; season-pack routes are not eligible.
+- `POST /api/v1/catalog/continuations/{opaque-id}/analysis[/episode/{episode-id}|/season/{season-number}]/grab/prepare` and `/execute` provide the same flow for a newly added exact movie, episode, or season pack. The continuation supplies the target identity, and Sonarr revalidates a season pack with the exact series ID and issued season number.
 - `GET /api/v1/grabs/history?limit=50` returns at most 100 public audit events and never returns idempotency keys or Arr handles.
 - `POST /api/v1/grabs/{eventId}/reconcile` accepts only an outcome (`grabbed` or `not_grabbed`) and its exact event-specific confirmation phrase.
 
 Request bodies are JSON-only and limited to 16 KiB. Challenges live only in process memory, expire after two minutes, and are bounded to 100 entries. Restarting Pegarr invalidates outstanding challenges but preserves audit history.
 
-The earlier single-instance item routes remain compatible. An instance-scoped request is required when an item ID would otherwise be ambiguous, and challenge binding, duplicate protection, and audit history are isolated by instance.
+The earlier single-instance item routes remain compatible. An instance-scoped request is required when an item ID would otherwise be ambiguous, and challenge binding, duplicate protection, and audit history are isolated by instance. Season-pack audit and duplicate identities additionally include the season number; startup migrates older episode/movie-only audit schemas without discarding their history.
 
 ## Timeouts and reconciliation
 

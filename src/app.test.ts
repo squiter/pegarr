@@ -601,7 +601,7 @@ test("PEG-CONTINUE-009 continuation Grab routes require independent administrato
   const libraryToken = "synthetic-access-token-value-0000000001";
   const adminToken = "synthetic-admin-token-value-00000000005";
   const continuationId = "g".repeat(32);
-  const scope = { kind: "episode", episodeId: 305 } as const;
+  let expectedScope: { readonly kind: "episode"; readonly episodeId: number } | { readonly kind: "season"; readonly seasonNumber: number } = { kind: "episode", episodeId: 305 };
   let preparations = 0;
   let executions = 0;
   const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
@@ -613,7 +613,7 @@ test("PEG-CONTINUE-009 continuation Grab routes require independent administrato
         preparations += 1;
         assert.equal(receivedId, continuationId);
         assert.equal(releaseId, "sonarr-0123456789abcdef01234567");
-        assert.deepEqual(receivedScope, scope);
+        assert.deepEqual(receivedScope, expectedScope);
         return {
           status: "confirmation_required",
           mode: "controlled_grab",
@@ -631,7 +631,7 @@ test("PEG-CONTINUE-009 continuation Grab routes require independent administrato
       },
       executeGrab: async (_receivedId: string, _challengeId: string, _confirmation: string, _idempotencyKey: string, receivedScope: unknown) => {
         executions += 1;
-        assert.deepEqual(receivedScope, scope);
+        assert.deepEqual(receivedScope, expectedScope);
         return { status: "challenge_expired", mode: "controlled_grab", detailCode: "challenge_missing_or_expired" } as const;
       },
     },
@@ -670,6 +670,17 @@ test("PEG-CONTINUE-009 continuation Grab routes require independent administrato
     idempotencyKey: "continuation_idempotency_0001",
   })).statusCode, 410);
   assert.equal(executions, 1);
+  expectedScope = { kind: "season", seasonNumber: 3 };
+  const seasonPrepared = await resolveRoute(
+    "POST",
+    `/api/v1/catalog/continuations/${continuationId}/analysis/season/3/grab/prepare`,
+    tmpdir(),
+    services,
+    access,
+    prepareBody,
+  );
+  assert.equal(seasonPrepared.statusCode, 200);
+  assert.equal(preparations, 2);
 });
 
 test("PEG-INSTANCE-004 instance status is authenticated, bounded, and read-only", async () => {
@@ -894,6 +905,16 @@ test("PEG-DASH-049 subtitle settings expose explicit per-language matching prefe
   assert.match(String(client.body), /renderSubtitleLanguagePreferences|Forced subtitles only|Hearing-impaired subtitles|subtitleLanguageRequirements/u);
   assert.match(String(model.body), /export function subtitleLanguageRequirements|hearingImpairedValues|Subtitle languages must be unique/u);
   assert.match(String(styles.body), /subtitle-language-preferences|subtitle-language-check|subtitle-hearing-preference/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-050 server-issued season analysis can enter the exact controlled Grab dialog", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const assets = [client.body, model.body].join("\n");
+  assert.match(String(client.body), /analysis\$\{scopePath\}|row\.grabEndpoint|server-issued season scope/u);
+  assert.match(String(client.body), /independent administrator token|confirmation must match|credentials: "omit"/u);
+  assert.match(String(model.body), /controlledGrab: capabilities\.controlledGrab === true|item\.kind === "season"/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 

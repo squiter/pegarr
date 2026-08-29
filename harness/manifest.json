@@ -1630,9 +1630,9 @@
     },
     {
       "id": "PEG-CONTINUE-008",
-      "title": "Only exact episode continuation scopes can use controlled Grab",
+      "title": "Only server-issued exact episode or season scopes can use controlled Grab",
       "evidence": "src/runtime.test.ts",
-      "boundary": "Temporary audit database and injected Sonarr responses; season mutation is blocked and no network or live service is used"
+      "boundary": "Temporary audit database and injected Sonarr responses; invalid scopes are blocked and no network or live service is used"
     },
     {
       "id": "PEG-CONTINUE-009",
@@ -1675,6 +1675,30 @@
       "title": "Subtitle settings expose required, forced, and hearing-impaired preferences",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no browser storage, credentials, network, or mutation"
+    },
+    {
+      "id": "PEG-SONARR-015",
+      "title": "Season-pack revalidation preserves the exact issued Sonarr scope",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Injected transport and synthetic season releases; no network or mutation"
+    },
+    {
+      "id": "PEG-GRAB-010",
+      "title": "Legacy Grab audit schemas migrate before season identities are recorded",
+      "evidence": "src/grab-audit.test.ts",
+      "boundary": "Temporary SQLite database containing synthetic audit rows only"
+    },
+    {
+      "id": "PEG-CONTINUE-010",
+      "title": "Issued season scopes reuse controlled Grab revalidation, confirmation, and audit",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary audit database and injected Sonarr responses with exactly one synthetic season mutation; no network or live service"
+    },
+    {
+      "id": "PEG-DASH-050",
+      "title": "Season analysis can enter the exact controlled Grab dialog",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with server-owned paths and no browser storage, network, or mutation"
     }
   ],
   "manualGaps": [

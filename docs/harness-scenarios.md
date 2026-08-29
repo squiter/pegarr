@@ -165,7 +165,7 @@
 | PEG-CONTINUE-006 | Sonarr scope routes authenticate before upstream work | `src/app.test.ts` |
 | PEG-DASH-046 | Successful series add loads explicit season and episode scope choices | `src/app.test.ts` |
 | PEG-CONTINUE-007 | Exact movie continuation rows can use explicit controlled Grab | `src/runtime.test.ts` |
-| PEG-CONTINUE-008 | Only exact episode continuation scopes can use controlled Grab | `src/runtime.test.ts` |
+| PEG-CONTINUE-008 | Only server-issued exact episode or season scopes can use controlled Grab | `src/runtime.test.ts` |
 | PEG-CONTINUE-009 | Continuation Grab routes authorize administrators before work | `src/app.test.ts` |
 | PEG-DASH-047 | Continuation rows reuse the exact controlled Grab dialog | `src/app.test.ts` |
 | PEG-ONBOARD-001 | Onboarding derives only safe discovery prerequisites and capabilities | `src/runtime.test.ts` |
@@ -173,6 +173,10 @@
 | PEG-DASH-048 | First-run guidance separates prerequisites, operator actions, and administrator Grab | `src/app.test.ts` |
 | PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
 | PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
+| PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |
+| PEG-GRAB-010 | Legacy Grab audit schemas migrate before season identities are recorded | `src/grab-audit.test.ts` |
+| PEG-CONTINUE-010 | Issued season scopes reuse controlled Grab safety and audit | `src/runtime.test.ts` |
+| PEG-DASH-050 | Season analysis can enter the exact controlled Grab dialog | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |

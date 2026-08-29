@@ -118,17 +118,19 @@ Bearer authentication does not encrypt traffic. Use HTTPS or a trusted private n
 
 The read-only token is deliberately unable to authorize a controlled Grab. Phase 2 uses a second administrator token, loaded from its own secret file, for the mutation routes. See [controlled Grab](controlled-grab.md).
 
-Exact movie and episode catalog continuations can use that same administrator boundary when both catalog add and controlled Grab are enabled:
+Exact movie, episode, and server-issued season catalog continuations can use that same administrator boundary when both catalog add and controlled Grab are enabled:
 
 ```text
 POST /api/v1/catalog/continuations/<opaque-id>/analysis/grab/prepare
 POST /api/v1/catalog/continuations/<opaque-id>/analysis/grab/execute
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/season/<season-number>/grab/prepare
+POST /api/v1/catalog/continuations/<opaque-id>/analysis/season/<season-number>/grab/execute
 POST /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>/grab/prepare
 POST /api/v1/catalog/continuations/<opaque-id>/analysis/episode/<episode-id>/grab/execute
 Authorization: Bearer <independent administrator token>
 ```
 
-Administrator authorization is checked before continuation lookup, Arr revalidation, or audit work. The browser cannot submit an Arr item ID, target label, release handle, or season-pack mutation through these routes.
+Administrator authorization is checked before continuation lookup, Arr revalidation, or audit work. The browser cannot submit an Arr item ID, target label, or release handle; a season-pack mutation is accepted only for the exact season number already issued by the continuation.
 
 ## Request bounds
 

@@ -330,6 +330,33 @@ export class SonarrClient {
     }
   }
 
+  async revalidateSeasonRelease(
+    seriesId: number,
+    seasonNumber: number,
+    releaseId: string,
+  ): Promise<RevalidatedArrRelease | undefined> {
+    const normalizedSeriesId = boundedInteger(seriesId, 1, Number.MAX_SAFE_INTEGER, "seriesId");
+    const normalizedSeasonNumber = boundedInteger(seasonNumber, 0, 10_000, "seasonNumber");
+    const normalizedReleaseId = safeReleaseId(releaseId, "sonarr");
+    const response = await this.#requestJson({
+      method: "GET",
+      path: "/api/v3/release",
+      query: { seriesId: String(normalizedSeriesId), seasonNumber: String(normalizedSeasonNumber) },
+      headers: { accept: "application/json", "x-api-key": this.#apiKey },
+      timeoutMs: this.#timeoutMs,
+      maxResponseBytes: this.#maxResponseBytes,
+    });
+    assertSuccessfulStatus(response, "season release revalidation");
+    try {
+      return mapSonarrRevalidatedReleaseResponse(response.body, this.#instanceId)
+        .find(({ candidate }) => candidate.id === normalizedReleaseId);
+    } catch {
+      throw new SonarrAdapterError("invalid_response", "Sonarr returned an invalid season release response", {
+        status: response.status,
+      });
+    }
+  }
+
   async grabRelease(handle: ArrReleaseHandle): Promise<ArrGrabReceipt> {
     const normalized = validateGrabHandle(handle);
     let response: JsonResponse;

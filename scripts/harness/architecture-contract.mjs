@@ -60,6 +60,7 @@ if (
   !sonarrAdapter.includes('path: `/api/v3/series/${itemId}`') ||
   !sonarrAdapter.includes('"verification_unknown"') ||
   !sonarrAdapter.includes("readSeriesReleaseScopes") ||
+  !sonarrAdapter.includes("revalidateSeasonRelease") ||
   !sonarrAdapter.includes('path: "/api/v3/episode"') ||
   !sonarrAdapter.includes('method: "POST"') ||
   !sonarrAdapter.includes("body: normalized") ||
@@ -257,6 +258,11 @@ for (const contract of ['createHash("sha256")', "timingSafeEqual", "authorizatio
 const sessionStore = readFileSync(resolve(repoRoot, "src/session-store.ts"), "utf8");
 for (const contract of ["randomBytes(32)", "createHash(\"sha256\")", "timingSafeEqual", "#prune(now)", "maxSessions", "csrfDigest"]) {
   if (!sessionStore.includes(contract)) issues.push(`The bounded session store must retain ${contract}`);
+}
+
+const grabAudit = readFileSync(resolve(repoRoot, "src/grab-audit.ts"), "utf8");
+for (const contract of ["'episode', 'movie', 'season'", "season_number", "grab_audit_before_seasons"]) {
+  if (!grabAudit.includes(contract)) issues.push(`The controlled Grab audit must retain season identity contract ${contract}`);
 }
 
 const dashboardClient = readFileSync(resolve(repoRoot, "src/web/dashboard.js"), "utf8");
@@ -516,6 +522,7 @@ if (/^phase-(?:2|3)-/u.test(manifest.phase)) {
     "parsePrepareGrabBody",
     "parseExecuteGrabBody",
     "parseCatalogContinuationGrabPath",
+    'scopeKind === "season"',
     'pathname === "/api/v1/session/login"',
     'pathname === "/api/v1/onboarding"',
     "sessionMutationAuthorized",

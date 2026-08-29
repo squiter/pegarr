@@ -1735,7 +1735,7 @@ async function grabRequest(endpoint, body) {
 
 function prepareGrabMessage(status, detailCode) {
   if (detailCode === "continuation_missing_or_expired") return "This catalog continuation expired. Add or search the title again before preparing a Grab.";
-  if (detailCode === "scope_not_grabbable") return "Only an exact movie or episode can prepare a controlled Grab. Season analysis remains read-only.";
+  if (detailCode === "scope_not_grabbable") return "Only an exact movie, episode, or server-issued season scope can prepare a controlled Grab.";
   const messages = {
     item_unavailable: "This item is no longer present in Pegarr's bounded missing inventory.",
     release_changed: "Arr no longer returns this exact release. Refresh the analysis before choosing another candidate.",

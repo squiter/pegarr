@@ -43,6 +43,7 @@ import {
 } from "./controlled-grab.js";
 import type { GrabReconciliationOutcome } from "./grab-audit.js";
 import { GrabAuditStore } from "./grab-audit.js";
+import type { ControlledGrabSelection } from "./grab-selection.js";
 import type { CatalogMediaItem, SonarrSeriesReleaseScopes } from "./domain.js";
 import type { ArrCatalogAddOptions, ArrCatalogAddReceipt } from "./domain.js";
 import type { MediaIdentity, ProviderSearchResult } from "./domain.js";
@@ -635,13 +636,15 @@ export function createRuntimeServices(
           ? {}
           : {
               sonarr: {
-                revalidate: (selection: ItemFeasibilitySelection, releaseId: string) => {
-                  if (selection.application !== "sonarr" || selection.kind !== "episode") {
+                revalidate: (selection: ControlledGrabSelection, releaseId: string) => {
+                  if (selection.application !== "sonarr") {
                     throw new TypeError("Sonarr Grab selection is inconsistent");
                   }
                   const client = selection.instanceId === undefined ? undefined : sonarrClients.get(selection.instanceId);
                   if (client === undefined) throw new TypeError("Sonarr Grab instance is inconsistent");
-                  return client.revalidateEpisodeRelease(selection.itemId, releaseId);
+                  return selection.kind === "season"
+                    ? client.revalidateSeasonRelease(selection.itemId, selection.seasonNumber, releaseId)
+                    : client.revalidateEpisodeRelease(selection.itemId, releaseId);
                 },
                 grab: (handle, selection) => {
                   const client = selection.instanceId === undefined ? undefined : sonarrClients.get(selection.instanceId);
@@ -872,7 +875,7 @@ export function createRuntimeServices(
         expiresAt: new Date(entry.expiresAtEpochMs).toISOString(),
         staleUntil: new Date(entry.expiresAtEpochMs).toISOString(),
       },
-      capabilities: { controlledGrab: controlledGrab !== undefined && selectedEpisode !== undefined },
+      capabilities: { controlledGrab: controlledGrab !== undefined },
     };
   };
   const readCatalogContinuationEntry = (continuationId: string): CatalogContinuationEntry | undefined => {
@@ -883,7 +886,7 @@ export function createRuntimeServices(
   const catalogGrabTarget = async (
     entry: CatalogContinuationEntry,
     scope?: CatalogContinuationScope,
-  ): Promise<{ readonly selection: ItemFeasibilitySelection; readonly targetLabel: string } | undefined> => {
+  ): Promise<{ readonly selection: ControlledGrabSelection; readonly targetLabel: string } | undefined> => {
     if (entry.application === "radarr") {
       if (scope !== undefined) return undefined;
       return {
@@ -891,8 +894,16 @@ export function createRuntimeServices(
         targetLabel: `${entry.item.title}${entry.item.year === undefined ? "" : ` (${entry.item.year})`}`,
       };
     }
-    if (scope?.kind !== "episode") return undefined;
+    if (scope === undefined) return undefined;
     const scopes = await readSonarrContinuationScopes(entry);
+    if (scope.kind === "season") {
+      const season = scopes.seasons.find(({ seasonNumber }) => seasonNumber === scope.seasonNumber);
+      if (season === undefined) return undefined;
+      return {
+        selection: { application: "sonarr", instanceId: entry.instanceId, kind: "season", itemId: entry.itemId, seasonNumber: season.seasonNumber },
+        targetLabel: `${entry.item.title} ${season.label}`,
+      };
+    }
     const episode = scopes.episodes.find(({ episodeId }) => episodeId === scope.episodeId);
     if (episode === undefined) return undefined;
     return {

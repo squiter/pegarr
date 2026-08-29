@@ -10,10 +10,11 @@ import type { GrabAuditEntry, GrabReconciliationOutcome } from "./grab-audit.js"
 import { GrabAuditStore } from "./grab-audit.js";
 import type { MissingInventoryResult } from "./inventory-missing.js";
 import type { ItemFeasibilitySelection } from "./item-feasibility.js";
+import type { ControlledGrabSelection } from "./grab-selection.js";
 
 export interface ControlledGrabSource {
-  revalidate(selection: ItemFeasibilitySelection, releaseId: string): Promise<RevalidatedArrRelease | undefined>;
-  grab(handle: ArrReleaseHandle, selection: ItemFeasibilitySelection): Promise<ArrGrabReceipt>;
+  revalidate(selection: ControlledGrabSelection, releaseId: string): Promise<RevalidatedArrRelease | undefined>;
+  grab(handle: ArrReleaseHandle, selection: ControlledGrabSelection): Promise<ArrGrabReceipt>;
 }
 
 export interface ControlledGrabServiceOptions {
@@ -29,7 +30,7 @@ export interface ControlledGrabServiceOptions {
 }
 
 export interface ControlledGrabTarget {
-  readonly selection: ItemFeasibilitySelection;
+  readonly selection: ControlledGrabSelection;
   readonly targetLabel: string;
 }
 
@@ -39,8 +40,9 @@ export interface GrabChallenge {
   readonly challengeId: string;
   readonly application: "sonarr" | "radarr";
   readonly instanceId: string;
-  readonly kind: "episode" | "movie";
+  readonly kind: "episode" | "movie" | "season";
   readonly itemId: number;
+  readonly seasonNumber?: number;
   readonly targetLabel: string;
   readonly releaseId: string;
   readonly releaseTitle: string;
@@ -107,7 +109,7 @@ export class ControlledGrabService {
   readonly #maxChallenges: number;
   readonly #challenges = new Map<string, StoredChallenge>();
   readonly #executions = new Map<string, {
-    readonly selection: ItemFeasibilitySelection;
+    readonly selection: ControlledGrabSelection;
     readonly confirmation: string;
     readonly promise: Promise<ExecuteGrabResult>;
   }>();
@@ -123,7 +125,7 @@ export class ControlledGrabService {
   }
 
   async prepare(selection: ItemFeasibilitySelection, releaseId: string): Promise<PrepareGrabResult> {
-    const validated = validateSelection(selection);
+    const validated = validateSelection(selection) as ItemFeasibilitySelection;
     const item = await this.#item(validated);
     if (item === undefined) return failure("item_unavailable", "item_not_missing");
     const canonicalSelection = { ...validated, instanceId: item.instanceId };
@@ -141,7 +143,7 @@ export class ControlledGrabService {
   }
 
   async #prepareTarget(
-    selection: ItemFeasibilitySelection & { readonly instanceId: string },
+    selection: ControlledGrabSelection & { readonly instanceId: string },
     targetLabel: string,
     releaseId: string,
   ): Promise<PrepareGrabResult> {
@@ -174,6 +176,7 @@ export class ControlledGrabService {
       instanceId: selection.instanceId,
       kind: selection.kind,
       itemId: selection.itemId,
+      ...(selection.kind === "season" ? { seasonNumber: selection.seasonNumber } : {}),
       targetLabel,
       releaseId: normalizedReleaseId,
       releaseTitle,
@@ -186,7 +189,7 @@ export class ControlledGrabService {
   }
 
   async execute(
-    selection: ItemFeasibilitySelection,
+    selection: ControlledGrabSelection,
     challengeId: string,
     confirmation: string,
     idempotencyKey: string,
@@ -247,7 +250,7 @@ export class ControlledGrabService {
   }
 
   async #execute(
-    selection: ItemFeasibilitySelection,
+    selection: ControlledGrabSelection,
     challengeId: string,
     confirmation: string,
     idempotencyKey: string,
@@ -258,6 +261,7 @@ export class ControlledGrabService {
         && (selection.instanceId === undefined || previous.instanceId === selection.instanceId)
         && previous.kind === selection.kind
         && previous.itemId === selection.itemId
+        && (selection.kind !== "season" || previous.seasonNumber === selection.seasonNumber)
         && confirmation === confirmationText(previous.releaseTitle, previous.targetLabel);
       return sameRequest
         ? resultFromAudit(previous, true)
@@ -271,14 +275,15 @@ export class ControlledGrabService {
       challenge.application !== selection.application ||
       (selection.instanceId !== undefined && challenge.instanceId !== selection.instanceId) ||
       challenge.kind !== selection.kind ||
-      challenge.itemId !== selection.itemId
+      challenge.itemId !== selection.itemId ||
+      (selection.kind === "season" && challenge.seasonNumber !== selection.seasonNumber)
     ) {
       return executionFailure("confirmation_mismatch", "challenge_target_mismatch");
     }
     if (confirmation !== challenge.confirmation) return executionFailure("confirmation_mismatch", "exact_confirmation_required");
 
     const canonicalSelection = { ...selection, instanceId: challenge.instanceId };
-    const targetKey = `${canonicalSelection.application}:${canonicalSelection.instanceId}:${canonicalSelection.kind}:${canonicalSelection.itemId}:${challenge.releaseId}`;
+    const targetKey = `${canonicalSelection.application}:${canonicalSelection.instanceId}:${canonicalSelection.kind}:${canonicalSelection.itemId}:${canonicalSelection.kind === "season" ? canonicalSelection.seasonNumber : "item"}:${challenge.releaseId}`;
     if (this.#targets.has(targetKey)) return executionFailure("duplicate_in_progress", "target_grab_in_progress");
     const blocking = this.#options.audit.recentBlocking(
       canonicalSelection,
@@ -455,21 +460,23 @@ function itemLabel(item: MissingMediaItem): string {
   return boundedText(`${item.title}${item.year === undefined ? "" : ` (${item.year})`}`, "targetLabel", 2_048);
 }
 
-function validateSelection(selection: ItemFeasibilitySelection): ItemFeasibilitySelection {
+function validateSelection(selection: ControlledGrabSelection): ControlledGrabSelection {
   if (!Number.isSafeInteger(selection.itemId) || selection.itemId < 1) throw new TypeError("itemId must be positive");
   if (selection.instanceId !== undefined && !/^[a-z0-9][a-z0-9_-]{0,63}$/iu.test(selection.instanceId)) {
     throw new TypeError("instanceId is invalid");
   }
   if (selection.application === "sonarr" && selection.kind === "episode") return selection;
+  if (selection.application === "sonarr" && selection.kind === "season" && Number.isSafeInteger(selection.seasonNumber) && selection.seasonNumber >= 0 && selection.seasonNumber <= 10_000) return selection;
   if (selection.application === "radarr" && selection.kind === "movie") return selection;
   throw new TypeError("selection is inconsistent");
 }
 
-function sameSelection(left: ItemFeasibilitySelection, right: ItemFeasibilitySelection): boolean {
+function sameSelection(left: ControlledGrabSelection, right: ControlledGrabSelection): boolean {
   return left.application === right.application
     && (left.instanceId === undefined || right.instanceId === undefined || left.instanceId === right.instanceId)
     && left.kind === right.kind
-    && left.itemId === right.itemId;
+    && left.itemId === right.itemId
+    && (left.kind !== "season" || right.kind !== "season" || left.seasonNumber === right.seasonNumber);
 }
 
 function validateReleaseId(value: string, application: "sonarr" | "radarr"): string {
