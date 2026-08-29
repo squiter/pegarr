@@ -39,7 +39,7 @@ export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "catalog_continuation" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -96,14 +96,18 @@ export async function resolveRoute(
   const catalogSearch = pathname === "/api/v1/catalog/search";
   const catalogCoverage = parseCatalogCoveragePath(pathname);
   const catalogAdd = parseCatalogAddPath(pathname);
+  const catalogContinuation = parseCatalogContinuationPath(pathname);
   const subtitleSettings = pathname === "/api/v1/settings/subtitles";
   const providerSettings = parseProviderSettingsPath(pathname);
-  const protectedLibraryRoute = catalogSearch || catalogCoverage !== undefined || catalogAdd !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
+  const protectedLibraryRoute = catalogSearch || catalogCoverage !== undefined || catalogAdd !== undefined || catalogContinuation !== undefined || subtitleSettings || providerSettings !== undefined || pathname === "/api/v1/library/instances" || pathname === "/api/v1/library/missing" || itemSelection !== undefined;
   if (protectedLibraryRoute && access?.control.configured !== true) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   const controlledGrabAvailable = services?.controlledGrab !== undefined && access?.adminControl?.configured === true;
   if (catalogAdd !== undefined && services?.catalogAdd === undefined) {
+    return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
+  }
+  if (catalogContinuation !== undefined && services?.catalogContinuation === undefined) {
     return { statusCode: 404, body: { service: "pegarr", status: "not_found" } };
   }
   if ((grabSelection !== undefined || grabHistory || grabReconciliation !== undefined) && !controlledGrabAvailable) {
@@ -152,6 +156,9 @@ export async function resolveRoute(
   }
   if (catalogAdd?.action === "add" && method !== "POST") {
     return { statusCode: 405, headers: { allow: "POST" }, body: { service: "pegarr", status: "method_not_allowed" } };
+  }
+  if (catalogContinuation !== undefined && method !== "GET") {
+    return { statusCode: 405, headers: { allow: "GET" }, body: { service: "pegarr", status: "method_not_allowed" } };
   }
 
   if (pathname === "/health") {
@@ -300,6 +307,21 @@ export async function resolveRoute(
     }
   }
 
+  if (catalogContinuation !== undefined) {
+    const rejection = authorizeLibraryRoute(access);
+    if (rejection !== undefined) return rejection;
+    try {
+      const result = await services?.catalogContinuation?.analyze(catalogContinuation);
+      if (result === undefined || result.status === "not_found") return { statusCode: 404, body: { service: "pegarr", mode: "read_only", status: "not_found" } };
+      if (result.status === "scope_required") return { statusCode: 409, body: result };
+      return { statusCode: 200, body: result };
+    } catch (error) {
+      return error instanceof TypeError
+        ? { statusCode: 400, body: { service: "pegarr", mode: "read_only", status: "invalid_request" } }
+        : { statusCode: 503, body: { service: "pegarr", mode: "read_only", status: "unavailable" } };
+    }
+  }
+
   if (catalogAdd !== undefined) {
     if (catalogAdd.action === "options") {
       const rejection = authorizeLibraryRoute(access);
@@ -322,8 +344,8 @@ export async function resolveRoute(
       if (error instanceof InvalidRequestBodyError || error instanceof TypeError) {
         return { statusCode: 400, body: { service: "pegarr", status: "invalid_request" } };
       }
-      if ((error instanceof SonarrAddError || error instanceof RadarrAddError) && error.code === "timeout_unknown") {
-        return { statusCode: 202, body: { service: "pegarr", mode: "catalog_add", status: "timeout_unknown" } };
+      if ((error instanceof SonarrAddError || error instanceof RadarrAddError) && (error.code === "timeout_unknown" || error.code === "verification_unknown")) {
+        return { statusCode: 202, body: { service: "pegarr", mode: "catalog_add", status: error.code } };
       }
       if ((error instanceof SonarrAddError || error instanceof RadarrAddError) && error.code === "already_exists") {
         return { statusCode: 409, body: { service: "pegarr", mode: "catalog_add", status: "already_exists" } };
@@ -571,6 +593,10 @@ function parseCatalogAddPath(pathname: string): { readonly selection: import("./
     return { selection: { application, instanceId: instanceId as string, providerId, value: value as string }, action };
   }
   return undefined;
+}
+
+function parseCatalogContinuationPath(pathname: string): string | undefined {
+  return /^\/api\/v1\/catalog\/continuations\/([A-Za-z0-9_-]{32})\/analysis$/u.exec(pathname)?.[1];
 }
 
 class InvalidRequestBodyError extends Error {}
@@ -846,6 +872,7 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (pathname === "/api/v1/integrations/radarr/status") return "radarr_status";
   if (/^\/api\/v1\/catalog\/(?:sonarr|radarr)\/[a-z0-9][a-z0-9_-]{0,63}\/(?:tvdb|tmdb)\/\d{1,16}\/add-options$/iu.test(pathname)) return "catalog_add_options";
   if (/^\/api\/v1\/catalog\/(?:sonarr|radarr)\/[a-z0-9][a-z0-9_-]{0,63}\/(?:tvdb|tmdb)\/\d{1,16}\/add$/iu.test(pathname)) return "catalog_add";
+  if (parseCatalogContinuationPath(pathname) !== undefined) return "catalog_continuation";
   if (/^\/api\/v1\/settings\/providers\/(?:subdl|opensubtitles)$/u.test(pathname)) return "provider_settings";
   if (pathname === "/api/v1/library/instances") return "arr_instances";
   if (pathname === "/api/v1/catalog/search") return "catalog_search";

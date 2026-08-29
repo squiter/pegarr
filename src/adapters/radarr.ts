@@ -26,6 +26,7 @@ import {
   safeCatalogTitle,
   selectedQualityProfile,
   selectedRootFolder,
+  verifiedAddedRecord,
 } from "./arr-add.js";
 import {
   JsonTransportError,
@@ -78,7 +79,7 @@ export class RadarrGrabError extends Error {
 }
 
 export class RadarrAddError extends Error {
-  readonly code: "timeout_unknown" | "unauthorized" | "rate_limited" | "already_exists" | "upstream_failure" | "invalid_response";
+  readonly code: "timeout_unknown" | "verification_unknown" | "unauthorized" | "rate_limited" | "already_exists" | "upstream_failure" | "invalid_response";
 
   constructor(code: RadarrAddError["code"], message: string) {
     super(message);
@@ -251,6 +252,20 @@ export class RadarrClient {
       itemId = addedArrId(response.body);
     } catch {
       throw new RadarrAddError("invalid_response", "Radarr returned an invalid add response");
+    }
+    try {
+      const verified = await this.#requestJson({
+        method: "GET",
+        path: `/api/v3/movie/${itemId}`,
+        query: {},
+        headers: { accept: "application/json", "x-api-key": this.#apiKey },
+        timeoutMs: this.#timeoutMs,
+        maxResponseBytes: Math.min(this.#maxResponseBytes, 512 * 1024),
+      });
+      assertSuccessfulStatus(verified, "added movie verification");
+      verifiedAddedRecord(verified.body, itemId, "tmdbId", tmdbId);
+    } catch {
+      throw new RadarrAddError("verification_unknown", "Radarr added the movie but its identity could not be verified");
     }
     return { status: "added", application: "radarr", instanceId: this.#instanceId, itemId, title, automaticSearch: false };
   }

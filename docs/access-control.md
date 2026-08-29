@@ -18,6 +18,9 @@ Authorization: Basic <Pegarr username and password>
 POST /api/v1/catalog/<application>/<instance-id>/<provider-id>/<value>/add
 Authorization: Basic <Pegarr username and password only>
 
+GET /api/v1/catalog/continuations/<opaque-id>/analysis
+Authorization: Basic <Pegarr username and password>
+
 PUT /api/v1/settings/subtitles
 PUT /api/v1/settings/providers/subdl
 PUT /api/v1/settings/providers/opensubtitles

@@ -36,9 +36,15 @@ POST /api/v1/catalog/radarr/<instance>/tmdb/<id>/add
 
 The POST body is exact and bounded. Sonarr accepts root-folder/profile IDs, `monitored`, a supported monitor mode, and the confirmation. Radarr accepts root-folder/profile IDs, `monitored`, a supported minimum availability, and the confirmation. Extra fields—including any automatic-search request—are rejected.
 
-A successful response returns only a safe Arr ID, title, application/instance identity, `automaticSearch: false`, and a typed Pegarr continuation. Radarr can proceed to exact movie analysis. Sonarr first needs the user to choose a season or episode. That executable continuation view is the next delivery slice; the current response does not silently start release analysis or Grab.
+A successful response returns only a safe Arr ID, title, application/instance identity, `automaticSearch: false`, and a short-lived opaque Pegarr continuation. Before issuing it, Pegarr re-reads the created Arr record by internal ID and verifies that its TVDB or TMDB identity still matches the selected catalog title.
 
-If the upstream POST times out, Pegarr reports `timeout_unknown` and does not claim the title was absent or retry automatically. Check the Arr library before trying again.
+For Radarr, the dashboard follows the continuation automatically and opens exact movie release analysis using the explicit Pegarr subtitle policy. The continuation expires after ten minutes, is held only in bounded server memory, and repeated reads share one analysis. It never enables controlled Grab. Sonarr still requires the user to choose a season or episode before exact analysis; that scope selector is the next delivery slice.
+
+```text
+GET /api/v1/catalog/continuations/<opaque-id>/analysis
+```
+
+If the upstream POST times out, Pegarr reports `timeout_unknown` and does not claim the title was absent or retry automatically. If Arr accepts the add but the identity re-read fails or mismatches, Pegarr reports `verification_unknown`; the user must check the Arr library before trying again.
 
 ## Verification boundary
 

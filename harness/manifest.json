@@ -1531,6 +1531,42 @@
       "title": "Catalog add is an explicit login-only UI mutation with automatic search off",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
+    },
+    {
+      "id": "PEG-SONARR-013",
+      "title": "Added Sonarr series identity is re-read before Pegarr continues",
+      "evidence": "src/adapters/sonarr.test.ts",
+      "boundary": "Injected transport and synthetic add plus identity-verification responses; no network or live mutation"
+    },
+    {
+      "id": "PEG-RADARR-012",
+      "title": "Added Radarr movie identity is re-read before Pegarr continues",
+      "evidence": "src/adapters/radarr.test.ts",
+      "boundary": "Injected transport and synthetic add plus identity-verification responses; no network or live mutation"
+    },
+    {
+      "id": "PEG-CONTINUE-001",
+      "title": "Catalog continuation is opaque, bounded, expiring, and server-owned",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected clock, temporary data directory, and synthetic Radarr responses; no network or live mutation"
+    },
+    {
+      "id": "PEG-CONTINUE-002",
+      "title": "Radarr continuation runs exact read-only analysis from Pegarr policy",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary policy plus injected Arr and subtitle-provider responses; no network, Grab, or live mutation"
+    },
+    {
+      "id": "PEG-CONTINUE-003",
+      "title": "Continuation analysis authenticates before Arr or provider work",
+      "evidence": "src/app.test.ts",
+      "boundary": "In-process route with synthetic login and analysis-call spy; no network or mutation"
+    },
+    {
+      "id": "PEG-DASH-045",
+      "title": "Successful movie add continues automatically into exact read-only analysis",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
     }
   ],
   "manualGaps": [

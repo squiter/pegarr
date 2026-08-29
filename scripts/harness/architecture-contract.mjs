@@ -57,6 +57,8 @@ if (
   !sonarrAdapter.includes('path: "/api/v3/series"') ||
   !sonarrAdapter.includes("searchForMissingEpisodes: false") ||
   !sonarrAdapter.includes("searchForCutoffUnmetEpisodes: false") ||
+  !sonarrAdapter.includes('path: `/api/v3/series/${itemId}`') ||
+  !sonarrAdapter.includes('"verification_unknown"') ||
   !sonarrAdapter.includes('method: "POST"') ||
   !sonarrAdapter.includes("body: normalized") ||
   (sonarrAdapter.match(/method: "POST"/gu) ?? []).length !== 2 ||
@@ -74,6 +76,8 @@ if (
   !radarrAdapter.includes('path: "/api/v3/movie"') ||
   !radarrAdapter.includes("searchForMovie: false") ||
   !radarrAdapter.includes('addMethod: "manual"') ||
+  !radarrAdapter.includes('path: `/api/v3/movie/${itemId}`') ||
+  !radarrAdapter.includes('"verification_unknown"') ||
   !radarrAdapter.includes('method: "POST"') ||
   !radarrAdapter.includes("body: normalized") ||
   (radarrAdapter.match(/method: "POST"/gu) ?? []).length !== 2 ||
@@ -261,6 +265,8 @@ for (const contract of [
   'credentials: "omit"',
   "replaceChildren",
   "textContent",
+  "loadCatalogContinuationAnalysis",
+  "/api/v1/catalog/continuations/",
 ]) {
   if (!dashboardClient.includes(contract)) {
     issues.push(`The dashboard client must retain ${contract}`);

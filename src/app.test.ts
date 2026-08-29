@@ -403,7 +403,7 @@ test("PEG-CATALOG-007 catalog add requires feature flag, login, and exact bounde
         mode: "catalog_add",
         status: "added",
         receipt: { status: "added", application: "radarr", instanceId: "main", itemId: 93, title: "Synthetic Add", automaticSearch: false },
-        next: { action: "exact_movie_release_analysis", movieId: 93 },
+        next: { action: "exact_movie_release_analysis", continuationId: "abcdefghijklmnopqrstuvwxABCDEFGH", expiresAt: "2026-08-29T05:00:00.000Z" },
       };
     },
   } });
@@ -416,6 +416,33 @@ test("PEG-CATALOG-007 catalog add requires feature flag, login, and exact bounde
   assert.equal(adds, 1);
   assert.match(JSON.stringify(response.body), /exact_movie_release_analysis/u);
   assert.doesNotMatch(JSON.stringify(response.body), /rootFolder|qualityProfile|confirmation/u);
+});
+
+test("PEG-CONTINUE-003 continuation analysis authenticates before Arr or provider work", async () => {
+  const username = "pegarr-user";
+  const password = "synthetic-password-value-00000000001";
+  const control = new AccessControl(new SecretValue("synthetic-access-token-value-0000000001"), { username, password: new SecretValue(password) });
+  const basic = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  const continuationId = "a".repeat(32);
+  const path = `/api/v1/catalog/continuations/${continuationId}/analysis`;
+  let analyses = 0;
+  const services = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
+  Object.assign(services, {
+    catalogContinuation: {
+      analyze: async (value: string) => {
+        analyses += 1;
+        assert.equal(value, continuationId);
+        return { kind: "catalog-continuation", mode: "read_only", status: "scope_required" } as const;
+      },
+    },
+  });
+  assert.equal((await resolveRoute("GET", path, tmpdir(), services, { control, authorization: "Basic invalid" })).statusCode, 401);
+  assert.equal(analyses, 0);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: basic })).statusCode, 405);
+  assert.equal(analyses, 0);
+  const response = await resolveRoute("GET", path, tmpdir(), services, { control, authorization: basic });
+  assert.equal(response.statusCode, 409);
+  assert.equal(analyses, 1);
 });
 
 test("PEG-INSTANCE-004 instance status is authenticated, bounded, and read-only", async () => {
@@ -579,6 +606,17 @@ test("PEG-DASH-044 catalog add is an explicit login-only mutation and never offe
   assert.match(String(client.body), /\/add-options|\/add`|exact release analysis/u);
   assert.match(String(styles.body), /catalog-add-panel|catalog-add-form|catalog-add-warning/u);
   assert.doesNotMatch(assets, /searchForMovie|searchForMissingEpisodes|automaticSearch\s*:/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-045 successful movie add continues automatically into exact read-only analysis", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const assets = [client.body, model.body].join("\n");
+  assert.match(String(client.body), /loadCatalogContinuationAnalysis|catalog\/continuations\/\$\{encodeURIComponent\(continuationId\)\}\/analysis/u);
+  assert.match(String(client.body), /Loading exact Radarr releases|Exact release analysis is ready below/u);
+  assert.match(String(client.body), /Fresh Arr and Pegarr-policy analysis/u);
+  assert.match(String(model.body), /explicit_default_unconfigured|Configure at least one Pegarr subtitle language/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 

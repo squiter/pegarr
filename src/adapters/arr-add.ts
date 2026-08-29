@@ -95,6 +95,23 @@ export function addedArrId(body: unknown): number {
   return positiveInteger(objectRecord(body, "add response").id, "add response.id");
 }
 
+export function verifiedAddedRecord(
+  body: unknown,
+  itemId: number,
+  identifierField: "tvdbId" | "tmdbId",
+  identifier: number,
+): Readonly<Record<string, unknown>> {
+  const record = objectRecord(body, "added item verification");
+  if (positiveInteger(record.id, "added item verification.id") !== positiveInteger(itemId, "itemId")) {
+    throw new TypeError("Added item verification returned a different Arr ID");
+  }
+  if (positiveInteger(record[identifierField], `added item verification.${identifierField}`) !== positiveInteger(identifier, identifierField)) {
+    throw new TypeError("Added item verification returned a different catalog identity");
+  }
+  safeCatalogTitle(record);
+  return record;
+}
+
 export function catalogTemplate(
   record: Readonly<Record<string, unknown>>,
   allowedFields: readonly string[],

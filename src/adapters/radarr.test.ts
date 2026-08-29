@@ -36,6 +36,7 @@ class FakeTransport implements JsonTransport {
 
 class AddTransport implements JsonTransport {
   readonly requests: JsonRequest[] = [];
+  verificationBody: unknown = { id: 92, title: "Synthetic Add Movie", tmdbId: 54321, path: "/private/media/Movies/Synthetic Add Movie" };
 
   async requestJson(request: JsonRequest): Promise<JsonResponse> {
     this.requests.push(request);
@@ -50,6 +51,9 @@ class AddTransport implements JsonTransport {
     }
     if (request.method === "POST" && request.path === "/api/v3/movie") {
       return { status: 201, headers: {}, body: { id: 92, title: "Synthetic Add Movie", path: "/private/media/Movies/Synthetic Add Movie" } };
+    }
+    if (request.method === "GET" && request.path === "/api/v3/movie/92") {
+      return { status: 200, headers: {}, body: this.verificationBody };
     }
     return { status: 404, headers: {}, body: {} };
   }
@@ -166,6 +170,26 @@ test("PEG-RADARR-011 add options are sanitized and movie add always disables aut
   assert.equal(post.body.rootFolderPath, "/private/media/Movies");
   assert.equal(post.body.privateField, undefined);
   assert.doesNotMatch(JSON.stringify(receipt), /private|rootFolderPath|qualityProfile/u);
+});
+
+test("PEG-RADARR-012 added movie identity is re-read before Pegarr continues", async () => {
+  const transport = new AddTransport();
+  const receipt = await client(transport).addCatalogMovie({
+    tmdbId: 54321, rootFolderId: 4, qualityProfileId: 8, monitored: true, minimumAvailability: "released",
+  });
+  assert.equal(receipt.itemId, 92);
+  const verification = transport.requests.at(-1);
+  assert.deepEqual(verification, {
+    method: "GET", path: "/api/v3/movie/92", query: {},
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500, maxResponseBytes: 64_000,
+  });
+  const mismatched = new AddTransport();
+  mismatched.verificationBody = { id: 92, title: "Wrong Movie", tmdbId: 99999 };
+  await assert.rejects(
+    client(mismatched).addCatalogMovie({ tmdbId: 54321, rootFolderId: 4, qualityProfileId: 8, monitored: true, minimumAvailability: "released" }),
+    (error: unknown) => error instanceof Error && "code" in error && error.code === "verification_unknown",
+  );
 });
 
 test("PEG-RADARR-002 movie releases preserve Arr decisions, editions, and safe evidence", () => {

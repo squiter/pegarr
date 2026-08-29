@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import type { FetchImplementation } from "./adapters/fetch-json-transport.js";
 import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
 import { BazarrClient } from "./adapters/bazarr.js";
@@ -44,6 +46,8 @@ import { GrabAuditStore } from "./grab-audit.js";
 import type { CatalogMediaItem } from "./domain.js";
 import type { ArrCatalogAddOptions, ArrCatalogAddReceipt } from "./domain.js";
 import type { MediaIdentity, ProviderSearchResult } from "./domain.js";
+import type { FeasibilityReport } from "./domain.js";
+import { buildFeasibilityReport } from "./matching.js";
 import { searchProviderPolicy } from "./provider-policy-search.js";
 import type { ProviderLanguageMapping } from "./provider-policy-search.js";
 import {
@@ -151,9 +155,45 @@ export interface CatalogAddResult {
   readonly status: ArrCatalogAddReceipt["status"];
   readonly receipt: ArrCatalogAddReceipt;
   readonly next:
-    | { readonly action: "exact_movie_release_analysis"; readonly movieId: number }
-    | { readonly action: "choose_series_scope"; readonly seriesId: number };
+    | { readonly action: "exact_movie_release_analysis"; readonly continuationId: string; readonly expiresAt: string }
+    | { readonly action: "choose_series_scope"; readonly continuationId: string; readonly expiresAt: string };
 }
+
+export type CatalogContinuationAnalysisResult =
+  | {
+      readonly kind: "item-feasibility";
+      readonly mode: "read_only";
+      readonly status: "ready";
+      readonly selection: { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number };
+      readonly report: FeasibilityReport;
+      readonly metrics: { readonly radarrRequests: 1; readonly bazarrRequests: 0; readonly providerRequests: number; readonly elapsedMs: number };
+      readonly analysis: { readonly source: "computed"; readonly generatedAt: string; readonly expiresAt: string; readonly staleUntil: string };
+      readonly capabilities: { readonly controlledGrab: false };
+    }
+  | {
+      readonly kind: "item-feasibility";
+      readonly mode: "read_only";
+      readonly status: "policy_unresolved";
+      readonly reason: "explicit_default_unconfigured";
+      readonly selection: { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number };
+    }
+  | {
+      readonly kind: "item-feasibility";
+      readonly mode: "read_only";
+      readonly status: "disabled";
+      readonly selection: { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number };
+      readonly missingIntegrations: readonly ["subdl"];
+    }
+  | {
+      readonly kind: "item-feasibility";
+      readonly mode: "read_only";
+      readonly status: "integration_failure";
+      readonly selection: { readonly application: "radarr"; readonly instanceId: string; readonly kind: "movie"; readonly itemId: number };
+      readonly failures: readonly [{ readonly integration: "radarr"; readonly operation: "release_search"; readonly state: ArrIntegrationState; readonly retryAfterSeconds?: number }];
+      readonly releases: readonly [];
+      readonly metrics: { readonly radarrRequests: 1; readonly bazarrRequests: 0; readonly providerRequests: 0; readonly elapsedMs: number };
+    }
+  | { readonly kind: "catalog-continuation"; readonly mode: "read_only"; readonly status: "not_found" | "scope_required" };
 
 export type CatalogCoverageResult =
   | {
@@ -189,6 +229,9 @@ export interface RuntimeServices {
     readOptions(selection: CatalogAddSelection): Promise<CatalogAddOptionsResult>;
     add(selection: CatalogAddSelection, input: CatalogAddInput): Promise<CatalogAddResult>;
   };
+  readonly catalogContinuation?: {
+    analyze(continuationId: string): Promise<CatalogContinuationAnalysisResult>;
+  };
   readMissingInventory(): Promise<MissingInventoryResult>;
   readItemFeasibility(
     selection: ItemFeasibilitySelection,
@@ -216,6 +259,18 @@ export interface RuntimeServicesOptions {
   readonly environment?: Readonly<Record<string, string | undefined>>;
   readonly dataDirectory?: string;
 }
+
+interface CatalogContinuationEntry {
+  readonly application: "sonarr" | "radarr";
+  readonly instanceId: string;
+  readonly itemId: number;
+  readonly item: MediaIdentity;
+  readonly expiresAtEpochMs: number;
+  analysis?: Promise<CatalogContinuationAnalysisResult>;
+}
+
+const catalogContinuationTtlMs = 10 * 60 * 1_000;
+const catalogContinuationMaxEntries = 100;
 
 interface AdapterErrorShape {
   readonly code: Exclude<ArrIntegrationState, "disabled" | "available">;
@@ -585,6 +640,109 @@ export function createRuntimeServices(
     };
   };
 
+  const catalogContinuations = new Map<string, CatalogContinuationEntry>();
+  const pruneCatalogContinuations = (): void => {
+    const currentTime = now();
+    for (const [id, entry] of catalogContinuations) {
+      if (entry.expiresAtEpochMs <= currentTime) catalogContinuations.delete(id);
+    }
+    while (catalogContinuations.size >= catalogContinuationMaxEntries) {
+      const oldest = catalogContinuations.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      catalogContinuations.delete(oldest);
+    }
+  };
+  const createCatalogContinuation = (
+    receipt: ArrCatalogAddReceipt,
+    item: CatalogMediaItem,
+  ): { readonly continuationId: string; readonly expiresAt: string } => {
+    pruneCatalogContinuations();
+    let continuationId: string;
+    do continuationId = randomBytes(24).toString("base64url"); while (catalogContinuations.has(continuationId));
+    const expiresAtEpochMs = now() + catalogContinuationTtlMs;
+    catalogContinuations.set(continuationId, {
+      application: receipt.application,
+      instanceId: receipt.instanceId,
+      itemId: receipt.itemId,
+      item: {
+        kind: item.kind,
+        title: item.title,
+        ...(item.year === undefined ? {} : { year: item.year }),
+        ids: item.ids,
+      },
+      expiresAtEpochMs,
+    });
+    return { continuationId, expiresAt: new Date(expiresAtEpochMs).toISOString() };
+  };
+  const buildRadarrContinuation = async (entry: CatalogContinuationEntry): Promise<CatalogContinuationAnalysisResult> => {
+    const selection = { application: "radarr" as const, instanceId: entry.instanceId, kind: "movie" as const, itemId: entry.itemId };
+    const settings = await subtitleSettings.read();
+    if (settings.status !== "configured") {
+      return { kind: "item-feasibility", mode: "read_only", status: "policy_unresolved", reason: "explicit_default_unconfigured", selection };
+    }
+    const providers = await resolveCatalogProviders("movie");
+    if (providers.length === 0) {
+      return { kind: "item-feasibility", mode: "read_only", status: "disabled", selection, missingIntegrations: ["subdl"] };
+    }
+    const client = radarrClients.get(entry.instanceId);
+    if (client === undefined) return { kind: "catalog-continuation", mode: "read_only", status: "not_found" };
+    const startedAt = now();
+    let releases: Awaited<ReturnType<RadarrClient["searchMovieReleases"]>>;
+    try {
+      releases = await client.searchMovieReleases(entry.itemId);
+    } catch (error) {
+      const adapterError = error instanceof RadarrAdapterError ? error : undefined;
+      return {
+        kind: "item-feasibility", mode: "read_only", status: "integration_failure", selection,
+        failures: [{
+          integration: "radarr", operation: "release_search", state: adapterError?.code ?? "unavailable",
+          ...(adapterError?.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: adapterError.retryAfterSeconds }),
+        }],
+        releases: [],
+        metrics: { radarrRequests: 1, bazarrRequests: 0, providerRequests: 0, elapsedMs: boundedElapsed(startedAt, now()) },
+      };
+    }
+    const searched = await searchProviderPolicy({ item: entry.item, policy: settings.policy, releases, providers });
+    const generatedAt = now();
+    return {
+      kind: "item-feasibility",
+      mode: "read_only",
+      status: "ready",
+      selection,
+      report: buildFeasibilityReport({
+        fixture: "catalog-continuation-radarr-movie-v1",
+        item: entry.item,
+        policy: settings.policy,
+        releases,
+        providerResults: searched.results,
+      }),
+      metrics: { radarrRequests: 1, bazarrRequests: 0, providerRequests: searched.requestCount, elapsedMs: boundedElapsed(startedAt, generatedAt) },
+      analysis: {
+        source: "computed",
+        generatedAt: new Date(generatedAt).toISOString(),
+        expiresAt: new Date(entry.expiresAtEpochMs).toISOString(),
+        staleUntil: new Date(entry.expiresAtEpochMs).toISOString(),
+      },
+      capabilities: { controlledGrab: false },
+    };
+  };
+  const catalogContinuation = configuration.catalogAdd === undefined
+    ? undefined
+    : {
+        analyze: async (continuationId: string): Promise<CatalogContinuationAnalysisResult> => {
+          if (!/^[A-Za-z0-9_-]{32}$/u.test(continuationId)) throw new TypeError("Catalog continuation ID is invalid");
+          pruneCatalogContinuations();
+          const entry = catalogContinuations.get(continuationId);
+          if (entry === undefined) return { kind: "catalog-continuation", mode: "read_only", status: "not_found" };
+          if (entry.application === "sonarr") return { kind: "catalog-continuation", mode: "read_only", status: "scope_required" };
+          entry.analysis ??= buildRadarrContinuation(entry).catch((error) => {
+            delete entry.analysis;
+            throw error;
+          });
+          return entry.analysis;
+        },
+      };
+
   const catalogAdd = configuration.catalogAdd === undefined
     ? undefined
     : {
@@ -626,14 +784,15 @@ export function createRuntimeServices(
                 monitored: input.monitored,
                 minimumAvailability: input.minimumAvailability ?? "released",
               });
+          const continuation = createCatalogContinuation(receipt, item);
           return {
             kind: "catalog-add",
             mode: "catalog_add",
             status: receipt.status,
             receipt,
             next: receipt.application === "radarr"
-              ? { action: "exact_movie_release_analysis", movieId: receipt.itemId }
-              : { action: "choose_series_scope", seriesId: receipt.itemId },
+              ? { action: "exact_movie_release_analysis", ...continuation }
+              : { action: "choose_series_scope", ...continuation },
           };
         },
       };
@@ -728,6 +887,7 @@ export function createRuntimeServices(
       };
     },
     ...(catalogAdd === undefined ? {} : { catalogAdd }),
+    ...(catalogContinuation === undefined ? {} : { catalogContinuation }),
     readMissingInventory,
     readItemFeasibility: (selection, readOptions) => itemFeasibility.read(selection, readOptions),
     ...(controlledGrab === undefined
@@ -799,6 +959,12 @@ function createUiOpenSubtitlesSource(
 
 function catalogAddConfirmation(item: CatalogMediaItem): string {
   return `ADD ${item.title} TO ${item.application.toUpperCase()}`;
+}
+
+function boundedElapsed(startedAt: number, completedAt: number): number {
+  return Number.isFinite(startedAt) && Number.isFinite(completedAt)
+    ? Math.max(0, Math.min(180_000, Math.round(completedAt - startedAt)))
+    : 0;
 }
 
 function requireClient<Client>(client: Client | undefined): Client {

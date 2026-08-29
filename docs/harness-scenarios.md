@@ -150,6 +150,12 @@
 | PEG-CATALOG-007 | Catalog add requires login, feature opt-in, and exact bounded input | `src/app.test.ts` |
 | PEG-CATALOG-008 | Explicit catalog add returns a safe Arr identity and Pegarr continuation | `src/runtime.test.ts` |
 | PEG-DASH-044 | Catalog add is an explicit login-only UI mutation with automatic search off | `src/app.test.ts` |
+| PEG-SONARR-013 | Added Sonarr series identity is re-read before Pegarr continues | `src/adapters/sonarr.test.ts` |
+| PEG-RADARR-012 | Added Radarr movie identity is re-read before Pegarr continues | `src/adapters/radarr.test.ts` |
+| PEG-CONTINUE-001 | Catalog continuation is opaque, bounded, expiring, and server-owned | `src/runtime.test.ts` |
+| PEG-CONTINUE-002 | Radarr continuation runs exact read-only analysis from Pegarr policy | `src/runtime.test.ts` |
+| PEG-CONTINUE-003 | Continuation analysis authenticates before Arr or provider work | `src/app.test.ts` |
+| PEG-DASH-045 | Successful movie add continues automatically into exact read-only analysis | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |
 | PEG-ACCESS-003 | Authorized inventory is read-only and rejects mutation methods | `src/app.test.ts` |

@@ -410,6 +410,9 @@ function unavailableView(value) {
     return { state: "disabled", message: `Configure ${integrations || "required integrations"} before investigating this item.` };
   }
   if (value.status === "policy_unresolved") {
+    if (value.reason === "explicit_default_unconfigured") {
+      return { state: "policy_unresolved", message: "Configure at least one Pegarr subtitle language before exact release analysis." };
+    }
     const reason = typeof value.reason === "string" ? value.reason.replaceAll("_", " ") : "unresolved";
     return { state: "policy_unresolved", message: `Bazarr policy is ${reason}. Pegarr did not assume a subtitle language.` };
   }

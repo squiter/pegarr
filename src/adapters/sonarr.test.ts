@@ -37,6 +37,7 @@ class FakeTransport implements JsonTransport {
 
 class AddTransport implements JsonTransport {
   readonly requests: JsonRequest[] = [];
+  verificationBody: unknown = { id: 91, title: "Synthetic Add Series", tvdbId: 12345, path: "/private/media/TV/Synthetic Add Series" };
 
   async requestJson(request: JsonRequest): Promise<JsonResponse> {
     this.requests.push(request);
@@ -51,6 +52,9 @@ class AddTransport implements JsonTransport {
     }
     if (request.method === "POST" && request.path === "/api/v3/series") {
       return { status: 201, headers: {}, body: { id: 91, title: "Synthetic Add Series", path: "/private/media/TV/Synthetic Add Series" } };
+    }
+    if (request.method === "GET" && request.path === "/api/v3/series/91") {
+      return { status: 200, headers: {}, body: this.verificationBody };
     }
     return { status: 404, headers: {}, body: {} };
   }
@@ -168,6 +172,26 @@ test("PEG-SONARR-012 add options are sanitized and series add always disables au
   assert.equal(post.body.rootFolderPath, "/private/media/TV");
   assert.equal(post.body.privateField, undefined);
   assert.doesNotMatch(JSON.stringify(receipt), /private|rootFolderPath|qualityProfile/u);
+});
+
+test("PEG-SONARR-013 added series identity is re-read before Pegarr continues", async () => {
+  const transport = new AddTransport();
+  const receipt = await client(transport).addCatalogSeries({
+    tvdbId: 12345, rootFolderId: 3, qualityProfileId: 7, monitored: true, monitor: "all",
+  });
+  assert.equal(receipt.itemId, 91);
+  const verification = transport.requests.at(-1);
+  assert.deepEqual(verification, {
+    method: "GET", path: "/api/v3/series/91", query: {},
+    headers: { accept: "application/json", "x-api-key": "synthetic-api-key" },
+    timeoutMs: 2_500, maxResponseBytes: 64_000,
+  });
+  const mismatched = new AddTransport();
+  mismatched.verificationBody = { id: 91, title: "Wrong Series", tvdbId: 99999 };
+  await assert.rejects(
+    client(mismatched).addCatalogSeries({ tvdbId: 12345, rootFolderId: 3, qualityProfileId: 7, monitored: true, monitor: "all" }),
+    (error: unknown) => error instanceof Error && "code" in error && error.code === "verification_unknown",
+  );
 });
 
 test("PEG-SONARR-002 releases preserve Arr decisions and safe evidence", () => {

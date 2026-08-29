@@ -74,9 +74,9 @@ This is one Pegarr workflow; the user does not need to visit the Arr UI. Exact p
 
 ## Implementation status
 
-- Completed locally: username/password-compatible authentication, sanitized multi-instance catalog lookup, discovery-first dashboard, persistent explicit default language policy, secret-safe SubDL/OpenSubtitles credential and mapping entry, immediate UI-configured provider use, title-level pre-add coverage preview, and opt-in explicit add-to-Arr with server-owned defaults and automatic search forced off.
-- Next: continue from the returned series/movie identity into an executable exact-release analysis view; series first needs a season or episode scope choice.
-- Not yet implemented: automatic-search suppression verification against live Arr, richer forced/hearing-impaired policy controls, cookie sessions, and the executable post-add exact-analysis handoff. The current add result returns a safe typed continuation marker without starting release search or Grab.
+- Completed locally: username/password-compatible authentication, sanitized multi-instance catalog lookup, discovery-first dashboard, persistent explicit default language policy, secret-safe SubDL/OpenSubtitles credential and mapping entry, immediate UI-configured provider use, title-level pre-add coverage preview, opt-in explicit add-to-Arr with server-owned defaults and automatic search forced off, created-record identity verification, and automatic Radarr handoff into exact read-only release analysis.
+- Next: add the Sonarr season/episode scope selector and continue its verified series identity into exact release analysis.
+- Not yet implemented: automatic-search suppression verification against live Arr, richer forced/hearing-impaired policy controls, cookie sessions, and the Sonarr post-add scope handoff. Radarr exact analysis is executable; neither continuation can silently Grab.
 
 Every behavior change must have a stable scenario in `harness/manifest.json`. Synthetic tests must never mutate a live Sonarr or Radarr instance, and no automated test may execute a live Grab.
 

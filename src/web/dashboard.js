@@ -439,8 +439,10 @@ async function submitCatalogAdd(event, context) {
       referrerPolicy: "no-referrer",
     });
     const result = await response.json();
-    if (response.status === 202 && result?.status === "timeout_unknown") {
-      context.status.textContent = "The add timed out, so its outcome is Unknown. Check the Arr library before trying again.";
+    if (response.status === 202 && (result?.status === "timeout_unknown" || result?.status === "verification_unknown")) {
+      context.status.textContent = result.status === "verification_unknown"
+        ? "Arr accepted the add, but Pegarr could not verify the returned identity. Check the Arr library before trying again."
+        : "The add timed out, so its outcome is Unknown. Check the Arr library before trying again.";
       context.status.dataset.state = "warning";
       return;
     }
@@ -451,10 +453,66 @@ async function submitCatalogAdd(event, context) {
     context.status.textContent = `Added to ${context.item.application === "sonarr" ? "Sonarr" : "Radarr"}. Automatic search remained off. ${next}`;
     context.status.dataset.state = "success";
     context.confirmation.disabled = true;
+    if (result?.next?.action === "exact_movie_release_analysis" && typeof result.next.continuationId === "string") {
+      await loadCatalogContinuationAnalysis(result.next.continuationId, context.item, result.receipt, context.status);
+    }
   } catch {
     context.status.textContent = "Pegarr could not confirm the add. Nothing else was started.";
     context.status.dataset.state = "error";
     context.submit.disabled = context.confirmation.value !== context.options?.confirmation;
+  }
+}
+
+async function loadCatalogContinuationAnalysis(continuationId, item, receipt, status) {
+  status.textContent = "Added with automatic search off. Loading exact Radarr releases and subtitle evidence…";
+  status.dataset.state = "loading";
+  const row = {
+    key: `catalog-continuation:${continuationId}`,
+    itemId: receipt?.itemId,
+    application: "radarr",
+    instanceId: item?.instanceId,
+    kind: "movie",
+    title: item?.title ?? "Added movie",
+    context: Number.isSafeInteger(item?.year) ? String(item.year) : "Movie",
+  };
+  selectedRow = row;
+  activeFeasibility = undefined;
+  resetReleaseControls();
+  elements.feasibilityPanel.hidden = false;
+  elements.feasibilityTitle.textContent = row.title;
+  elements.feasibilityContext.textContent = `${row.context} · added with automatic search off`;
+  elements.feasibilitySummary.replaceChildren();
+  elements.releaseTableBody.replaceChildren();
+  elements.releaseTableWrap.hidden = true;
+  elements.releaseControls.hidden = true;
+  setFeasibilityNotice("Searching exact Radarr releases and checking subtitle evidence…", "loading");
+  try {
+    const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis`, {
+      method: "GET",
+      headers: { authorization: libraryAuthorization },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+    });
+    if (response.status === 401) {
+      libraryAuthorization = undefined;
+      clearPageEvidence();
+      showAccess("Those credentials were not accepted. Sign in again.");
+      return;
+    }
+    const view = feasibilityView(await response.json());
+    if (!response.ok && view.state === "invalid") throw new Error("catalog_continuation_unavailable");
+    renderFeasibility(view);
+    status.textContent = view.state === "ready"
+      ? "Added with automatic search off. Exact release analysis is ready below."
+      : "The title was added, but exact release analysis needs attention below.";
+    status.dataset.state = view.state === "ready" ? "success" : "warning";
+    elements.feasibilityTitle.focus();
+  } catch {
+    setFeasibilityNotice("The movie was added, but Pegarr could not complete exact analysis. Subtitle availability remains Unknown.", "error");
+    status.textContent = "Added with automatic search off, but exact release analysis is unavailable.";
+    status.dataset.state = "warning";
   }
 }
 
@@ -997,7 +1055,9 @@ function renderFeasibility(view) {
     ? "Stale cached analysis"
     : view.analysis.source === "memory_cache"
       ? "Pegarr item cache"
-      : "Fresh Arr/Bazarr analysis";
+      : view.policySource === "explicit_default"
+        ? "Fresh Arr and Pegarr-policy analysis"
+        : "Fresh Arr/Bazarr analysis";
   const analysisTiming = document.createElement("span");
   analysisTiming.textContent = `${view.analysis.elapsedMs} ms · ${view.analysis.arrRequests} Arr · ${view.analysis.bazarrRequests} Bazarr · ${view.analysis.providerRequests} provider ${view.analysis.providerRequests === 1 ? "request" : "requests"}`;
   analysis.append(analysisSource, analysisTiming);

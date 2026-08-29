@@ -9,13 +9,14 @@ import { loadRuntimeConfiguration, SecretValue } from "./config.js";
 import { syntheticSonarrSystemStatusResponse } from "./fixtures/sonarr-system-status.js";
 import { syntheticRadarrSystemStatusResponse } from "./fixtures/radarr-system-status.js";
 import { syntheticRadarrMissingItemsResponse } from "./fixtures/radarr-missing-items.js";
+import { syntheticRadarrMovieReleaseResponse } from "./fixtures/radarr-release-search.js";
 import { syntheticSonarrMissingItemsResponse } from "./fixtures/sonarr-missing-items.js";
 import { syntheticSonarrEpisodeReleaseResponse } from "./fixtures/sonarr-release-search.js";
 import {
   syntheticBazarrLanguageProfilesResponse,
   syntheticBazarrSeriesAssignmentResponse,
 } from "./fixtures/bazarr-language-policy.js";
-import { syntheticSubdlV2EpisodeSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
+import { syntheticSubdlV2EpisodeSearchResponse, syntheticSubdlV2MovieSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
 import { syntheticOpenSubtitlesEpisodeSearchResponse } from "./fixtures/opensubtitles-subtitle-search.js";
 import { createRuntimeServices } from "./runtime.js";
 import { SubtitleSettingsStore } from "./subtitle-settings.js";
@@ -297,7 +298,7 @@ test("PEG-CATALOG-005 a UI-configured provider is usable immediately for pre-add
   services.close();
 });
 
-test("PEG-CATALOG-008 explicit catalog add returns a safe Arr identity and Pegarr continuation", async (context) => {
+test("PEG-CATALOG-008 PEG-CONTINUE-001 catalog add returns a bounded server-owned continuation", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-catalog-add-"));
   context.after(async () => rm(directory, { recursive: true }));
   const configuration = {
@@ -311,8 +312,10 @@ test("PEG-CATALOG-008 explicit catalog add returns a safe Arr identity and Pegar
     catalogAdd: { enabled: true as const },
   };
   const requests: Array<{ method: string; url: URL; body?: unknown }> = [];
+  let currentTime = 1_000;
   const services = createRuntimeServices(configuration, {
     dataDirectory: directory,
+    now: () => currentTime,
     fetchImplementation: async (input, init) => {
       const url = new URL(input);
       const method = init?.method ?? "GET";
@@ -338,6 +341,9 @@ test("PEG-CATALOG-008 explicit catalog add returns a safe Arr identity and Pegar
       }
       if (url.pathname === "/api/v3/movie" && method === "POST") {
         return new Response(JSON.stringify({ id: 93 }), { status: 201 });
+      }
+      if (url.pathname === "/api/v3/movie/93") {
+        return new Response(JSON.stringify({ id: 93, title: "Synthetic Add Movie", tmdbId: 42 }), { status: 200 });
       }
       return new Response("not found", { status: 404 });
     },
@@ -366,20 +372,23 @@ test("PEG-CATALOG-008 explicit catalog add returns a safe Arr identity and Pegar
   assert.equal(requests.filter(({ method }) => method === "POST").length, postsBeforeConfirmation);
 
   const result = await services.catalogAdd.add(selection, { ...input, confirmation: options.confirmation });
-  assert.deepEqual(result, {
-    kind: "catalog-add",
-    mode: "catalog_add",
-    status: "added",
-    receipt: {
+  assert.equal(result.status, "added");
+  assert.deepEqual(result.receipt, {
       status: "added",
       application: "radarr",
       instanceId: "synthetic-radarr",
       itemId: 93,
       title: "Synthetic Add Movie",
       automaticSearch: false,
-    },
-    next: { action: "exact_movie_release_analysis", movieId: 93 },
   });
+  assert.equal(result.next.action, "exact_movie_release_analysis");
+  assert.match(result.next.continuationId, /^[A-Za-z0-9_-]{32}$/u);
+  assert.equal(result.next.expiresAt, "1970-01-01T00:10:01.000Z");
+  assert.deepEqual({
+    kind: "catalog-add",
+    mode: "catalog_add",
+    status: "added",
+  }, { kind: result.kind, mode: result.mode, status: result.status });
   const post = requests.find(({ method }) => method === "POST");
   assert.deepEqual((post?.body as { addOptions?: unknown } | undefined)?.addOptions, {
     monitor: "movieOnly",
@@ -387,6 +396,79 @@ test("PEG-CATALOG-008 explicit catalog add returns a safe Arr identity and Pegar
     addMethod: "manual",
   });
   assert.doesNotMatch(JSON.stringify(result), /private|rootFolder|qualityProfile|confirmation|api.?key/iu);
+  assert.equal((await services.catalogContinuation?.analyze(result.next.continuationId))?.status, "policy_unresolved");
+  currentTime += 600_001;
+  assert.equal((await services.catalogContinuation?.analyze(result.next.continuationId))?.status, "not_found");
+  services.close();
+});
+
+test("PEG-CONTINUE-002 Radarr continuation runs exact read-only analysis from Pegarr policy", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-radarr-continuation-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  await new SubtitleSettingsStore(directory).update({ languages: [
+    { code: "pt-BR", required: true, forced: false, hearingImpaired: "either" },
+  ] });
+  const configuration = {
+    radarr: {
+      instanceId: "synthetic-radarr",
+      baseUrl: "https://radarr.example.invalid",
+      allowedHosts: ["radarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-radarr-key-value"),
+    },
+    subdl: {
+      instanceId: "subdl",
+      baseUrl: "https://subdl.example.invalid",
+      allowedHosts: ["subdl.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-subdl-key-value"),
+    },
+    subdlLanguageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
+    catalogAdd: { enabled: true as const },
+  };
+  const requests: string[] = [];
+  const services = createRuntimeServices(configuration, {
+    dataDirectory: directory,
+    now: () => 10_000,
+    fetchImplementation: async (input, init) => {
+      const url = new URL(input);
+      const method = init?.method ?? "GET";
+      requests.push(`${method} ${url.hostname}${url.pathname}${url.search}`);
+      if (url.hostname === "radarr.example.invalid" && url.pathname === "/api/v3/movie/lookup") {
+        return new Response(JSON.stringify([{ title: "Synthetic Movie", year: 2025, tmdbId: 84, imdbId: "tt7654321", id: 0 }]), { status: 200 });
+      }
+      if (url.pathname === "/api/v3/rootfolder") return new Response(JSON.stringify([{ id: 4, path: "/private/media/Movies", accessible: true }]), { status: 200 });
+      if (url.pathname === "/api/v3/qualityprofile") return new Response(JSON.stringify([{ id: 8, name: "Synthetic UHD" }]), { status: 200 });
+      if (url.hostname === "radarr.example.invalid" && url.pathname === "/api/v3/movie" && method === "POST") return new Response(JSON.stringify({ id: 93 }), { status: 201 });
+      if (url.hostname === "radarr.example.invalid" && url.pathname === "/api/v3/movie/93") return new Response(JSON.stringify({ id: 93, title: "Synthetic Movie", tmdbId: 84 }), { status: 200 });
+      if (url.hostname === "radarr.example.invalid" && url.pathname === "/api/v3/release") return new Response(JSON.stringify(syntheticRadarrMovieReleaseResponse), { status: 200 });
+      if (url.hostname === "subdl.example.invalid" && url.pathname === "/api/v2/subtitles/search") return new Response(JSON.stringify(syntheticSubdlV2MovieSearchResponse), { status: 200 });
+      return new Response("not found", { status: 404 });
+    },
+  });
+  assert.ok(services.catalogAdd);
+  assert.ok(services.catalogContinuation);
+  const selection = { application: "radarr" as const, instanceId: "synthetic-radarr", providerId: "tmdb" as const, value: "84" };
+  const options = await services.catalogAdd.readOptions(selection);
+  const added = await services.catalogAdd.add(selection, {
+    rootFolderId: 4,
+    qualityProfileId: 8,
+    monitored: true,
+    minimumAvailability: "released",
+    confirmation: options.confirmation,
+  });
+  const result = await services.catalogContinuation.analyze(added.next.continuationId);
+  assert.equal(result.status, "ready");
+  if (result.status !== "ready") return;
+  assert.equal(result.selection.itemId, 93);
+  assert.equal(result.report.item.title, "Synthetic Movie");
+  assert.equal(result.report.policy.source, "explicit_default");
+  assert.ok(result.report.releases.length > 0);
+  assert.deepEqual(result.capabilities, { controlledGrab: false });
+  await services.catalogContinuation.analyze(added.next.continuationId);
+  assert.equal(requests.filter((entry) => entry.includes("/api/v3/release")).length, 1);
+  assert.equal(requests.filter((entry) => entry.includes("/api/v2/subtitles/search")).length, 1);
+  assert.doesNotMatch(JSON.stringify(result), /private|api.?key|example\.invalid|download.*handle/iu);
   services.close();
 });
 
