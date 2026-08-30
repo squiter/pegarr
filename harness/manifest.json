@@ -1745,7 +1745,7 @@
     {
       "id": "PEG-MANUAL-003",
       "title": "NAS pull, startup, persistence, and architecture smoke test",
-      "reason": "CI builds amd64 and arm64 images but cannot prove the user's NAS environment"
+      "reason": "The live NAS pulled immutable digest sha256:d1822dcd9f3a0b187f0647699fa781d2794df55cb65797e0f35d337baa7ff063 on 2026-08-30, saved the native read-only Arr/Bazarr config mounts, reached healthy state, survived a controlled Pegarr-only restart, enforced HTTPS plus authentication before catalog access, and emitted bounded startup/readiness logs; runtime architecture and user identity, secret-file permissions, authenticated upstream reads, provider-setting persistence, and provider-cache reuse still require sanitized live evidence"
     },
     {
       "id": "PEG-MANUAL-004",

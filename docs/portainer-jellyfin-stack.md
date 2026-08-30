@@ -4,6 +4,8 @@ The [`compose.portainer-jellyfin.yaml`](../deploy/compose.portainer-jellyfin.yam
 
 The live `jellyfin` stack was first validated with an older Pegarr image on 2026-08-28. Before updating it, export the current Portainer definition and compare it with this overlay. The release-candidate overlay deliberately has no default image: `PEGARR_IMAGE` must name the exact immutable digest already validated locally and published by CI.
 
+On 2026-08-30, the live stack was updated to `ghcr.io/squiter/pegarr@sha256:d1822dcd9f3a0b187f0647699fa781d2794df55cb65797e0f35d337baa7ff063`. Portainer confirmed the saved definition uses the three native application-config mounts, secure session cookies, and `PEGARR_ADD_ENABLED=false`; Pegarr became healthy while Sonarr, Radarr, and Bazarr stayed running. The private `pegarr.brikas.net` proxy then passed HTTPS readiness, authentication-gate, redirect, controlled-restart, and bounded startup-log checks. Provider and authenticated upstream acceptance remain manual gaps.
+
 Port `8080` was occupied on the NAS, so the overlay publishes Pegarr on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
 
 ## Configuration and credentials

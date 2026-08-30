@@ -76,6 +76,14 @@ Verify:
 
 This advances `PEG-MANUAL-003` and may add installed-service evidence to the other gaps. It does not automatically authorize controlled Grab in production.
 
+#### 2026-08-30 production checkpoint
+
+The live `jellyfin` Portainer stack now runs the published multi-architecture image at immutable digest `sha256:d1822dcd9f3a0b187f0647699fa781d2794df55cb65797e0f35d337baa7ff063`. The update preserved the existing Jellyfin, Sonarr, Radarr, Bazarr, Lidarr, and Prowlarr services and changed only Pegarr from legacy API-key-file extraction to the native read-only application-config mounts. Catalog add remains disabled and controlled Grab remains absent.
+
+The refreshed container reached healthy state, survived a controlled Pegarr-only restart, and returned ready through `https://pegarr.brikas.net/health/ready`. The private Nginx Proxy Manager route uses the existing wildcard certificate, forces HTTP to HTTPS, leaves HSTS disabled, and requires authentication before catalog access. Startup and readiness logs contained only bounded event metadata.
+
+Keep `PEG-MANUAL-003` open. Runtime architecture and user identity, secret-file permissions, authenticated Sonarr/Radarr/Bazarr reads, provider-setting persistence, and provider-cache reuse still need sanitized live evidence. `PEG-MANUAL-004` and `PEG-MANUAL-007` remain wholly open; this checkpoint performed no add, automatic search, Grab, or download mutation.
+
 ### 5. First public release
 
 After local acceptance and the read-only NAS smoke test:
