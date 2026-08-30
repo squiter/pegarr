@@ -1729,12 +1729,12 @@
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "Local Colima refreshed the authenticated Sonarr 4.0.16.2944 status and monitored missing-page envelopes on 2026-08-28, after a 100-row episode release search was measured on 2026-08-26, without retaining private records; no local Radarr service is available, and NAS production validation is intentionally separate"
+      "reason": "Local Colima refreshed the authenticated Sonarr 4.0.16.2944 status and a bounded one-row monitored missing-page envelope on 2026-08-30, after a 100-row episode release search was measured on 2026-08-26, without retaining private records; no local Radarr service is available, and NAS production validation is intentionally separate"
     },
     {
       "id": "PEG-MANUAL-002",
       "title": "Live Bazarr profile resolution and provider policy",
-      "reason": "Local Colima refreshed the authenticated profile-list and targeted series-assignment shapes on 2026-08-28 without retaining policy contents; installed NAS compatibility remains intentionally untested"
+      "reason": "Local Colima refreshed the authenticated Bazarr profile-list envelope on 2026-08-30 and measured one profile with one language item, after targeted series-assignment shapes were verified on 2026-08-28, without retaining policy contents; installed NAS compatibility remains intentionally untested"
     },
     {
       "id": "PEG-MANUAL-003",

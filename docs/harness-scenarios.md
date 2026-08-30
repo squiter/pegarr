@@ -297,8 +297,8 @@
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima refreshed Sonarr 4.0.16.2944 status and monitored missing-page shapes on 2026-08-28 after a measured release search on 2026-08-26; no local Radarr is available, and NAS production validation remains separate |
-| PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima refreshed authenticated profile-list and targeted series-assignment shapes on 2026-08-28 without retaining policy contents; installed NAS compatibility remains intentionally untested |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima refreshed Sonarr 4.0.16.2944 status and a bounded one-row monitored missing-page envelope on 2026-08-30 after a measured release search on 2026-08-26; no local Radarr is available, and NAS production validation remains separate |
+| PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima refreshed the authenticated profile-list envelope on 2026-08-30 and measured one profile with one language item after targeted series-assignment shapes were verified on 2026-08-28; installed NAS compatibility remains intentionally untested |
 | PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |
