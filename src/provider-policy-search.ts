@@ -65,7 +65,7 @@ export async function searchProviderPolicy(options: {
           status: "unsupported",
           searchedLanguages: [requirement.code],
           subtitles: [],
-          detail: `No explicit ${provider.provider} language mapping is configured`,
+          detail: `No explicit ${providerDisplayName(provider.provider)} language mapping is configured`,
         });
         continue;
       }

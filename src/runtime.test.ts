@@ -345,6 +345,78 @@ test("PEG-CATALOG-005 a UI-configured provider is usable immediately for pre-add
   services.close();
 });
 
+test("PEG-SETTINGS-005 UI-managed provider configuration drives existing-item analysis immediately", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-ui-provider-existing-item-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  const configuration = {
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+    bazarr: {
+      instanceId: "synthetic-bazarr",
+      baseUrl: "https://bazarr.example.invalid",
+      allowedHosts: ["bazarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-bazarr-key-value"),
+    },
+  };
+  const providerKey = "synthetic-ui-opensubtitles-key-value";
+  let providerApiKey: string | null = null;
+  let providerRequests = 0;
+  const services = createRuntimeServices(configuration, {
+    dataDirectory: directory,
+    fetchImplementation: async (input, init) => {
+      const url = new URL(input);
+      let body: unknown;
+      if (url.pathname === "/api/v3/wanted/missing") {
+        body = syntheticSonarrMissingItemsResponse;
+      } else if (url.pathname === "/api/v3/release") {
+        body = syntheticSonarrEpisodeReleaseResponse;
+      } else if (url.pathname === "/api/system/languages/profiles") {
+        body = syntheticBazarrLanguageProfilesResponse;
+      } else if (url.pathname === "/api/series") {
+        body = syntheticBazarrSeriesAssignmentResponse;
+      } else if (url.hostname === "api.opensubtitles.com" && url.pathname === "/api/v1/subtitles") {
+        providerRequests += 1;
+        providerApiKey = new Headers(init?.headers).get("api-key");
+        body = syntheticOpenSubtitlesEpisodeSearchResponse;
+      } else {
+        return new Response("{}", { status: 404 });
+      }
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+    now: () => 1_000,
+    missingInventoryPageSize: 2,
+  });
+
+  const selection = { application: "sonarr", kind: "episode", itemId: 305 } as const;
+  assert.equal((await services.readItemFeasibility(selection)).status, "disabled");
+  await services.updateProviderSettings("opensubtitles", {
+    apiKey: providerKey,
+    languageMappings: [{ policyCode: "en", providerCode: "en" }],
+  });
+  const result = await services.readItemFeasibility(selection);
+  services.close();
+
+  assert.equal(result.status, "ready");
+  if (result.status !== "ready") return;
+  assert.equal(providerRequests, 1);
+  assert.equal(providerApiKey, providerKey);
+  assert.equal(result.report.providerStatus[0]?.provider, "opensubtitles");
+  assert.equal(result.report.providerStatus[0]?.status, "success");
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /synthetic-(?:sonarr|bazarr|ui-opensubtitles)-key|example\.invalid|api\.opensubtitles\.com/iu,
+  );
+});
+
 test("PEG-CATALOG-008 PEG-CONTINUE-001 catalog add returns a bounded server-owned continuation", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-catalog-add-"));
   context.after(async () => rm(directory, { recursive: true }));

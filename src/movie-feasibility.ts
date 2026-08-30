@@ -8,9 +8,9 @@ import { RadarrAdapterError } from "./adapters/radarr.js";
 import type { ArrReleaseCandidate, FeasibilityReport, MediaIdentity } from "./domain.js";
 import { buildFeasibilityReport } from "./matching.js";
 import {
-  searchSubdlPolicy,
   searchProviderPolicy,
   validateLanguageMappings,
+  type PlannedSubtitleProvider,
   type ProviderLanguageMapping,
   type SubtitleWindowSource,
   type SubdlWindowSource,
@@ -78,16 +78,18 @@ export type RadarrMovieFeasibilityOutcome =
 export interface RadarrMovieFeasibilityServiceOptions {
   readonly radarr: RadarrMovieReleaseSource;
   readonly bazarr: BazarrMoviePolicySource;
-  readonly subdl: SubdlWindowSource;
+  readonly subdl?: SubdlWindowSource;
   readonly opensubtitles?: SubtitleWindowSource;
+  readonly providers?: readonly PlannedSubtitleProvider[];
   readonly now?: () => number;
 }
 
 export class RadarrMovieFeasibilityService {
   readonly #radarr: RadarrMovieReleaseSource;
   readonly #bazarr: BazarrMoviePolicySource;
-  readonly #subdl: SubdlWindowSource;
+  readonly #subdl: SubdlWindowSource | undefined;
   readonly #opensubtitles: SubtitleWindowSource | undefined;
+  readonly #providers: readonly PlannedSubtitleProvider[] | undefined;
   readonly #now: () => number;
 
   constructor(options: RadarrMovieFeasibilityServiceOptions) {
@@ -95,6 +97,10 @@ export class RadarrMovieFeasibilityService {
     this.#bazarr = options.bazarr;
     this.#subdl = options.subdl;
     this.#opensubtitles = options.opensubtitles;
+    this.#providers = options.providers;
+    if (this.#subdl === undefined && this.#providers === undefined) {
+      throw new TypeError("Movie feasibility requires at least one subtitle provider");
+    }
     this.#now = options.now ?? Date.now;
   }
 
@@ -136,32 +142,26 @@ export class RadarrMovieFeasibilityService {
       };
     }
 
-    const providerSearch = this.#opensubtitles === undefined
-      ? await searchSubdlPolicy({
-          item: validated.item,
-          policy: resolution.policy,
-          mappings: validated.subdlLanguages,
-          subdl: this.#subdl,
-        })
-      : await searchProviderPolicy({
-          item: validated.item,
-          policy: resolution.policy,
-          releases,
-          providers: [
-            {
-              provider: "subdl",
-              tier: "preferred",
-              mappings: validated.subdlLanguages,
-              source: this.#subdl,
-            },
-            {
-              provider: "opensubtitles",
-              tier: "fallback",
-              mappings: validated.opensubtitlesLanguages ?? [],
-              source: this.#opensubtitles,
-            },
-          ],
-        });
+    const providers = this.#providers ?? [
+      ...(this.#subdl === undefined ? [] : [{
+        provider: "subdl",
+        tier: "preferred" as const,
+        mappings: validated.subdlLanguages,
+        source: this.#subdl,
+      }]),
+      ...(this.#opensubtitles === undefined ? [] : [{
+        provider: "opensubtitles",
+        tier: "fallback" as const,
+        mappings: validated.opensubtitlesLanguages ?? [],
+        source: this.#opensubtitles,
+      }]),
+    ];
+    const providerSearch = await searchProviderPolicy({
+      item: validated.item,
+      policy: resolution.policy,
+      releases,
+      providers,
+    });
     return {
       status: "ready",
       mode: "read_only",

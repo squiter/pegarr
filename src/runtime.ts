@@ -526,7 +526,7 @@ export function createRuntimeServices(
     uiProviderRevision = -1;
   };
 
-  const resolveCatalogProviders = async (kind: CatalogMediaItem["kind"]): Promise<readonly {
+  const resolveCatalogProviders = async (kind: CatalogMediaItem["kind"] | "episode"): Promise<readonly {
     readonly provider: "subdl" | "opensubtitles";
     readonly tier: "preferred" | "fallback";
     readonly mappings: readonly ProviderLanguageMapping[];
@@ -568,65 +568,75 @@ export function createRuntimeServices(
       }]),
     ];
   };
-  const missingIntegrations = {
-    episode: [
-      ...(sonarrClients.size === 0 ? ["sonarr" as const] : []),
-      ...(bazarrClient === undefined ? ["bazarr" as const] : []),
-      ...(managedSubdl === undefined ? ["subdl" as const] : []),
-    ],
-    movie: [
-      ...(radarrClients.size === 0 ? ["radarr" as const] : []),
-      ...(bazarrClient === undefined ? ["bazarr" as const] : []),
-      ...(managedSubdl === undefined ? ["subdl" as const] : []),
-    ],
+  let itemFeasibility: ItemFeasibilityService | undefined;
+  let itemFeasibilityProviderRevision = -1;
+  const resolveItemFeasibility = async (): Promise<ItemFeasibilityService> => {
+    const providers = await resolveCatalogProviders("episode");
+    if (
+      itemFeasibility !== undefined
+      && itemFeasibilityProviderRevision === uiProviderRevision
+    ) {
+      return itemFeasibility;
+    }
+    const subdl = providers.find(({ provider }) => provider === "subdl");
+    const opensubtitles = providers.find(({ provider }) => provider === "opensubtitles");
+    const providerMissing = providers.length === 0;
+    const missingIntegrations = {
+      episode: [
+        ...(sonarrClients.size === 0 ? ["sonarr" as const] : []),
+        ...(bazarrClient === undefined ? ["bazarr" as const] : []),
+        ...(providerMissing ? ["subdl" as const] : []),
+      ],
+      movie: [
+        ...(radarrClients.size === 0 ? ["radarr" as const] : []),
+        ...(bazarrClient === undefined ? ["bazarr" as const] : []),
+        ...(providerMissing ? ["subdl" as const] : []),
+      ],
+    };
+    itemFeasibility = new ItemFeasibilityService({
+      readInventory: readMissingInventory,
+      ...(sonarrClients.size === 0 || bazarrClient === undefined || providerMissing
+        ? {}
+        : {
+            episodeForInstance: (instanceId: string) => {
+              const sonarr = sonarrClients.get(instanceId);
+              return sonarr === undefined ? undefined : new SonarrEpisodeFeasibilityService({
+                sonarr,
+                bazarr: bazarrClient,
+                providers,
+                now,
+              });
+            },
+          }),
+      ...(radarrClients.size === 0 || bazarrClient === undefined || providerMissing
+        ? {}
+        : {
+            movieForInstance: (instanceId: string) => {
+              const radarr = radarrClients.get(instanceId);
+              return radarr === undefined ? undefined : new RadarrMovieFeasibilityService({
+                radarr,
+                bazarr: bazarrClient,
+                providers,
+                now,
+              });
+            },
+          }),
+      subdlLanguages: subdl?.mappings ?? [],
+      opensubtitlesLanguages: opensubtitles?.mappings ?? [],
+      missingIntegrations,
+      now,
+      ttlMs: boundedCacheTtl(
+        options.itemFeasibilityTtlMs ?? defaultStatusTtlMs,
+        "itemFeasibilityTtlMs",
+      ),
+      ...(options.itemFeasibilityStaleTtlMs === undefined
+        ? {}
+        : { staleTtlMs: options.itemFeasibilityStaleTtlMs }),
+      maxEntries: options.itemFeasibilityMaxEntries ?? 100,
+    });
+    itemFeasibilityProviderRevision = uiProviderRevision;
+    return itemFeasibility;
   };
-  const itemFeasibility = new ItemFeasibilityService({
-    readInventory: readMissingInventory,
-    ...(sonarrClients.size === 0 || bazarrClient === undefined || managedSubdl === undefined
-      ? {}
-      : {
-          episodeForInstance: (instanceId: string) => {
-            const sonarr = sonarrClients.get(instanceId);
-            return sonarr === undefined ? undefined : new SonarrEpisodeFeasibilityService({
-              sonarr,
-              bazarr: bazarrClient,
-              subdl: managedSubdl.source,
-              ...(managedOpenSubtitles === undefined
-                ? {}
-                : { opensubtitles: managedOpenSubtitles.source }),
-              now,
-            });
-          },
-        }),
-    ...(radarrClients.size === 0 || bazarrClient === undefined || managedSubdl === undefined
-      ? {}
-      : {
-          movieForInstance: (instanceId: string) => {
-            const radarr = radarrClients.get(instanceId);
-            return radarr === undefined ? undefined : new RadarrMovieFeasibilityService({
-              radarr,
-              bazarr: bazarrClient,
-              subdl: managedSubdl.source,
-              ...(managedOpenSubtitles === undefined
-                ? {}
-                : { opensubtitles: managedOpenSubtitles.source }),
-              now,
-            });
-          },
-        }),
-    subdlLanguages: configuration.subdlLanguageMappings ?? [],
-    opensubtitlesLanguages: configuration.opensubtitlesLanguageMappings ?? [],
-    missingIntegrations,
-    now,
-    ttlMs: boundedCacheTtl(
-      options.itemFeasibilityTtlMs ?? defaultStatusTtlMs,
-      "itemFeasibilityTtlMs",
-    ),
-    ...(options.itemFeasibilityStaleTtlMs === undefined
-      ? {}
-      : { staleTtlMs: options.itemFeasibilityStaleTtlMs }),
-    maxEntries: options.itemFeasibilityMaxEntries ?? 100,
-  });
 
   const controlledGrab = configuration.controlledGrab === undefined
     ? undefined
@@ -830,7 +840,7 @@ export function createRuntimeServices(
     if (settings.status !== "configured") {
       return { kind: "item-feasibility", mode: "read_only", status: "policy_unresolved", reason: "explicit_default_unconfigured", selection };
     }
-    const providers = await resolveCatalogProviders("series");
+    const providers = await resolveCatalogProviders(selectedEpisode === undefined ? "series" : "episode");
     if (providers.length === 0) {
       return { kind: "item-feasibility", mode: "read_only", status: "disabled", selection, missingIntegrations: ["subdl"] };
     }
@@ -1145,7 +1155,8 @@ export function createRuntimeServices(
     ...(catalogAdd === undefined ? {} : { catalogAdd }),
     ...(catalogContinuation === undefined ? {} : { catalogContinuation }),
     readMissingInventory,
-    readItemFeasibility: (selection, readOptions) => itemFeasibility.read(selection, readOptions),
+    readItemFeasibility: async (selection, readOptions) =>
+      (await resolveItemFeasibility()).read(selection, readOptions),
     ...(controlledGrab === undefined
       ? {}
       : {

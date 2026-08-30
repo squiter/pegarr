@@ -1717,6 +1717,12 @@
       "title": "Packaged OpenSubtitles probe makes one redacted search on an internal-only network",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Synthetic sibling container, search response, and secret; local Docker architecture only"
+    },
+    {
+      "id": "PEG-SETTINGS-005",
+      "title": "UI-managed provider configuration drives existing-item analysis immediately",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary private settings files and injected Arr, Bazarr, and provider responses; no network"
     }
   ],
   "manualGaps": [
