@@ -91,6 +91,7 @@
 | PEG-PROBE-010 | OpenSubtitles probe states stay distinct and invalid input remains redacted | `src/probe-opensubtitles.test.ts` |
 | PEG-DOCKER-026 | The packaged OpenSubtitles probe makes one redacted search on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-SETTINGS-005 | UI-managed provider configuration drives existing-item analysis immediately | `src/runtime.test.ts` |
+| PEG-PORTAINER-001 | Portainer overlay requires an immutable image and native secret-safe configuration | `scripts/harness/architecture-contract.mjs` |
 | PEG-FLOW-001 | Resolved Bazarr policy drives one SubDL search per language and one report | `src/episode-feasibility.test.ts` |
 | PEG-FLOW-002 | Missing provider language mappings stay scoped without extra requests | `src/episode-feasibility.test.ts` |
 | PEG-FLOW-003 | Unresolved Bazarr assignment stops provider work without assumed policy | `src/episode-feasibility.test.ts` |

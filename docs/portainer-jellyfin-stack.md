@@ -1,53 +1,78 @@
 # Portainer Jellyfin-stack deployment
 
-The [`compose.portainer-jellyfin.yaml`](../deploy/compose.portainer-jellyfin.yaml) overlay adds Pegarr to an existing Compose stack whose Sonarr, Radarr, and Bazarr services share the `jellyfin_net` network. Catalog add and controlled Grab both remain disabled by default, and the overlay does not configure a subtitle provider.
+The [`compose.portainer-jellyfin.yaml`](../deploy/compose.portainer-jellyfin.yaml) overlay adds Pegarr to an existing Compose stack whose Sonarr, Radarr, and Bazarr services share the `jellyfin_net` network. It does not replace or recreate those services. Catalog add and controlled Grab remain disabled by default.
 
-The checked-in overlay matches the live `jellyfin` stack deployment validated on 2026-08-28. Port `8080` was already occupied on that NAS, so Pegarr is published on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
+The live `jellyfin` stack was first validated with an older Pegarr image on 2026-08-28. Before updating it, export the current Portainer definition and compare it with this overlay. The release-candidate overlay deliberately has no default image: `PEGARR_IMAGE` must name the exact immutable digest already validated locally and published by CI.
 
-## Environment variables and credentials
+Port `8080` was occupied on the NAS, so the overlay publishes Pegarr on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
 
-Portainer environment variables are appropriate for non-secret topology and behavior settings such as service URLs, allowed hosts, the published port, cache limits, time zone, and Pegarr username. They are not an appropriate place for API keys, the Pegarr password, or the legacy access token because container metadata, process inspection, support bundles, and diagnostics can expose them.
+## Configuration and credentials
 
-`PEGARR_ADD_ENABLED` is a non-secret behavior switch and may be set in Portainer. Leave it `false` for a read-only deployment. Set it to `true` only after deploying an image that includes `PEG-CONFIG-015` and the add scenarios, and only when the username/password login is active. This enables the explicit add button; it never enables automatic Arr search or controlled Grab.
+Portainer environment variables are appropriate for non-secret topology and behavior settings such as service URLs, allowed hosts, the published port, cache limits, time zone, and Pegarr username. Never place API keys, provider keys, Pegarr passwords, access tokens, or administrator tokens in Portainer variables.
 
-The current published image predates Pegarr's native application-config support. To keep the live deployment secret-safe without publishing a new image, the overlay mounts only these existing files read-only:
+Pegarr reads the existing applications' credentials through three narrowly mounted files:
 
 - Sonarr `/config/config.xml`;
 - Radarr `/config/config.xml`;
 - Bazarr `/config/config/config.yaml`.
 
-Its startup wrapper extracts only the three application API keys into the container's private `/tmp` filesystem, generates Pegarr's password and legacy access token in the private `pegarr-data` volume when absent, and then starts Pegarr. It does not read subtitle-provider credentials from Bazarr.
+The native bounded configuration loader extracts only the required application API key in memory. The files remain mounted read-only, and Pegarr never reads subtitle-provider credentials from Bazarr.
 
-The pinned image digest in this overlay predates username/password login, so it continues to use the legacy access token until a new image containing `PEG-ACCESS-005` and `PEG-CONFIG-014` is published. After that update, the default username is `pegarr` and the generated password is used. To display either credential deliberately from the NAS terminal, put Docker's options before the container name:
+On first startup, the overlay generates a Pegarr password and a legacy API access token inside the private `pegarr-data` volume. It never prints them during startup. Username/password sessions are the browser path; the bearer token remains only for compatible API clients.
+
+After signing in, configure SubDL and OpenSubtitles from Pegarr's settings page. Provider keys are written under `/data/provider-secrets` with private permissions, mappings stay in `/data/provider-settings.json`, and neither value is returned to the browser. This configuration immediately powers pre-add coverage, post-add continuation, and existing-item analysis.
+
+To display the generated login password deliberately from the NAS terminal:
 
 ```console
 docker exec -it jellyfin-pegarr-1 /bin/sh -c 'cat /data/password'
-docker exec -it jellyfin-pegarr-1 /bin/sh -c 'cat /data/access_token'
 ```
 
-Treat the terminal output as a password, do not paste it into Portainer variables, and clear shared terminal history or captures when appropriate.
+Treat that output as a password. Do not paste it into Portainer variables, screenshots, issues, or shared terminal captures.
 
-After an image containing `PEG-CONFIG-013` is published, replace the wrapper and temporary key-file variables with the native settings below while retaining the same read-only mounts:
+## Required Portainer variables
 
-```yaml
-environment:
-  PEGARR_SONARR_APP_CONFIG_FILE: /run/upstream/sonarr-config.xml
-  PEGARR_RADARR_APP_CONFIG_FILE: /run/upstream/radarr-config.xml
-  PEGARR_BAZARR_APP_CONFIG_FILE: /run/upstream/bazarr-config.yaml
+Set:
+
+```text
+PEGARR_IMAGE=ghcr.io/squiter/pegarr@sha256:<validated-digest>
+SONARR_CONFIG_PATH=<existing Sonarr config directory>
+RADARR_CONFIG_PATH=<existing Radarr config directory>
+BAZARR_CONFIG_PATH=<existing Bazarr config directory>
 ```
 
-Do not combine an `APP_CONFIG_FILE` setting with the corresponding `API_KEY_FILE` setting. The native loader reads at most 1 MiB, requires exactly one application API key, and reports only redacted configuration errors.
+Optional non-secret controls include `PEGARR_PORT`, `PEGARR_USERNAME`, `TZ`, and `PEGARR_ADD_ENABLED`. Leave `PEGARR_ADD_ENABLED=false` during the first deployment and read-only smoke test.
 
-## Deploy in Portainer
+When the browser route is protected by verified HTTPS, set `PEGARR_SESSION_COOKIE_SECURE=true`. Keep it `false` only while testing a direct private HTTP route. Changing this flag before HTTPS works prevents the browser from returning the session cookie over HTTP.
 
-1. Export or copy the current stack definition before editing it.
-2. Merge the `pegarr` service and the `pegarr-data` volume from the overlay into the existing stack; do not replace or recreate the existing service definitions.
-3. Keep Pegarr on the same `jellyfin_net` network as Sonarr, Radarr, and Bazarr.
-4. Update the stack and confirm `jellyfin-pegarr-1` becomes healthy while the existing containers remain running.
-5. Open `http://NAS_ADDRESS:8088/health/ready`. A successful response proves Pegarr itself is ready. Validate live upstream status separately because browser automation and repository tests do not cross the NAS boundary.
+Controlled Grab is intentionally absent from this overlay. Enable it only through a separately reviewed configuration with an independent administrator secret and after local controlled-Grab acceptance succeeds.
 
-The live dashboard boundary is enabled by credentials stored in `pegarr-data`; they are never printed during startup or placed in Portainer. The pinned image currently uses the legacy bearer token; the next compatible image uses the generated username/password while retaining token compatibility. Provider evidence remains `Unknown` until a supported subtitle-provider key is mounted separately. Catalog add remains disabled unless `PEGARR_ADD_ENABLED=true`, and controlled Grab remains disabled unless it is independently configured and separately confirmed.
+## First deployment or update
 
-## Roll back
+1. Export or copy the current Portainer stack definition as the rollback unit.
+2. Record the currently deployed Pegarr image digest and confirm the existing Sonarr, Radarr, and Bazarr containers are healthy.
+3. Set `PEGARR_IMAGE` to the exact validated digest. Never use `latest` for the acceptance deployment.
+4. Merge only the `pegarr` service and `pegarr-data` volume changes into the existing stack. Preserve every existing media-service image, mount, path, network, and environment value.
+5. Update the stack and confirm `jellyfin-pegarr-1` becomes healthy while the existing containers remain running.
+6. Open `/health/ready`, then sign in and verify the onboarding page before configuring providers.
 
-Restore the exported pre-change Compose definition in the Portainer editor and update the stack. This removes only the Pegarr service. The `pegarr-data` volume remains for a recoverable redeploy unless it is deliberately removed later.
+The overlay retains a read-only root filesystem, dropped capabilities, `no-new-privileges`, a bounded temporary filesystem, and the persistent `/data` volume.
+
+## Read-only smoke test
+
+Before enabling catalog add, verify:
+
+- authentication is required before upstream work;
+- Sonarr, Radarr, and Bazarr report safe available states;
+- SubDL and OpenSubtitles settings survive one controlled Pegarr restart;
+- a repeated stable provider window uses cached evidence rather than another provider request;
+- the catalog and existing-item dashboards preserve Arr rejection reasons and honest provider failures;
+- container logs contain no credentials, URLs with secrets, private media paths, provider response bodies, or download handles.
+
+This advances the manual NAS and installed-service gaps but does not authorize an add, automatic search, controlled Grab, or arbitrary download.
+
+## Rollback
+
+Restore the exported pre-change Compose definition in the Portainer editor and update the stack. This returns the prior Pegarr service definition without changing Sonarr, Radarr, Bazarr, or their data.
+
+Keep the `pegarr-data` volume for a recoverable redeploy unless its private settings and audit data have been backed up and the user explicitly decides to remove it. If the new image started successfully and migrated persistent data, retain a backup of that volume before rolling forward again.

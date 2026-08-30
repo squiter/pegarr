@@ -4,13 +4,13 @@ This record preserves supporting work identified during the now-complete Phase 3
 
 ## Portainer example for a combined media stack
 
-**Status:** proposed for later documentation work
+**Status:** implemented; release-candidate refresh and live read-only validation in progress
 
 Execution order and acceptance boundaries now live in the [release-candidate roadmap](release-candidate-roadmap.md).
 
-Create a secret-safe Portainer stack example showing Pegarr deployed beside Sonarr, Radarr, Bazarr, and the supported subtitle-provider configuration. The example should reuse the existing Compose overlays, private data volume, secret-file mounts, internal service names, read-only container hardening, and explicit controlled-Grab opt-in.
+The secret-safe [Portainer overlay](../deploy/compose.portainer-jellyfin.yaml) and [deployment runbook](portainer-jellyfin-stack.md) now place Pegarr beside existing Sonarr, Radarr, and Bazarr services without taking ownership of them. The release-candidate refresh requires an explicitly supplied immutable image digest, native read-only application-config loading, persistent private UI-managed provider settings, read-only container hardening, and a separate controlled-Grab opt-in.
 
-This is documentation and deployment composition only. Pegarr must remain independently deployable, must not take ownership of the Arr/Bazarr containers, and must not require Portainer at runtime. The guide should cover both first deployment and a reversible update without embedding API keys, NAS paths, hostnames, or architecture assumptions.
+This remains documentation and deployment composition only. Pegarr is independently deployable, does not take ownership of the Arr/Bazarr containers, and does not require Portainer at runtime. The live NAS refresh remains an explicit manual acceptance boundary with an exported rollback definition.
 
 ## Quota-aware provider scheduling and cache retention
 

@@ -42,13 +42,13 @@ Verify one complete operator-owned flow:
 
 This advances `PEG-MANUAL-004`. It never authorizes an automated live Grab, a production Grab, or an arbitrary download.
 
-### 3. Portainer deployment example
+### 3. Portainer deployment refresh
 
-Create the planned secret-safe example showing Pegarr beside Sonarr, Radarr, Bazarr, SubDL, and OpenSubtitles. It should compose the existing overlays instead of making those services core runtime dependencies.
+Refresh the existing secret-safe example and live stack comparison showing Pegarr beside Sonarr, Radarr, and Bazarr, with SubDL and OpenSubtitles configured through Pegarr's persistent server-side settings. It must use the validated immutable image and must not make those services core runtime dependencies.
 
 The guide must include:
 
-- private secret-file mounts rather than credentials in environment values;
+- native read-only Arr/Bazarr application-config mounts and private persistent UI-managed provider credentials rather than credentials in environment values;
 - an explicit persistent Pegarr data volume for provider cache and Grab audit data;
 - internal service names and an authenticated browser route;
 - the default read-only deployment and a visibly separate controlled-Grab opt-in;

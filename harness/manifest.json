@@ -1723,6 +1723,12 @@
       "title": "UI-managed provider configuration drives existing-item analysis immediately",
       "evidence": "src/runtime.test.ts",
       "boundary": "Temporary private settings files and injected Arr, Bazarr, and provider responses; no network"
+    },
+    {
+      "id": "PEG-PORTAINER-001",
+      "title": "Portainer overlay requires an immutable image and native secret-safe configuration",
+      "evidence": "scripts/harness/architecture-contract.mjs",
+      "boundary": "Repository-owned Compose and documentation only; no Portainer or NAS access"
     }
   ],
   "manualGaps": [

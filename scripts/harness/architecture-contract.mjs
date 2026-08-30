@@ -369,6 +369,30 @@ if (/PEGARR_RADARR_API_KEY\s*:/u.test(radarrCompose)) {
   issues.push("The Radarr Compose overlay may not pass the API key as an environment value");
 }
 
+const portainerCompose = readFileSync(resolve(repoRoot, "deploy/compose.portainer-jellyfin.yaml"), "utf8");
+const portainerScenario = "PEG-PORTAINER-001";
+for (const contract of [
+  "PEGARR_IMAGE:?set PEGARR_IMAGE to the validated immutable Pegarr digest",
+  "PEGARR_PASSWORD_FILE: /data/password",
+  "PEGARR_SESSION_COOKIE_SECURE:",
+  "PEGARR_SONARR_APP_CONFIG_FILE: /run/upstream/sonarr-config.xml",
+  "PEGARR_RADARR_APP_CONFIG_FILE: /run/upstream/radarr-config.xml",
+  "PEGARR_BAZARR_APP_CONFIG_FILE: /run/upstream/bazarr-config.yaml",
+  "PEGARR_ADD_ENABLED: ${PEGARR_ADD_ENABLED:-false}",
+  "pegarr-data:/data",
+  "read_only: true",
+  "cap_drop:",
+  "no-new-privileges:true",
+  "external: true",
+]) {
+  if (!portainerCompose.includes(contract)) {
+    issues.push(`${portainerScenario} Portainer overlay must retain ${contract}`);
+  }
+}
+if (/PEGARR_(?:SONARR|RADARR|BAZARR)_API_KEY_FILE|<ApiKey>|apikey\s*:/iu.test(portainerCompose)) {
+  issues.push(`${portainerScenario} Portainer overlay must use native application-config loading without extracting API keys`);
+}
+
 const nasCompose = readFileSync(resolve(repoRoot, "deploy/compose.nas.yaml"), "utf8");
 for (const contract of [
   "PEGARR_PROVIDER_CACHE_POSITIVE_TTL_SECONDS",

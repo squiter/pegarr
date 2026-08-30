@@ -26,7 +26,7 @@ Provider failures are never treated as proof that subtitles do not exist.
 
 ## Project status
 
-The API-feasibility milestone and Phases 1 through 3 are complete. Pegarr now has instance-safe Arr identity and runtime fan-out, two quota-aware subtitle-provider adapters, bounded asymmetric caching, season-pack semantics, preference-aware matching, and expanded real-world release parsing. Product review identified that the existing missing-item dashboard is a secondary workflow, not the intended product entry point. The active P0 cycle is the [discovery-first roadmap](docs/discovery-first-roadmap.md): username/password login, catalog search for unadded titles, subtitle settings and pre-add coverage, then an explicit add-and-continue flow. The [release-candidate roadmap](docs/release-candidate-roadmap.md) resumes after that correction.
+The API-feasibility milestone, implementation Phases 1 through 3, and the discovery-first P0 workflow are complete locally. Pegarr now supports username/password sessions, catalog search for unadded titles, UI-managed subtitle policy and provider settings, pre-add coverage, explicit add with automatic search disabled, exact release continuation, and administrator-confirmed controlled Grab. The active work is the [release-candidate roadmap](docs/release-candidate-roadmap.md): installed-service acceptance, a rollback-safe Portainer/NAS deployment, and the first immutable public release.
 
 The current repository foundation includes:
 
