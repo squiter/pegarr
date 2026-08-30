@@ -16,6 +16,7 @@
     "probe:radarr": "node dist/probe-radarr.js",
     "probe:bazarr": "node dist/probe-bazarr.js",
     "probe:subdl": "node dist/probe-subdl.js",
+    "probe:opensubtitles": "node dist/probe-opensubtitles.js",
     "report:sonarr-episode": "node dist/report-sonarr-episode.js",
     "report:sonarr-season": "node dist/report-sonarr-season.js",
     "report:radarr-movie": "node dist/report-radarr-movie.js",

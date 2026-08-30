@@ -83,6 +83,8 @@ The Phase 3 OpenSubtitles boundary is search-only. It does not log in as a user 
 | `PEGARR_OPENSUBTITLES_ALLOW_INSECURE_HTTP` | No | Test fixtures only; production access should remain HTTPS |
 | `PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS` | For release evidence | Comma-separated Bazarr-policy-to-OpenSubtitles pairs such as `en:en,pt-BR:pt-br`; no language is assumed |
 
+The one-shot OpenSubtitles probe requires one deliberate movie or episode window. Set `PEGARR_OPENSUBTITLES_PROBE_KIND`, at least one of `PEGARR_OPENSUBTITLES_PROBE_IMDB_ID` or `PEGARR_OPENSUBTITLES_PROBE_TMDB_ID`, and an explicit `PEGARR_OPENSUBTITLES_PROBE_POLICY_LANGUAGE` to `PEGARR_OPENSUBTITLES_PROBE_PROVIDER_LANGUAGE` mapping. Episode probes also require `PEGARR_OPENSUBTITLES_PROBE_SEASON` and `PEGARR_OPENSUBTITLES_PROBE_EPISODE`. The probe makes exactly one search and never prints those inputs.
+
 Following the [official OpenSubtitles REST search contract](https://opensubtitles.stoplight.io/docs/opensubtitles-api/a172317bd5ccc-search-for-subtitles), the adapter uses the fixed application identity `Pegarr v0.1.0`, exact IMDb or TMDB identifiers, lowercase provider language codes, and sorted query fields. When both providers are configured, Pegarr searches SubDL as the compatibility-preserving preferred source, evaluates candidates against Arr-accepted releases, and calls OpenSubtitles as a fallback only while required-language coverage remains below Likely. This ordering is a Pegarr policy, not a claim that either provider is unlimited: [SubDL documents daily search quotas](https://subdl.com/at/developers), while OpenSubtitles reports its own rate-window evidence.
 
 Pegarr deliberately does not accept direct `PEGARR_SONARR_API_KEY`, `PEGARR_RADARR_API_KEY`, `PEGARR_BAZARR_API_KEY`, `PEGARR_SUBDL_API_KEY`, or `PEGARR_OPENSUBTITLES_API_KEY` values. Environment variables can be exposed by process inspection, container metadata, support bundles, or accidental diagnostics. Each API key file is capped at 4096 bytes, parsed as one value, kept server-side, and serialized as `[redacted]` if the configuration object is accidentally encoded as JSON.
@@ -183,6 +185,12 @@ PEGARR_SUBDL_PROBE_SEASON=1
 PEGARR_SUBDL_PROBE_EPISODE=1
 PEGARR_OPENSUBTITLES_API_KEY_HOST_FILE=/absolute/private/path/opensubtitles_api_key
 PEGARR_OPENSUBTITLES_LANGUAGE_MAPPINGS=en:en,pt-BR:pt-br
+PEGARR_OPENSUBTITLES_PROBE_KIND=episode
+PEGARR_OPENSUBTITLES_PROBE_IMDB_ID=tt1234567
+PEGARR_OPENSUBTITLES_PROBE_POLICY_LANGUAGE=en
+PEGARR_OPENSUBTITLES_PROBE_PROVIDER_LANGUAGE=en
+PEGARR_OPENSUBTITLES_PROBE_SEASON=1
+PEGARR_OPENSUBTITLES_PROBE_EPISODE=1
 PEGARR_PROVIDER_CACHE_POSITIVE_TTL_SECONDS=86400
 PEGARR_PROVIDER_CACHE_EMPTY_TTL_SECONDS=900
 PEGARR_PROVIDER_CACHE_MAX_ENTRIES=5000
@@ -219,6 +227,7 @@ docker compose -f deploy/compose.nas.yaml -f deploy/compose.sonarr.yaml run --rm
 docker compose -f deploy/compose.nas.yaml -f deploy/compose.radarr.yaml run --rm pegarr npm run --silent probe:radarr
 docker compose -f deploy/compose.nas.yaml -f deploy/compose.bazarr.yaml run --rm pegarr npm run --silent probe:bazarr
 docker compose -f deploy/compose.nas.yaml -f deploy/compose.subdl.yaml run --rm pegarr npm run --silent probe:subdl
+docker compose -f deploy/compose.nas.yaml -f deploy/compose.opensubtitles.yaml run --rm pegarr npm run --silent probe:opensubtitles
 ```
 
-Each command prints one compact JSON record. Exit code `0` means its integration was available; `1` means a configured upstream failure such as unauthorized or unavailable; `2` means disabled or invalid configuration. The Bazarr probe performs only the language-profile GET and reports counts, response bytes, and timing—never profile names, tags, language values, or library metadata. The SubDL probe performs exactly one search for the configured stable item/language window and reports only the result count, request count, quota evidence, and timing—never identifiers, language codes, release names, or credentials. The output is designed to be safe to attach to an issue, but review diagnostics before publishing it as a general precaution.
+Each command prints one compact JSON record. Exit code `0` means its integration was available; `1` means a configured upstream failure such as unauthorized or unavailable; `2` means disabled or invalid configuration. The Bazarr probe performs only the language-profile GET and reports counts, response bytes, and timing—never profile names, tags, language values, or library metadata. The SubDL and OpenSubtitles probes each perform exactly one search for the configured stable item/language window and report only result count, request count, quota evidence, and timing—never identifiers, language codes, release names, hostnames, or credentials. The output is designed to be safe to attach to an issue, but review diagnostics before publishing it as a general precaution.

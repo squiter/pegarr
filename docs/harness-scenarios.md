@@ -87,6 +87,9 @@
 | PEG-PROBE-006 | Bazarr probe exit states stay distinct and redacted | `src/probe-bazarr.test.ts` |
 | PEG-PROBE-007 | The one-shot SubDL search reports only bounded aggregate evidence | `src/probe-subdl.test.ts` |
 | PEG-PROBE-008 | SubDL probe states stay distinct and invalid input remains redacted | `src/probe-subdl.test.ts` |
+| PEG-PROBE-009 | The one-shot OpenSubtitles search reports only bounded aggregate evidence | `src/probe-opensubtitles.test.ts` |
+| PEG-PROBE-010 | OpenSubtitles probe states stay distinct and invalid input remains redacted | `src/probe-opensubtitles.test.ts` |
+| PEG-DOCKER-026 | The packaged OpenSubtitles probe makes one redacted search on an internal-only network | `scripts/harness/docker-build.mjs` |
 | PEG-FLOW-001 | Resolved Bazarr policy drives one SubDL search per language and one report | `src/episode-feasibility.test.ts` |
 | PEG-FLOW-002 | Missing provider language mappings stay scoped without extra requests | `src/episode-feasibility.test.ts` |
 | PEG-FLOW-003 | Unresolved Bazarr assignment stops provider work without assumed policy | `src/episode-feasibility.test.ts` |

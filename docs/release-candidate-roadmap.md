@@ -5,7 +5,7 @@
 
 Pegarr's API-feasibility milestone and implementation Phases 1 through 3 are complete. This document retains the release-candidate validation sequence, but that work follows the discovery-first P0 cycle: proving the product can find a not-yet-added title, preview subtitle coverage, add it explicitly with automatic search disabled, and continue to exact release selection inside Pegarr.
 
-At the start of this cycle, the repository has 228 deterministic automated scenarios and six explicit manual gaps. The implementation baseline is signed commit [`f1c1576`](https://github.com/squiter/pegarr/commit/f1c1576d57a12426cdaf0cd2a163946836580ff1). Treat the scenario manifest and phase ledgers as authoritative if those numbers later change.
+At the start of this cycle, the repository had 228 deterministic automated scenarios and six explicit manual gaps. Discovery-first catalog add later introduced `PEG-MANUAL-007`; treat the scenario manifest and phase ledgers as authoritative for the current counts.
 
 ## Ordered work
 
@@ -116,7 +116,7 @@ Start with local read-only acceptance. Read `AGENTS.md`, the research document, 
 For every result:
 
 - distinguish implementation evidence from installed-environment evidence;
-- preserve the six manual gaps until their complete claims are proven;
+- preserve all manifest manual gaps until their complete claims are proven;
 - improve a fixture, guide, tool, or sensor when a failure would otherwise recur;
 - add a stable harness scenario for every behavior change;
 - use `npm run check:affected` as the local completion gate;

@@ -420,6 +420,88 @@ async function configuredSubdlProbeSmokeTest() {
   }
 }
 
+async function configuredOpenSubtitlesProbeSmokeTest() {
+  const scenario = "PEG-DOCKER-026";
+  const suffix = `${process.pid}`;
+  const networkName = `pegarr-harness-opensubtitles-internal-${suffix}`;
+  const fixtureName = `pegarr-harness-opensubtitles-${suffix}`;
+  const artifactsDirectory = resolve(".artifacts");
+  mkdirSync(artifactsDirectory, { recursive: true });
+  const secretDirectory = mkdtempSync(join(artifactsDirectory, "pegarr-synthetic-docker-"));
+  const secretPath = join(secretDirectory, "opensubtitles_api_key");
+  const syntheticKey = "synthetic-docker-api-key";
+  writeFileSync(secretPath, syntheticKey, { mode: 0o444 });
+
+  const network = docker([
+    "network", "create", "--internal", "--label", "pegarr.harness=true", networkName,
+  ]);
+  if (network.status !== 0) {
+    rmSync(secretDirectory, { recursive: true, force: true });
+    throw new Error(`${scenario} could not create an internal network:\n${outputOf(network)}`);
+  }
+
+  const fixtureScript = [
+    "const { createServer } = require('node:http');",
+    `const expectedKey = ${JSON.stringify(syntheticKey)};`,
+    "const expectedUrl = '/api/v1/subtitles?episode_number=5&languages=en&parent_imdb_id=9000005&season_number=3&type=episode';",
+    "const body = { data: [{ attributes: { language: 'en', release: 'private.release.name', files: [] } }] };",
+    "createServer((request, response) => {",
+    "  if (request.method !== 'GET' || request.url !== expectedUrl || request.headers['api-key'] !== expectedKey || request.headers['user-agent'] !== 'Pegarr v0.1.0') { response.writeHead(401); response.end('{}'); return; }",
+    "  response.writeHead(200, { 'content-type': 'application/json', 'x-ratelimit-limit-second': '5', 'x-ratelimit-remaining-second': '4' });",
+    "  response.end(JSON.stringify(body));",
+    "}).listen(8082, '0.0.0.0');",
+  ].join("\n");
+
+  try {
+    const fixture = docker([
+      "run", "--detach", "--name", fixtureName, "--label", "pegarr.harness=true",
+      "--network", networkName, "--network-alias", "opensubtitles-fixture", "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m", "pegarr:harness", "node", "-e", fixtureScript,
+    ]);
+    if (fixture.status !== 0) {
+      throw new Error(`${scenario} could not start the synthetic OpenSubtitles container:\n${outputOf(fixture)}`);
+    }
+
+    const runArgs = [
+      "run", "--rm", "--network", networkName, "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+      "--mount", `type=bind,source=${secretPath},target=/run/secrets/opensubtitles_api_key,readonly`,
+      "--env", "PEGARR_OPENSUBTITLES_URL=http://opensubtitles-fixture:8082/api/v1",
+      "--env", "PEGARR_OPENSUBTITLES_ALLOWED_HOSTS=opensubtitles-fixture",
+      "--env", "PEGARR_OPENSUBTITLES_API_KEY_FILE=/run/secrets/opensubtitles_api_key",
+      "--env", "PEGARR_OPENSUBTITLES_ALLOW_INSECURE_HTTP=true",
+      "--env", "PEGARR_OPENSUBTITLES_PROBE_KIND=episode",
+      "--env", "PEGARR_OPENSUBTITLES_PROBE_IMDB_ID=tt9000005",
+      "--env", "PEGARR_OPENSUBTITLES_PROBE_POLICY_LANGUAGE=en",
+      "--env", "PEGARR_OPENSUBTITLES_PROBE_PROVIDER_LANGUAGE=en",
+      "--env", "PEGARR_OPENSUBTITLES_PROBE_SEASON=3",
+      "--env", "PEGARR_OPENSUBTITLES_PROBE_EPISODE=5",
+      "pegarr:harness", "npm", "run", "--silent", "probe:opensubtitles",
+    ];
+    let probe;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      probe = docker(runArgs);
+      if (probe.status === 0) break;
+      await delay(250);
+    }
+    if (
+      probe?.status !== 0
+      || !probe.stdout.includes('"state":"available"')
+      || !probe.stdout.includes('"requestCount":1')
+      || !probe.stdout.includes('"subtitleCount":1')
+      || !probe.stdout.includes('"quotaRemaining":4')
+      || /private|synthetic-docker-api-key|opensubtitles-fixture|9000005/iu.test(probe.stdout)
+    ) {
+      throw new Error(`${scenario} packaged OpenSubtitles probe failed:\n${outputOf(probe)}`);
+    }
+    process.stdout.write(`${scenario} packaged exact-search probe=available (one request, secret-file, read-only, internal-network)\n`);
+  } finally {
+    docker(["rm", "--force", fixtureName]);
+    docker(["network", "rm", networkName]);
+    rmSync(secretDirectory, { recursive: true, force: true });
+  }
+}
+
 async function packagedEpisodeReportSmokeTest() {
   const scenario = "PEG-DOCKER-006";
   const seasonScenario = "PEG-DOCKER-009";
@@ -1188,6 +1270,7 @@ export async function main() {
     });
     await configuredBazarrProbeSmokeTest();
     await configuredSubdlProbeSmokeTest();
+    await configuredOpenSubtitlesProbeSmokeTest();
     await packagedEpisodeReportSmokeTest();
     await packagedMovieReportSmokeTest();
     await packagedMissingInventorySmokeTest();
@@ -1222,6 +1305,7 @@ export async function main() {
     });
     await configuredBazarrProbeSmokeTest();
     await configuredSubdlProbeSmokeTest();
+    await configuredOpenSubtitlesProbeSmokeTest();
     await packagedEpisodeReportSmokeTest();
     await packagedMovieReportSmokeTest();
     await packagedMissingInventorySmokeTest();
