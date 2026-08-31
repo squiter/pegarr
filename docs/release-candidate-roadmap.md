@@ -84,6 +84,14 @@ The refreshed container reached healthy state, survived a controlled Pegarr-only
 
 Keep `PEG-MANUAL-003` open. Runtime architecture and user identity, secret-file permissions, authenticated Sonarr/Radarr/Bazarr reads, provider-setting persistence, and provider-cache reuse still need sanitized live evidence. `PEG-MANUAL-004` and `PEG-MANUAL-007` remain wholly open; this checkpoint performed no add, automatic search, Grab, or download mutation.
 
+#### 2026-08-31 authenticated production follow-up
+
+Portainer inspection confirmed that the running Pegarr container uses the `node` user, a read-only root filesystem, `CapDrop: ALL`, `no-new-privileges`, and only the persistent `/data` mount as writable. The Sonarr, Radarr, and Bazarr application-config mounts are read-only. Sonarr `4.0.19.2979` and Radarr `6.3.0.10514` each returned an available, read-only status without exposing their URLs or credentials.
+
+The authenticated production dashboard restored an operator session, loaded seven monitored-and-missing items, reported one ready Sonarr and one ready Radarr instance, and returned four bounded Sonarr catalog matches for a fresh query. The UI also restored one required `pt-br` language and server-side SubDL and OpenSubtitles settings, each with one explicit language mapping. A bounded Sonarr series preview nevertheless rendered `Pt-Br: Unsupported`. Treat that result as a failed provider-acceptance checkpoint: it does not prove a provider request, successful language compatibility, or cache reuse, and it must not be rewritten as `No match found`.
+
+Keep `PEG-MANUAL-003` open for private secret-file permissions, installed Bazarr assignment reads, provider-setting survival across a post-configuration container restart, and provider-cache evidence. Keep `PEG-MANUAL-005` open until the configured SubDL mapping produces a sanitized live provider result and a repeated preview proves a cache hit. Keep `PEG-MANUAL-006` open because title-level Sonarr series previews do not exercise OpenSubtitles; use a bounded movie or exact episode acceptance case. No add, automatic search, Grab, or download mutation was performed.
+
 ### 5. First public release
 
 After local acceptance and the read-only NAS smoke test:

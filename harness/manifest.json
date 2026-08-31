@@ -1735,17 +1735,17 @@
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "Local Colima refreshed the authenticated Sonarr 4.0.16.2944 status and a bounded one-row monitored missing-page envelope on 2026-08-30, after a 100-row episode release search was measured on 2026-08-26, without retaining private records; no local Radarr service is available, and NAS production validation is intentionally separate"
+      "reason": "Local Colima refreshed the authenticated Sonarr 4.0.16.2944 status and a bounded one-row monitored missing-page envelope on 2026-08-30, after a 100-row episode release search was measured on 2026-08-26; on 2026-08-31 the NAS reported Sonarr 4.0.19.2979 and Radarr 6.3.0.10514 available, restored an operator session with seven bounded missing items, and returned four Sonarr catalog matches without retaining private records, while installed Radarr catalog and exact release-analysis compatibility remain unproven"
     },
     {
       "id": "PEG-MANUAL-002",
       "title": "Live Bazarr profile resolution and provider policy",
-      "reason": "Local Colima refreshed the authenticated Bazarr profile-list envelope on 2026-08-30 and measured one profile with one language item, after targeted series-assignment shapes were verified on 2026-08-28, without retaining policy contents; installed NAS compatibility remains intentionally untested"
+      "reason": "Local Colima refreshed the authenticated Bazarr profile-list envelope on 2026-08-30 and measured one profile with one language item, after targeted series-assignment shapes were verified on 2026-08-28; on 2026-08-31 the NAS dashboard restored one required pt-br policy language without retaining private profile contents, while installed Bazarr profile and assignment reads remain unproven"
     },
     {
       "id": "PEG-MANUAL-003",
       "title": "NAS pull, startup, persistence, and architecture smoke test",
-      "reason": "The live NAS pulled immutable digest sha256:d1822dcd9f3a0b187f0647699fa781d2794df55cb65797e0f35d337baa7ff063 on 2026-08-30, saved the native read-only Arr/Bazarr config mounts, reached healthy state, survived a controlled Pegarr-only restart, enforced HTTPS plus authentication before catalog access, and emitted bounded startup/readiness logs; runtime architecture and user identity, secret-file permissions, authenticated upstream reads, provider-setting persistence, and provider-cache reuse still require sanitized live evidence"
+      "reason": "The live NAS pulled immutable digest sha256:d1822dcd9f3a0b187f0647699fa781d2794df55cb65797e0f35d337baa7ff063 on 2026-08-30, saved the native read-only Arr/Bazarr config mounts, reached healthy state, survived a controlled Pegarr-only restart, enforced HTTPS plus authentication before catalog access, and emitted bounded startup/readiness logs; on 2026-08-31 Portainer verified the node user, read-only root, dropped capabilities, no-new-privileges, and mount write boundaries while the authenticated dashboard restored inventory, catalog search, policy, and provider settings, but secret-file permissions, installed Bazarr reads, post-configuration restart persistence, successful provider evidence, and cache reuse remain open"
     },
     {
       "id": "PEG-MANUAL-004",
@@ -1755,12 +1755,12 @@
     {
       "id": "PEG-MANUAL-005",
       "title": "Live SubDL v2 search and language-code compatibility",
-      "reason": "The official request, quota contract, live route, and authentication boundary are pinned, but an authenticated sanitized response and Bazarr-to-SubDL language mapping have not been verified"
+      "reason": "The official request, quota contract, live route, and authentication boundary are pinned; on 2026-08-31 the NAS dashboard restored a server-side SubDL credential and one pt-BR mapping, but a bounded Sonarr series preview returned Pt-Br Unsupported, so no successful sanitized provider response, quota evidence, or cache hit is yet proven"
     },
     {
       "id": "PEG-MANUAL-006",
       "title": "Live OpenSubtitles REST search and language-code compatibility",
-      "reason": "The official search contract and deterministic adapter are pinned, but an operator-owned API key, sanitized live response, measured rate headers, and Bazarr-to-OpenSubtitles language mappings have not been verified"
+      "reason": "The official search contract and deterministic adapter are pinned; on 2026-08-31 the NAS dashboard restored a server-side OpenSubtitles credential and one pt-BR mapping, but the bounded series preview does not exercise OpenSubtitles, so an exact movie or episode sanitized response, measured rate headers, mapping compatibility, and cache reuse remain unproven"
     },
     {
       "id": "PEG-MANUAL-007",
