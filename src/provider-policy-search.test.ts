@@ -143,7 +143,7 @@ test("PEG-PROVIDER-003 preferred quota failures stay Unknown and allow bounded f
   assert.equal(fallback.calls.length, 1);
   assert.equal(result.requestCount, 2);
   assert.equal(result.results[0]?.status, "rate_limited");
-  assert.equal(result.results[0]?.searchedLanguages, undefined);
+  assert.deepEqual(result.results[0]?.searchedLanguages, ["pt-BR"]);
   assert.deepEqual(result.results[0]?.quota, { limit: 2_000, remaining: 0 });
   assert.equal(result.results[1]?.status, "success");
 });

@@ -345,6 +345,47 @@ test("PEG-CATALOG-005 a UI-configured provider is usable immediately for pre-add
   services.close();
 });
 
+test("PEG-CATALOG-009 UI-managed provider failures remain Unknown instead of Unsupported", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "pegarr-ui-provider-failure-"));
+  context.after(async () => rm(directory, { recursive: true }));
+  await new SubtitleSettingsStore(directory).update({ languages: [
+    { code: "pt-BR", required: true, forced: false, hearingImpaired: "either" },
+  ] });
+  const services = createRuntimeServices({
+    sonarr: {
+      instanceId: "synthetic-sonarr",
+      baseUrl: "https://sonarr.example.invalid",
+      allowedHosts: ["sonarr.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-sonarr-key-value"),
+    },
+  }, {
+    dataDirectory: directory,
+    fetchImplementation: async (input) => {
+      const url = new URL(input);
+      if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/series/lookup") {
+        return new Response(JSON.stringify([{ title: "Synthetic Discovery", year: 2026, tvdbId: 42, tmdbId: 84, imdbId: "tt1234567", id: 0 }]), { status: 200 });
+      }
+      if (url.hostname === "api.subdl.com" && url.pathname === "/api/v2/subtitles/search") {
+        return new Response("{}", { status: 401, headers: { "content-type": "application/json" } });
+      }
+      return new Response("not found", { status: 404 });
+    },
+  });
+  await services.updateProviderSettings("subdl", {
+    apiKey: "synthetic-ui-subdl-key-value",
+    languageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
+  });
+
+  const result = await services.previewCatalogCoverage({ application: "sonarr", instanceId: "synthetic-sonarr", providerId: "tvdb", value: "42" });
+  assert.equal(result.status, "ready");
+  if (result.status !== "ready") return;
+  assert.equal(result.languages[0]?.state, "unknown");
+  assert.equal(result.providers[0]?.status, "unauthorized");
+  assert.deepEqual(result.providers[0]?.searchedLanguages, ["pt-br"]);
+  services.close();
+});
+
 test("PEG-SETTINGS-005 UI-managed provider configuration drives existing-item analysis immediately", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-ui-provider-existing-item-"));
   context.after(async () => rm(directory, { recursive: true }));

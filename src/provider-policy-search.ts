@@ -76,7 +76,10 @@ export async function searchProviderPolicy(options: {
         });
         if (result.cache?.status !== "hit") requestCount += 1;
         if (result.provider !== provider.provider) {
-          results.push(providerFailure(provider.provider, "invalid_response"));
+          results.push({
+            ...providerFailure(provider.provider, "invalid_response"),
+            searchedLanguages: [requirement.code],
+          });
           break;
         }
         if (result.status === "success") {
@@ -85,6 +88,7 @@ export async function searchProviderPolicy(options: {
           results.push({
             provider: result.provider,
             status: result.status,
+            searchedLanguages: [requirement.code],
             subtitles: [],
             ...(result.detail === undefined ? {} : { detail: result.detail }),
             ...(result.quota === undefined ? {} : { quota: result.quota }),
@@ -93,7 +97,10 @@ export async function searchProviderPolicy(options: {
         }
       } catch (error) {
         requestCount += 1;
-        results.push(providerFailure(provider.provider, classifyProviderError(error)));
+        results.push({
+          ...providerFailure(provider.provider, classifyProviderError(error)),
+          searchedLanguages: [requirement.code],
+        });
         break;
       }
       if (
@@ -154,6 +161,7 @@ export async function searchSubdlPolicy(options: {
       results.push({
         provider: result.provider,
         status: result.status,
+        searchedLanguages: [requirement.code],
         subtitles: [],
         ...(result.detail === undefined ? {} : { detail: result.detail }),
         ...(result.quota === undefined ? {} : { quota: result.quota }),
@@ -161,7 +169,10 @@ export async function searchSubdlPolicy(options: {
       break;
     } catch (error) {
       requestCount += 1;
-      results.push(providerFailure(error));
+      results.push({
+        ...providerFailure(error),
+        searchedLanguages: [requirement.code],
+      });
       break;
     }
   }

@@ -157,6 +157,7 @@
 | PEG-CATALOG-006 | Catalog add-option reads authenticate before upstream work | `src/app.test.ts` |
 | PEG-CATALOG-007 | Catalog add requires login, feature opt-in, and exact bounded input | `src/app.test.ts` |
 | PEG-CATALOG-008 | Explicit catalog add returns a safe Arr identity and Pegarr continuation | `src/runtime.test.ts` |
+| PEG-CATALOG-009 | Catalog provider failures remain Unknown instead of Unsupported | `src/runtime.test.ts` |
 | PEG-DASH-044 | Catalog add is an explicit login-only UI mutation with automatic search off | `src/app.test.ts` |
 | PEG-SONARR-013 | Added Sonarr series identity is re-read before Pegarr continues | `src/adapters/sonarr.test.ts` |
 | PEG-RADARR-012 | Added Radarr movie identity is re-read before Pegarr continues | `src/adapters/radarr.test.ts` |

@@ -202,5 +202,5 @@ test("PEG-FLOW-004 provider failure stops further searches and keeps all languag
     outcome.report.releases[0]?.subtitle.languages.map(({ confidence }) => confidence),
     ["unknown", "unknown", "unknown"],
   );
-  assert.equal(outcome.report.providerStatus[0]?.searchedLanguages, undefined);
+  assert.deepEqual(outcome.report.providerStatus[0]?.searchedLanguages, ["en"]);
 });

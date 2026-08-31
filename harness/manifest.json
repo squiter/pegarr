@@ -1509,6 +1509,12 @@
       "boundary": "Temporary private settings and injected Arr/provider responses; no live network or mutation"
     },
     {
+      "id": "PEG-CATALOG-009",
+      "title": "Catalog provider failures remain Unknown instead of Unsupported",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Temporary private settings and injected unauthorized provider response; no live network or mutation"
+    },
+    {
       "id": "PEG-DASH-043",
       "title": "Provider onboarding clears credentials and remains page-memory-only",
       "evidence": "src/app.test.ts",
@@ -1755,7 +1761,7 @@
     {
       "id": "PEG-MANUAL-005",
       "title": "Live SubDL v2 search and language-code compatibility",
-      "reason": "The official request, quota contract, live route, and authentication boundary are pinned; on 2026-08-31 the NAS dashboard restored a server-side SubDL credential and one pt-BR mapping, but a bounded Sonarr series preview returned Pt-Br Unsupported, so no successful sanitized provider response, quota evidence, or cache hit is yet proven"
+      "reason": "The official request, quota contract, live route, and authentication boundary are pinned; on 2026-08-31 the NAS dashboard restored a server-side SubDL credential and one pt-BR mapping, but the deployed digest misreported a bounded provider failure as Pt-Br Unsupported; PEG-CATALOG-009 now preserves the requested language as Unknown locally, while corrected-image deployment, a successful sanitized provider response, quota evidence, and a cache hit remain unproven"
     },
     {
       "id": "PEG-MANUAL-006",
