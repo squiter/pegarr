@@ -162,7 +162,9 @@ elements.setupMenuToggle?.addEventListener("click", () => {
 elements.setupPanelClose?.addEventListener("click", () => closeSetupPanel(true, true));
 elements.setupBackdrop?.addEventListener("click", () => closeSetupPanel(true, true));
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !elements.setupPanel.hidden) closeSetupPanel(true, true);
+  if (elements.setupPanel.hidden) return;
+  if (event.key === "Escape") closeSetupPanel(true, true);
+  else if (event.key === "Tab") trapSetupPanelFocus(event);
 });
 
 elements.refreshButton?.addEventListener("click", loadInventory);
@@ -450,6 +452,37 @@ function openSetupPanel(moveFocus) {
   elements.setupBackdrop.hidden = false;
   elements.setupMenuToggle.setAttribute("aria-expanded", "true");
   if (moveFocus) elements.setupPanelClose.focus();
+}
+
+function setupPanelFocusableElements() {
+  const selector = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(",");
+  return Array.from(elements.setupPanel.querySelectorAll(selector))
+    .filter((candidate) => !candidate.closest("[hidden]") && candidate.getAttribute("aria-hidden") !== "true");
+}
+
+function trapSetupPanelFocus(event) {
+  const focusable = setupPanelFocusableElements();
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (!elements.setupPanel.contains(active) || (event.shiftKey && active === first)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function closeSetupPanel(rememberDismissal, returnFocus) {

@@ -1677,6 +1677,12 @@
       "boundary": "Static dashboard assets and page-memory-only dismissal state; no browser storage, credentials, network, or mutation"
     },
     {
+      "id": "PEG-DASH-052",
+      "title": "Modal setup drawer traps keyboard focus until it closes",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard markup and keyboard-focus control flow; no browser storage, credentials, network, or mutation"
+    },
+    {
       "id": "PEG-SETTINGS-004",
       "title": "Per-language policy preferences remain explicit, unique, and bounded",
       "evidence": "src/dashboard-model.test.ts",

@@ -911,6 +911,20 @@ test("PEG-DASH-051 setup stays in a collapsible menu and opens automatically onl
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
+test("PEG-DASH-052 setup drawer traps keyboard focus while it is modal", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const html = String(page.body);
+  const script = String(client.body);
+
+  assert.match(html, /setup-panel[^>]+role="dialog"[^>]+aria-modal="true"|role="dialog"[^>]+aria-modal="true"[^>]+setup-panel/u);
+  assert.match(script, /event\.key === "Tab"[^\n]+trapSetupPanelFocus\(event\)/u);
+  assert.match(script, /function trapSetupPanelFocus\(event\)/u);
+  assert.match(script, /!elements\.setupPanel\.contains\(active\)|active === first/u);
+  assert.match(script, /active === last[\s\S]+first\.focus\(\)/u);
+  assert.doesNotMatch([page.body, client.body].join("\n"), /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
 test("PEG-DASH-049 subtitle settings expose explicit per-language matching preferences", async () => {
   const page = await resolveRoute("GET", "/", tmpdir());
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());

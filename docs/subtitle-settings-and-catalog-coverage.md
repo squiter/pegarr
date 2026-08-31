@@ -4,7 +4,7 @@ Pegarr now has a server-owned explicit default subtitle policy and a read-only p
 
 ## Dashboard behavior
 
-After username/password sign-in, catalog discovery is the first content in the normal page flow. First-run guidance, subtitle policy, and provider configuration live in the **Setup & settings** drawer in the signed-in header. Pegarr opens that drawer automatically while a prerequisite is incomplete; the user can close it for the rest of the page session, and it remains available from the header. Once onboarding reports ready, later page loads keep the drawer collapsed by default. This state is page-memory-only and does not add browser storage.
+After username/password sign-in, catalog discovery is the first content in the normal page flow. First-run guidance, subtitle policy, and provider configuration live in the **Setup & settings** drawer in the signed-in header. Pegarr opens that drawer automatically while a prerequisite is incomplete; the user can close it for the rest of the page session, and it remains available from the header. Once onboarding reports ready, later page loads keep the drawer collapsed by default. This state is page-memory-only and does not add browser storage. While the drawer is open, keyboard focus stays inside its modal boundary; Escape closes it and restores focus to the menu button.
 
 The drawer lets the user enter up to 16 comma-separated language codes. Each language gets explicit controls for required versus optional coverage, forced-only subtitles, and hearing-impaired subtitles with either, prefer, require, or avoid semantics. New languages start as required, non-forced, and either; saved values round-trip through the same server-owned policy model used by matching.
 
@@ -67,4 +67,4 @@ Provider mapping metadata is stored in `DATA_DIR/provider-settings.json`. Creden
 
 The response includes aggregate subtitle counts and safe provider status/quota/cache evidence. It deliberately omits provider subtitle IDs and release names because exact release matching is not yet possible at this stage.
 
-`PEG-SETTINGS-001` through `PEG-SETTINGS-004`, `PEG-PROVIDERSETTINGS-001` through `PEG-PROVIDERSETTINGS-003`, `PEG-CATALOG-003` through `PEG-CATALOG-005`, `PEG-DASH-042` through `PEG-DASH-043`, `PEG-DASH-049`, and `PEG-DASH-051` are the deterministic evidence for this slice.
+`PEG-SETTINGS-001` through `PEG-SETTINGS-004`, `PEG-PROVIDERSETTINGS-001` through `PEG-PROVIDERSETTINGS-003`, `PEG-CATALOG-003` through `PEG-CATALOG-005`, `PEG-DASH-042` through `PEG-DASH-043`, `PEG-DASH-049`, and `PEG-DASH-051` through `PEG-DASH-052` are the deterministic evidence for this slice.
