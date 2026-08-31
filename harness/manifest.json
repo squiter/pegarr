@@ -1769,7 +1769,7 @@
     {
       "id": "PEG-MANUAL-003",
       "title": "NAS pull, startup, persistence, and architecture smoke test",
-      "reason": "The live NAS first pulled immutable digest sha256:d1822dcd9f3a0b187f0647699fa781d2794df55cb65797e0f35d337baa7ff063, then deployed corrected provider-evidence digest sha256:dc89826ebb3d699e8ac225c6019aad120ab8398a4710ee24807af11e5fe75340, and on 2026-08-31 replaced only Pegarr with discovery-navigation digest sha256:f4e60a22eff42c275f788b8f87c5552d0ad848de5c51b0805c85ecc87c1ea785; Portainer preserved the complete stack definition except for the image digest, kept pruning and forced re-pull disabled, left all six sibling services running, and brought Pegarr healthy with HTTPS readiness plus the new setup-drawer assets, while earlier acceptance had already confirmed native read-only Arr/Bazarr mounts, secure cookies, disabled catalog add, the node user, read-only root, dropped capabilities, no-new-privileges, persisted login/settings, mount write boundaries, and the password file as node:node mode 0600; installed Bazarr assignment reads, the remaining provider-secret permissions, successful provider evidence, cache reuse, and fresh post-restart authenticated drawer interaction remain open"
+      "reason": "The live NAS first pulled immutable digest sha256:d1822dcd9f3a0b187f0647699fa781d2794df55cb65797e0f35d337baa7ff063, then deployed corrected provider-evidence digest sha256:dc89826ebb3d699e8ac225c6019aad120ab8398a4710ee24807af11e5fe75340 and discovery-navigation digest sha256:f4e60a22eff42c275f788b8f87c5552d0ad848de5c51b0805c85ecc87c1ea785; on 2026-08-31 actionable-discovery digest sha256:bd9cacdf6935fbeba7bf4fb729ba42b88ccae5e520858fff6697762394992b60 enabled explicit catalog add, became healthy, left all six sibling services running, loaded the installed Sonarr add defaults without submission, and returned successful bounded SubDL pt-br evidence for one series and one movie; earlier acceptance had already confirmed native read-only Arr/Bazarr mounts, secure cookies, the node user, read-only root, dropped capabilities, no-new-privileges, persisted login/settings, mount write boundaries, and the password file as node:node mode 0600; installed Bazarr assignment reads, the remaining provider-secret permissions, cache reuse, and fresh post-restart authenticated drawer interaction remain open"
     },
     {
       "id": "PEG-MANUAL-004",
@@ -1779,17 +1779,17 @@
     {
       "id": "PEG-MANUAL-005",
       "title": "Live SubDL v2 search and language-code compatibility",
-      "reason": "The official request, quota contract, live route, and authentication boundary are pinned; on 2026-08-31 corrected NAS digest sha256:dc89826ebb3d699e8ac225c6019aad120ab8398a4710ee24807af11e5fe75340 invoked SubDL for bounded not-yet-added series and movie previews, preserved the requested pt-br language as Unknown, and reported unauthorized instead of Unsupported or No match found; the saved credential must be replaced before a successful sanitized response, live mapping compatibility, quota evidence, and a cache hit can be proven, and authentication failures are intentionally not cached"
+      "reason": "The official request, quota contract, live route, and authentication boundary are pinned; on 2026-08-31 actionable-discovery digest sha256:bd9cacdf6935fbeba7bf4fb729ba42b88ccae5e520858fff6697762394992b60 returned 30 bounded pt-br matches for Game of Thrones and one for The Adventures of Tintin from SubDL, proving successful authenticated series and movie responses plus live language mapping compatibility; the first series attempt received a transient rejection and remained Could Not Check before the uncached retry succeeded; sanitized quota and cache-hit evidence remain open"
     },
     {
       "id": "PEG-MANUAL-006",
       "title": "Live OpenSubtitles REST search and language-code compatibility",
-      "reason": "The official search contract and deterministic adapter are pinned; on 2026-08-31 corrected NAS digest sha256:dc89826ebb3d699e8ac225c6019aad120ab8398a4710ee24807af11e5fe75340 invoked OpenSubtitles during a bounded not-yet-added movie preview, preserved the requested pt-br language as Unknown, and reported unauthorized without leaking the credential; the saved credential must be replaced before a successful sanitized response, measured rate headers, live mapping compatibility, and cache reuse can be proven"
+      "reason": "The official search contract and deterministic adapter are pinned; on 2026-08-31 actionable-discovery digest sha256:bd9cacdf6935fbeba7bf4fb729ba42b88ccae5e520858fff6697762394992b60 invoked OpenSubtitles during a bounded not-yet-added movie preview and reported temporary service unavailability without hiding SubDL's positive pt-br evidence; a successful sanitized OpenSubtitles response, measured rate headers, live mapping compatibility, and cache reuse remain open"
     },
     {
       "id": "PEG-MANUAL-007",
       "title": "Live Sonarr and Radarr catalog-add compatibility and automatic-search suppression",
-      "reason": "Synthetic tests prove the exact add bodies and safe continuation; a separately authorized harmless live add must confirm installed-version compatibility and that no automatic search starts"
+      "reason": "Synthetic tests prove the exact add bodies and safe continuation; on 2026-08-31 the enabled live UI loaded Game of Thrones with the installed Sonarr root folder, quality profile, monitor choices, and exact confirmation phrase, then canceled without submission; a separately authorized harmless live add must still confirm the POST result and that no automatic search starts"
     }
   ]
 }
