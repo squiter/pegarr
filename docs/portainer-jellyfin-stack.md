@@ -18,6 +18,8 @@ Live subtitle acceptance also succeeded. A bounded Game of Thrones series previe
 
 Portainer then replaced only Pegarr with the `29508c7` image at `ghcr.io/squiter/pegarr@sha256:108b07b774c5a8d00059465de6a632c97f6c15c3be9fab41ed332b8b7fb3d7ad`. The new container returned HTTPS readiness `200`, the unauthenticated session route remained `401`, and the served dashboard asset contained the corrected transient-rejection guidance. The proxy returned a brief `502` while the container was being replaced and recovered to `ready`; no catalog add, automatic search, Grab, or download mutation occurred during this wording-only redeploy.
 
+The catalog-confirmation UX fix at commit `143b7d9` was deployed as `ghcr.io/squiter/pegarr@sha256:022b19b6984e14d8b8e0bf41b3a239e28f08c9e547c2adc37c7e42713b06b3b4`. Portainer preserved the 5,277-character stack definition and changed only the Pegarr digest. Pegarr became healthy while all six sibling services stayed running. HTTPS readiness returned `ready`, the session route stayed authenticated with an unauthenticated `401`, and the served assets contained the focused confirmation field, explanatory disabled state, mismatch guidance, exact-match success state, and visibly disabled button styling. The container replacement expired the prior Pegarr browser session, so this acceptance did not submit a catalog add or claim a fresh authenticated interaction.
+
 Port `8080` was occupied on the NAS, so the overlay publishes Pegarr on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
 
 ## Configuration and credentials
