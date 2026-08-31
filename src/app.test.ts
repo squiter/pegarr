@@ -842,10 +842,24 @@ test("PEG-DASH-044 catalog add is an explicit login-only mutation and never offe
   const assets = [page.body, client.body, styles.body].join("\n");
   assert.match(String(page.body), /explicitly add with automatic search disabled|never downloads a release/u);
   assert.match(String(client.body), /catalogAddEnabled|sessionCsrfToken !== undefined|loadCatalogAddOptions|renderCatalogAddForm|submitCatalogAdd/u);
+  assert.match(String(client.body), /Not in \$\{applicationName\}|Adding disabled|catalog adding turned off/u);
   assert.match(String(client.body), /Automatic search stays off|no release will be downloaded|timeout.*Unknown/iu);
   assert.match(String(client.body), /\/add-options|\/add`|exact release analysis/u);
   assert.match(String(styles.body), /catalog-add-panel|catalog-add-form|catalog-add-warning/u);
   assert.doesNotMatch(assets, /searchForMovie|searchForMissingEpisodes|automaticSearch\s*:/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-053 pre-add coverage exposes actionable provider diagnostics", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [client.body, model.body, styles.body].join("\n");
+
+  assert.match(String(client.body), /catalogCoverageView|Subtitle provider checks|Series preview checks title-level SubDL evidence/u);
+  assert.match(String(client.body), /Could not check subtitle coverage.*valid response/u);
+  assert.match(String(model.body), /Available.*matches|Not found|Could not check|API key was rejected|request limit reached/u);
+  assert.match(String(styles.body), /catalog-provider-diagnostics|catalog-provider-diagnostic--unauthorized|catalog-coverage-scope/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 

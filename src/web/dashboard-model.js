@@ -11,6 +11,33 @@ export function rowsFromInventory(value) {
   return rows;
 }
 
+export function catalogCoverageView(value) {
+  if (!isRecord(value) || value.status !== "ready" || !Array.isArray(value.languages) || !Array.isArray(value.providers)) {
+    return { state: "invalid", message: "Subtitle coverage is unavailable." };
+  }
+  const languages = value.languages.flatMap((language) => {
+    if (!isRecord(language) || typeof language.code !== "string") return [];
+    const code = safeCatalogLanguage(language.code);
+    const subtitleCount = Number.isSafeInteger(language.subtitleCount) && language.subtitleCount >= 0
+      ? Math.min(language.subtitleCount, 1_000_000)
+      : 0;
+    if (language.state === "available") {
+      return [{ code, state: "available", label: `${code}: Available${subtitleCount > 0 ? ` (${subtitleCount} matches)` : ""}` }];
+    }
+    if (language.state === "no_match_found") return [{ code, state: "no_match_found", label: `${code}: Not found` }];
+    if (language.state === "unsupported") return [{ code, state: "unsupported", label: `${code}: Provider not configured for this language` }];
+    return [{ code, state: "unknown", label: `${code}: Could not check` }];
+  });
+  const providers = value.providers.flatMap((provider) => {
+    if (!isRecord(provider)) return [];
+    const id = provider.provider === "subdl" || provider.provider === "opensubtitles" ? provider.provider : "provider";
+    const name = id === "subdl" ? "SubDL" : id === "opensubtitles" ? "OpenSubtitles" : "Subtitle provider";
+    const status = providerStatusValues.includes(provider.status) ? provider.status : "unexpected_status";
+    return [{ id, name, status, message: catalogProviderMessage(name, status) }];
+  });
+  return { state: "ready", languages, providers };
+}
+
 export function selectRows(rows, options = {}) {
   const filters = inventorySelectionOptions(options);
   const selected = rows.filter((row) =>
@@ -729,10 +756,32 @@ function languagePreferenceKey(value) {
   return value.trim().replaceAll("_", "-").toLocaleLowerCase();
 }
 
+function safeCatalogLanguage(value) {
+  const normalized = value.trim().replaceAll("_", "-");
+  return normalized.length >= 1 && normalized.length <= 32 && /^[a-z0-9-]+$/iu.test(normalized)
+    ? normalized
+    : "Language";
+}
+
+function catalogProviderMessage(name, status) {
+  const messages = {
+    success: `${name}: checked successfully.`,
+    unauthorized: `${name}: API key was rejected. Update it in Setup & settings.`,
+    rate_limited: `${name}: request limit reached. Try again after the provider resets it.`,
+    timeout: `${name}: check timed out. Try again.`,
+    unavailable: `${name}: service is currently unavailable. Try again.`,
+    unsupported: `${name}: this language is not mapped for the provider.`,
+    invalid_response: `${name}: returned an invalid response.`,
+    unexpected_status: `${name}: rejected the check with an unexpected response.`,
+  };
+  return messages[status];
+}
+
 const confidenceValues = ["confirmed", "likely", "possible", "no_match_found", "unknown"];
 const requiredCoverageValues = ["strong", "possible", "no_match_found", "unknown", "no_accepted_release", "no_required_languages"];
 const providerEvidenceValues = ["available", "partial", "unavailable", "unknown"];
 const providerFailureStatuses = ["rate_limited", "timeout", "unavailable", "unsupported", "unauthorized", "invalid_response", "unexpected_status"];
+const providerStatusValues = ["success", ...providerFailureStatuses];
 const releaseProtocols = ["torrent", "usenet"];
 const hearingImpairedValues = ["required", "prefer", "avoid", "either"];
 const applicabilityValues = ["always", "audio_matches", "audio_does_not_match"];

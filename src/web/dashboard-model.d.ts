@@ -30,6 +30,14 @@ export interface DashboardAnalysisSummary {
 }
 
 export function rowsFromInventory(value: unknown): readonly DashboardRow[];
+export type CatalogCoverageView =
+  | {
+      readonly state: "ready";
+      readonly languages: readonly { readonly code: string; readonly state: "available" | "no_match_found" | "unknown" | "unsupported"; readonly label: string }[];
+      readonly providers: readonly { readonly id: "subdl" | "opensubtitles" | "provider"; readonly name: string; readonly status: string; readonly message: string }[];
+    }
+  | { readonly state: "invalid"; readonly message: string };
+export function catalogCoverageView(value: unknown): CatalogCoverageView;
 export function selectRows(
   rows: readonly DashboardRow[],
   options: { readonly query?: string; readonly application?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly requiredCoverage?: string; readonly providerEvidence?: string; readonly profile?: string; readonly language?: string; readonly analysisAge?: string; readonly nowEpochMs?: number; readonly sort?: string },

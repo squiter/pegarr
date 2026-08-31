@@ -1558,7 +1558,7 @@
     },
     {
       "id": "PEG-DASH-044",
-      "title": "Catalog add is an explicit login-only UI mutation with automatic search off",
+      "title": "Catalog results distinguish library state from the explicit login-only add action",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no browser storage, cookies, network, or mutation"
     },
@@ -1681,6 +1681,12 @@
       "title": "Modal setup drawer traps keyboard focus and background scrolling until it closes",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard markup, keyboard-focus control flow, and background-scroll styling; no browser storage, credentials, network, or mutation"
+    },
+    {
+      "id": "PEG-DASH-053",
+      "title": "Pre-add coverage distinguishes availability from actionable provider failures",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure dashboard projection plus static browser assets using synthetic provider states; no credentials, network, or mutation"
     },
     {
       "id": "PEG-SETTINGS-004",

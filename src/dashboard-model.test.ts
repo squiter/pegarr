@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases, subtitleLanguageRequirements } from "./web/dashboard-model.js";
+import { activeInventoryFilterCount, catalogCoverageView, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases, subtitleLanguageRequirements } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -54,6 +54,30 @@ const inventory = {
     },
   ],
 };
+
+test("PEG-DASH-053 catalog coverage distinguishes availability from actionable provider failures", () => {
+  const available = catalogCoverageView({
+    status: "ready",
+    languages: [{ code: "pt-BR", state: "available", subtitleCount: 12 }],
+    providers: [{ provider: "subdl", status: "success", searchedLanguages: ["pt-br"] }],
+  });
+  assert.deepEqual(available, {
+    state: "ready",
+    languages: [{ code: "pt-BR", state: "available", label: "pt-BR: Available (12 matches)" }],
+    providers: [{ id: "subdl", name: "SubDL", status: "success", message: "SubDL: checked successfully." }],
+  });
+
+  const unknown = catalogCoverageView({
+    status: "ready",
+    languages: [{ code: "pt_BR", state: "unknown", subtitleCount: 0 }],
+    providers: [{ provider: "subdl", status: "unauthorized", searchedLanguages: ["pt-br"] }],
+  });
+  assert.deepEqual(unknown, {
+    state: "ready",
+    languages: [{ code: "pt-BR", state: "unknown", label: "pt-BR: Could not check" }],
+    providers: [{ id: "subdl", name: "SubDL", status: "unauthorized", message: "SubDL: API key was rejected. Update it in Setup & settings." }],
+  });
+});
 
 test("PEG-DASH-001 inventory view-model mapping preserves only display-safe fields", () => {
   const rows = rowsFromInventory(inventory);

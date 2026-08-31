@@ -14,6 +14,8 @@ UI-managed provider credentials use the official HTTPS service endpoints. They b
 
 Catalog results expose **Preview subtitles** when they have a safe TVDB identity for Sonarr or TMDB identity for Radarr. Pegarr re-runs an exact catalog lookup server-side before spending provider quota, then returns only aggregate language coverage and provider health.
 
+The preview presents an answer, not an unexplained state: **Available** includes the aggregate match count, **Not found** means a configured provider completed the search successfully with no evidence, and **Could not check** is followed by the provider-level reason and action. Authentication rejection directs the operator to replace the API key in **Setup & settings**; rate limits, timeouts, service unavailability, invalid responses, and missing language mappings remain distinct. Pegarr never changes one of those failures into **Not found**.
+
 For series, the current preview is title-level SubDL evidence with no season or episode restriction. It proves that the provider has matching title evidence, not that every episode or cut is covered. Movie previews may use both configured providers. Exact release compatibility is still evaluated only after the explicit add-and-continue step creates an Arr internal ID.
 
 ## API
@@ -67,4 +69,4 @@ Provider mapping metadata is stored in `DATA_DIR/provider-settings.json`. Creden
 
 The response includes aggregate subtitle counts and safe provider status/quota/cache evidence. It deliberately omits provider subtitle IDs and release names because exact release matching is not yet possible at this stage.
 
-`PEG-SETTINGS-001` through `PEG-SETTINGS-004`, `PEG-PROVIDERSETTINGS-001` through `PEG-PROVIDERSETTINGS-003`, `PEG-CATALOG-003` through `PEG-CATALOG-005`, `PEG-DASH-042` through `PEG-DASH-043`, `PEG-DASH-049`, and `PEG-DASH-051` through `PEG-DASH-052` are the deterministic evidence for this slice.
+`PEG-SETTINGS-001` through `PEG-SETTINGS-004`, `PEG-PROVIDERSETTINGS-001` through `PEG-PROVIDERSETTINGS-003`, `PEG-CATALOG-003` through `PEG-CATALOG-005`, `PEG-DASH-042` through `PEG-DASH-044`, `PEG-DASH-049`, and `PEG-DASH-051` through `PEG-DASH-053` are the deterministic evidence for this slice.

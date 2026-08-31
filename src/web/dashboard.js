@@ -1,4 +1,4 @@
-import { activeInventoryFilterCount, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, subtitleLanguageRequirements } from "/assets/dashboard-model.js";
+import { activeInventoryFilterCount, catalogCoverageView, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, subtitleLanguageRequirements } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -576,7 +576,8 @@ function renderCatalogItem(item) {
   actions.className = "catalog-result-actions";
   const state = document.createElement("span");
   state.className = `source-chip ${item?.alreadyAdded ? "source-chip--ready" : ""}`;
-  state.textContent = item?.alreadyAdded ? "Already added" : "Available to add";
+  const applicationName = item?.application === "sonarr" ? "Sonarr" : "Radarr";
+  state.textContent = item?.alreadyAdded ? `Already in ${applicationName}` : `Not in ${applicationName}`;
   const preview = document.createElement("button");
   preview.className = "secondary-button catalog-preview-button";
   preview.type = "button";
@@ -596,6 +597,14 @@ function renderCatalogItem(item) {
     add.textContent = `Add to ${item?.application === "sonarr" ? "Sonarr" : "Radarr"}`;
     add.addEventListener("click", () => loadCatalogAddOptions(item, add, addPanel));
     actions.append(add);
+  } else if (!item?.alreadyAdded) {
+    const disabledAdd = document.createElement("button");
+    disabledAdd.className = "quiet-button catalog-add-button";
+    disabledAdd.type = "button";
+    disabledAdd.disabled = true;
+    disabledAdd.textContent = "Adding disabled";
+    disabledAdd.title = "This Pegarr server has catalog adding turned off.";
+    actions.append(disabledAdd);
   }
   row.append(copy, actions, coverage, addPanel);
   return row;
@@ -1172,14 +1181,34 @@ async function previewCatalogCoverage(item, button, output) {
       output.textContent = messages[result.status] ?? "Subtitle coverage is unavailable.";
       return;
     }
-    output.replaceChildren(...result.languages.map((language) => {
+    const view = catalogCoverageView(result);
+    if (view.state !== "ready") {
+      output.textContent = view.message;
+      return;
+    }
+    const languageChips = view.languages.map((language) => {
       const chip = document.createElement("span");
       chip.className = `coverage-chip coverage-chip--${language.state}`;
-      chip.textContent = `${language.code}: ${language.state.replaceAll("_", " ")}${language.subtitleCount > 0 ? ` (${language.subtitleCount})` : ""}`;
+      chip.textContent = language.label;
       return chip;
+    });
+    const diagnostics = document.createElement("ul");
+    diagnostics.className = "catalog-provider-diagnostics";
+    diagnostics.setAttribute("aria-label", "Subtitle provider checks");
+    diagnostics.append(...view.providers.map((provider) => {
+      const diagnostic = document.createElement("li");
+      diagnostic.className = `catalog-provider-diagnostic catalog-provider-diagnostic--${provider.status}`;
+      diagnostic.textContent = provider.message;
+      return diagnostic;
     }));
+    const scope = document.createElement("p");
+    scope.className = "catalog-coverage-scope";
+    scope.textContent = item.application === "sonarr"
+      ? "Series preview checks title-level SubDL evidence. Exact season, episode, and release compatibility is checked after adding."
+      : "Movie preview checks configured title-level providers. Exact release compatibility is checked after adding.";
+    output.replaceChildren(...languageChips, diagnostics, scope);
   } catch {
-    output.textContent = "Pegarr could not verify subtitle coverage. Availability remains Unknown.";
+    output.textContent = "Could not check subtitle coverage because Pegarr did not receive a valid response. Try again.";
   } finally {
     button.disabled = false;
   }

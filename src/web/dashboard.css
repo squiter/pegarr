@@ -98,6 +98,17 @@ button, select { cursor: pointer; }
 .setup-panel .onboarding-steps { grid-template-columns: 1fr; }
 .setup-panel .settings-panel { margin-top: 1rem; }
 
+.catalog-provider-diagnostics { display: grid; gap: .4rem; width: 100%; margin: .25rem 0 0; padding: 0; list-style: none; }
+.catalog-provider-diagnostic { color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.catalog-provider-diagnostic--unauthorized,
+.catalog-provider-diagnostic--invalid_response,
+.catalog-provider-diagnostic--unexpected_status { color: var(--danger); }
+.catalog-provider-diagnostic--rate_limited,
+.catalog-provider-diagnostic--timeout,
+.catalog-provider-diagnostic--unavailable { color: var(--warning); }
+.catalog-provider-diagnostic--success { color: var(--accent); }
+.catalog-coverage-scope { width: 100%; margin: .25rem 0 0; color: var(--muted); font-size: .75rem; line-height: 1.45; }
+
 .brand {
   display: inline-flex;
   gap: .8rem;

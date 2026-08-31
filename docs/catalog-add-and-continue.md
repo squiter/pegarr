@@ -20,6 +20,8 @@ Pegarr refuses to start when catalog add is enabled without username/password lo
 4. Type the exact server-provided confirmation phrase.
 5. Confirm the add.
 
+Catalog result status is descriptive, not an action: **Not in Sonarr** and **Not in Radarr** mean the title is absent from that library. When catalog add is enabled, a separate **Add to Sonarr** or **Add to Radarr** button is shown. When it is disabled, Pegarr says **Adding disabled** instead of presenting an availability badge that looks actionable.
+
 Pegarr re-resolves the exact TVDB or TMDB catalog record, root folder, and quality profile immediately before the mutation. The browser never supplies a filesystem path or forwards a complete catalog object.
 
 Sonarr adds always send `searchForMissingEpisodes: false` and `searchForCutoffUnmetEpisodes: false`. Radarr adds always send `searchForMovie: false` and use manual add mode. No successful add starts a release download.

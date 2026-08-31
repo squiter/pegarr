@@ -158,7 +158,7 @@
 | PEG-CATALOG-007 | Catalog add requires login, feature opt-in, and exact bounded input | `src/app.test.ts` |
 | PEG-CATALOG-008 | Explicit catalog add returns a safe Arr identity and Pegarr continuation | `src/runtime.test.ts` |
 | PEG-CATALOG-009 | Catalog provider failures remain Unknown instead of Unsupported | `src/runtime.test.ts` |
-| PEG-DASH-044 | Catalog add is an explicit login-only UI mutation with automatic search off | `src/app.test.ts` |
+| PEG-DASH-044 | Catalog results distinguish library state from the explicit login-only add action | `src/app.test.ts` |
 | PEG-SONARR-013 | Added Sonarr series identity is re-read before Pegarr continues | `src/adapters/sonarr.test.ts` |
 | PEG-RADARR-012 | Added Radarr movie identity is re-read before Pegarr continues | `src/adapters/radarr.test.ts` |
 | PEG-CONTINUE-001 | Catalog continuation is opaque, bounded, expiring, and server-owned | `src/runtime.test.ts` |
@@ -179,6 +179,7 @@
 | PEG-DASH-048 | First-run guidance separates prerequisites, operator actions, and administrator Grab | `src/app.test.ts` |
 | PEG-DASH-051 | Setup stays in a collapsible menu and opens only while first-run work remains | `src/app.test.ts` |
 | PEG-DASH-052 | Modal setup drawer traps keyboard focus and background scrolling until it closes | `src/app.test.ts` |
+| PEG-DASH-053 | Pre-add coverage distinguishes availability from actionable provider failures | `src/dashboard-model.test.ts` |
 | PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
 | PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
 | PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |
