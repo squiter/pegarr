@@ -914,6 +914,7 @@ test("PEG-DASH-051 setup stays in a collapsible menu and opens automatically onl
 test("PEG-DASH-052 setup drawer traps keyboard focus while it is modal", async () => {
   const page = await resolveRoute("GET", "/", tmpdir());
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
   const html = String(page.body);
   const script = String(client.body);
 
@@ -922,7 +923,9 @@ test("PEG-DASH-052 setup drawer traps keyboard focus while it is modal", async (
   assert.match(script, /function trapSetupPanelFocus\(event\)/u);
   assert.match(script, /!elements\.setupPanel\.contains\(active\)|active === first/u);
   assert.match(script, /active === last[\s\S]+first\.focus\(\)/u);
-  assert.doesNotMatch([page.body, client.body].join("\n"), /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+  assert.match(script, /document\.body\.classList\.add\("setup-panel-open"\)[\s\S]+document\.body\.classList\.remove\("setup-panel-open"\)/u);
+  assert.match(String(styles.body), /body\.setup-panel-open\s*\{\s*overflow:\s*hidden/u);
+  assert.doesNotMatch([page.body, client.body, styles.body].join("\n"), /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
 test("PEG-DASH-049 subtitle settings expose explicit per-language matching preferences", async () => {

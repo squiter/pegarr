@@ -29,6 +29,7 @@ body {
     radial-gradient(circle at 90% 15%, rgb(45 212 191 / 8%), transparent 28rem),
     var(--background);
 }
+body.setup-panel-open { overflow: hidden; }
 
 button, input, select { font: inherit; }
 button, select { cursor: pointer; }

@@ -450,6 +450,7 @@ function renderOnboarding(status) {
 function openSetupPanel(moveFocus) {
   elements.setupPanel.hidden = false;
   elements.setupBackdrop.hidden = false;
+  document.body.classList.add("setup-panel-open");
   elements.setupMenuToggle.setAttribute("aria-expanded", "true");
   if (moveFocus) elements.setupPanelClose.focus();
 }
@@ -490,6 +491,7 @@ function closeSetupPanel(rememberDismissal, returnFocus) {
   const wasOpen = !elements.setupPanel.hidden;
   elements.setupPanel.hidden = true;
   elements.setupBackdrop.hidden = true;
+  document.body.classList.remove("setup-panel-open");
   elements.setupMenuToggle.setAttribute("aria-expanded", "false");
   if (wasOpen && returnFocus && !elements.setupMenuToggle.hidden) elements.setupMenuToggle.focus();
 }

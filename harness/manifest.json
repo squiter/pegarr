@@ -1678,9 +1678,9 @@
     },
     {
       "id": "PEG-DASH-052",
-      "title": "Modal setup drawer traps keyboard focus until it closes",
+      "title": "Modal setup drawer traps keyboard focus and background scrolling until it closes",
       "evidence": "src/app.test.ts",
-      "boundary": "Static dashboard markup and keyboard-focus control flow; no browser storage, credentials, network, or mutation"
+      "boundary": "Static dashboard markup, keyboard-focus control flow, and background-scroll styling; no browser storage, credentials, network, or mutation"
     },
     {
       "id": "PEG-SETTINGS-004",
