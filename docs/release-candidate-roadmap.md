@@ -94,6 +94,14 @@ The follow-up implementation identified that failed provider results had lost th
 
 Keep `PEG-MANUAL-003` open for private secret-file permissions, installed Bazarr assignment reads, provider-setting survival across a post-configuration container restart, and provider-cache evidence. Keep `PEG-MANUAL-005` open until the configured SubDL mapping produces a sanitized live provider result and a repeated preview proves a cache hit. Keep `PEG-MANUAL-006` open because title-level Sonarr series previews do not exercise OpenSubtitles; use a bounded movie or exact episode acceptance case. No add, automatic search, Grab, or download mutation was performed.
 
+#### 2026-08-31 corrected-image production acceptance
+
+The live stack now runs the corrected multi-architecture image at immutable digest `sha256:dc89826ebb3d699e8ac225c6019aad120ab8398a4710ee24807af11e5fe75340`. Portainer retained all seven services, the three read-only application-config mounts, secure session cookies, `PEGARR_ADD_ENABLED=false`, the read-only root filesystem, dropped capabilities, and `no-new-privileges`. The replacement Pegarr container became healthy, `/health/ready` returned `200`, and the persisted username/password authenticated successfully without exposing either secret. The password file was owned by `node:node` with mode `0600`.
+
+Authenticated read-only acceptance returned four Sonarr matches for `The Expanse` and twenty Radarr matches for `Dune`; both selected titles were not already added. The corrected series preview made one SubDL request and returned `pt-br: Unknown` with a language-scoped `unauthorized` provider result. The corrected movie preview made one SubDL and one OpenSubtitles request and returned the same honest `Unknown` state with both failures scoped to `pt-br`. Repeating either preview made the provider requests again because authentication failures are intentionally not cached. This closes the incorrect `Unsupported` regression and proves that both live provider paths are invoked, but the saved provider credentials themselves must be replaced before successful result, quota, mapping, or cache-hit evidence is possible.
+
+Keep `PEG-MANUAL-003` open for installed Bazarr assignment reads and successful provider-cache evidence. Keep `PEG-MANUAL-005` and `PEG-MANUAL-006` open for valid provider credentials, successful sanitized responses, live language compatibility, quota evidence, and a cache hit. `PEG-MANUAL-004` and `PEG-MANUAL-007` remain open and separately authorized; this acceptance performed no add, automatic search, Grab, or download mutation.
+
 ### 5. First public release
 
 After local acceptance and the read-only NAS smoke test:

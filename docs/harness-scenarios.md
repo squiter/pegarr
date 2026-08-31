@@ -299,12 +299,12 @@
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima refreshed Sonarr 4.0.16.2944 status and a bounded one-row monitored missing-page envelope on 2026-08-30 after a measured release search on 2026-08-26; no local Radarr is available, and NAS production validation remains separate |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima refreshed Sonarr 4.0.16.2944 status and a bounded one-row monitored missing-page envelope on 2026-08-30 after a measured release search on 2026-08-26; the NAS later proved installed Sonarr and Radarr status plus bounded series and movie catalog lookup, while exact installed release analysis remains open |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima refreshed the authenticated profile-list envelope on 2026-08-30 and measured one profile with one language item after targeted series-assignment shapes were verified on 2026-08-28; installed NAS compatibility remains intentionally untested |
-| PEG-MANUAL-003 | NAS runtime smoke test | Multi-architecture CI does not reproduce the NAS environment |
+| PEG-MANUAL-003 | NAS runtime smoke test | Corrected immutable digest, container hardening, HTTPS readiness, persisted authentication/settings, and mode-0600 password storage are live-proven; installed Bazarr assignments, remaining provider-secret permissions, successful provider evidence, and cache reuse remain open |
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
-| PEG-MANUAL-005 | Live SubDL v2 compatibility | The live authentication boundary is proven; an authenticated sanitized response and Bazarr-to-SubDL language mapping remain unverified |
-| PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The official search contract and adapter are pinned; an operator-owned key, sanitized response, measured rate headers, and language mapping remain unverified |
+| PEG-MANUAL-005 | Live SubDL v2 compatibility | The corrected NAS image invokes SubDL and preserves an unauthorized pt-br result as Unknown; valid credentials, a successful sanitized response, quota evidence, live mapping compatibility, and cache reuse remain open |
+| PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The corrected NAS image invokes OpenSubtitles for a movie and preserves an unauthorized pt-br result as Unknown; valid credentials, a successful sanitized response, rate headers, live mapping compatibility, and cache reuse remain open |
 | PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | Synthetic tests prove the exact add bodies; a separately authorized harmless live add remains manual |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.
