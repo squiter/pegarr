@@ -1,4 +1,4 @@
-import { activeInventoryFilterCount, catalogCoverageView, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, subtitleLanguageRequirements } from "/assets/dashboard-model.js";
+import { activeInventoryFilterCount, catalogAddConfirmationView, catalogCoverageView, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, subtitleLanguageRequirements } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -661,7 +661,7 @@ function renderCatalogAddForm(item, identity, options, panel, openButton) {
         ["announced", "Announced"], ["inCinemas", "In cinemas"], ["released", "Released"],
       ], options?.defaults?.minimumAvailability ?? "released");
   const confirmationLabel = document.createElement("label");
-  confirmationLabel.textContent = "Type this confirmation phrase";
+  confirmationLabel.textContent = "Confirmation required before adding";
   const phrase = document.createElement("code");
   phrase.textContent = typeof options?.confirmation === "string" ? options.confirmation : "";
   const confirmation = document.createElement("input");
@@ -669,12 +669,24 @@ function renderCatalogAddForm(item, identity, options, panel, openButton) {
   confirmation.maxLength = 2048;
   confirmation.autocomplete = "off";
   confirmation.spellcheck = false;
-  confirmationLabel.append(phrase, confirmation);
+  confirmation.placeholder = "Paste or type the exact phrase shown above";
+  const confirmationHint = document.createElement("span");
+  confirmationHint.className = "catalog-add-confirmation-hint";
+  confirmationHint.setAttribute("role", "status");
+  confirmationHint.setAttribute("aria-live", "polite");
+  confirmationLabel.append(phrase, confirmation, confirmationHint);
   const submit = document.createElement("button");
   submit.className = "primary-button";
   submit.type = "submit";
-  submit.disabled = true;
-  submit.textContent = `Confirm add to ${item.application === "sonarr" ? "Sonarr" : "Radarr"}`;
+  const renderConfirmationState = () => {
+    const view = catalogAddConfirmationView(options?.confirmation, confirmation.value, item?.application);
+    submit.disabled = !view.matches;
+    submit.textContent = view.buttonLabel;
+    confirmationHint.textContent = view.message;
+    confirmationHint.dataset.state = view.state;
+    confirmation.setAttribute("aria-invalid", view.state === "mismatch" ? "true" : "false");
+  };
+  renderConfirmationState();
   const cancel = document.createElement("button");
   cancel.className = "secondary-button";
   cancel.type = "button";
@@ -684,9 +696,7 @@ function renderCatalogAddForm(item, identity, options, panel, openButton) {
     panel.hidden = true;
     openButton.disabled = false;
   });
-  confirmation.addEventListener("input", () => {
-    submit.disabled = confirmation.value !== options?.confirmation;
-  });
+  confirmation.addEventListener("input", renderConfirmationState);
   const status = document.createElement("p");
   status.className = "status-message catalog-add-status";
   form.addEventListener("submit", (event) => submitCatalogAdd(event, {
@@ -698,6 +708,7 @@ function renderCatalogAddForm(item, identity, options, panel, openButton) {
   actions.append(submit, cancel);
   form.append(warning, root.label, profile.label, applicationOption.label, monitoredLabel, confirmationLabel, actions, status);
   panel.replaceChildren(form);
+  confirmation.focus();
 }
 
 async function submitCatalogAdd(event, context) {

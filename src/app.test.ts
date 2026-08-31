@@ -863,6 +863,18 @@ test("PEG-DASH-053 pre-add coverage exposes actionable provider diagnostics", as
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
+test("PEG-DASH-054 catalog add makes the exact confirmation requirement actionable", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [client.body, model.body, styles.body].join("\n");
+
+  assert.match(String(client.body), /Confirmation required before adding|Paste or type the exact phrase shown above|catalogAddConfirmationView|confirmation\.focus/u);
+  assert.match(String(model.body), /Type the confirmation phrase to continue|Confirmation phrase does not match|automatic search stays off/u);
+  assert.match(String(styles.body), /catalog-add-confirmation-hint|cursor: not-allowed/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
 test("PEG-DASH-045 successful movie add continues automatically into exact read-only analysis", async () => {
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
   const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());

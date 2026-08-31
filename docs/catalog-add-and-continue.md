@@ -17,7 +17,7 @@ Pegarr refuses to start when catalog add is enabled without username/password lo
 1. Search the catalog and preview subtitle coverage.
 2. Select **Add to Sonarr** or **Add to Radarr**.
 3. Choose a server-owned root folder and quality profile plus monitoring defaults.
-4. Type the exact server-provided confirmation phrase.
+4. Type or paste the exact server-provided confirmation phrase. The add button explains that it is waiting for this phrase, reports a mismatch, and becomes active only when the text matches exactly.
 5. Confirm the add.
 
 Catalog result status is descriptive, not an action: **Not in Sonarr** and **Not in Radarr** mean the title is absent from that library. When catalog add is enabled, a separate **Add to Sonarr** or **Add to Radarr** button is shown. When it is disabled, Pegarr says **Adding disabled** instead of presenting an availability badge that looks actionable.

@@ -38,6 +38,17 @@ export type CatalogCoverageView =
     }
   | { readonly state: "invalid"; readonly message: string };
 export function catalogCoverageView(value: unknown): CatalogCoverageView;
+export interface CatalogAddConfirmationView {
+  readonly matches: boolean;
+  readonly buttonLabel: string;
+  readonly message: string;
+  readonly state: "waiting" | "mismatch" | "ready";
+}
+export function catalogAddConfirmationView(
+  expected: unknown,
+  entered: unknown,
+  application: unknown,
+): CatalogAddConfirmationView;
 export function selectRows(
   rows: readonly DashboardRow[],
   options: { readonly query?: string; readonly application?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly requiredCoverage?: string; readonly providerEvidence?: string; readonly profile?: string; readonly language?: string; readonly analysisAge?: string; readonly nowEpochMs?: number; readonly sort?: string },

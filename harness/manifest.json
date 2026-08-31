@@ -1689,6 +1689,12 @@
       "boundary": "Pure dashboard projection plus static browser assets using synthetic provider states; no credentials, network, or mutation"
     },
     {
+      "id": "PEG-DASH-054",
+      "title": "Catalog add explains its disabled state and enables only for the exact confirmation phrase",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure confirmation projection and static dashboard assets; no credentials, network, or mutation"
+    },
+    {
       "id": "PEG-SETTINGS-004",
       "title": "Per-language policy preferences remain explicit, unique, and bounded",
       "evidence": "src/dashboard-model.test.ts",
