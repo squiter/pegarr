@@ -766,7 +766,7 @@ function safeCatalogLanguage(value) {
 function catalogProviderMessage(name, status) {
   const messages = {
     success: `${name}: checked successfully.`,
-    unauthorized: `${name}: API key was rejected. Update it in Setup & settings.`,
+    unauthorized: `${name}: rejected this request. Try again; if it keeps failing, update the API key in Setup & settings.`,
     rate_limited: `${name}: request limit reached. Try again after the provider resets it.`,
     timeout: `${name}: check timed out. Try again.`,
     unavailable: `${name}: service is currently unavailable. Try again.`,

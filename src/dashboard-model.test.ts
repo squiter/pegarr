@@ -75,7 +75,7 @@ test("PEG-DASH-053 catalog coverage distinguishes availability from actionable p
   assert.deepEqual(unknown, {
     state: "ready",
     languages: [{ code: "pt-BR", state: "unknown", label: "pt-BR: Could not check" }],
-    providers: [{ id: "subdl", name: "SubDL", status: "unauthorized", message: "SubDL: API key was rejected. Update it in Setup & settings." }],
+    providers: [{ id: "subdl", name: "SubDL", status: "unauthorized", message: "SubDL: rejected this request. Try again; if it keeps failing, update the API key in Setup & settings." }],
   });
 });
 
