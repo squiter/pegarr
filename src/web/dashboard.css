@@ -55,6 +55,47 @@ button, select { cursor: pointer; }
   padding: 1.25rem 1.5rem;
 }
 .topbar-actions { display: flex; gap: .65rem; align-items: center; }
+.setup-menu-toggle { display: inline-flex; gap: .55rem; align-items: center; }
+.setup-menu-state {
+  padding: .15rem .42rem;
+  color: var(--warning);
+  background: rgb(251 191 36 / 8%);
+  border: 1px solid rgb(251 191 36 / 30%);
+  border-radius: 999px;
+  font-size: .64rem;
+  font-weight: 800;
+}
+.setup-menu-state[data-state="ready"] { color: var(--accent); background: rgb(52 211 153 / 8%); border-color: rgb(52 211 153 / 30%); }
+.setup-menu-state[data-state="unavailable"] { color: var(--danger); background: rgb(251 113 133 / 8%); border-color: rgb(251 113 133 / 30%); }
+
+.setup-backdrop { position: fixed; z-index: 20; inset: 0; background: rgb(2 8 7 / 72%); backdrop-filter: blur(3px); }
+.setup-panel {
+  position: fixed;
+  z-index: 21;
+  top: 0;
+  right: 0;
+  width: min(100%, 44rem);
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(1rem, 3vw, 2rem);
+  background: linear-gradient(155deg, rgb(18 36 33), rgb(7 16 15));
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+}
+.setup-panel-heading {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.setup-panel-heading h2 { margin-bottom: .4rem; font-size: 2rem; }
+.setup-panel-heading p:last-child { max-width: 52ch; margin-bottom: 0; color: var(--muted); line-height: 1.5; }
+.setup-panel .onboarding-panel { margin-top: 1rem; }
+.setup-panel .onboarding-steps { grid-template-columns: 1fr; }
+.setup-panel .settings-panel { margin-top: 1rem; }
 
 .brand {
   display: inline-flex;
@@ -485,6 +526,12 @@ footer {
 
 @media (max-width: 760px) {
   .phase-badge { display: none; }
+  .topbar { align-items: stretch; flex-direction: column; gap: .8rem; }
+  .topbar-actions { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
+  .setup-menu-toggle { flex: 1; justify-content: center; }
+  .setup-panel { border-left: 0; }
+  .setup-panel-heading { align-items: stretch; flex-direction: column; }
+  .setup-panel-heading button { width: 100%; }
   .shell { margin-top: 2.5rem; }
   .access-panel { grid-template-columns: 1fr; gap: 1.5rem; }
   .token-row { align-items: stretch; flex-direction: column; }

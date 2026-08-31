@@ -177,6 +177,7 @@
 | PEG-ONBOARD-001 | Onboarding derives only safe discovery prerequisites and capabilities | `src/runtime.test.ts` |
 | PEG-ONBOARD-002 | Onboarding authenticates before work and projects access capabilities | `src/app.test.ts` |
 | PEG-DASH-048 | First-run guidance separates prerequisites, operator actions, and administrator Grab | `src/app.test.ts` |
+| PEG-DASH-051 | Setup stays in a collapsible menu and opens only while first-run work remains | `src/app.test.ts` |
 | PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
 | PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
 | PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |

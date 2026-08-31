@@ -16,9 +16,55 @@ export const dashboardPage = `<!doctype html>
     </a>
     <div class="topbar-actions">
       <span class="phase-badge">Discovery-first P0</span>
+      <button id="setup-menu-toggle" class="quiet-button setup-menu-toggle" type="button" aria-controls="setup-panel" aria-expanded="false" hidden>
+        <span>Setup &amp; settings</span>
+        <span id="setup-menu-state" class="setup-menu-state">Checking</span>
+      </button>
       <button id="session-logout" class="quiet-button" type="button" hidden>Sign out</button>
     </div>
   </header>
+
+  <div id="setup-backdrop" class="setup-backdrop" hidden></div>
+  <aside id="setup-panel" class="setup-panel" role="dialog" aria-modal="true" aria-labelledby="setup-panel-title" hidden>
+    <div class="setup-panel-heading">
+      <div>
+        <p class="eyebrow">Setup &amp; settings</p>
+        <h2 id="setup-panel-title">Configure Pegarr</h2>
+        <p>Review first-run readiness, subtitle policy, and provider connections without leaving discovery.</p>
+      </div>
+      <button id="setup-panel-close" class="quiet-button" type="button" aria-label="Close setup and settings">Close</button>
+    </div>
+
+    <section id="onboarding" class="onboarding-panel" aria-labelledby="onboarding-title">
+      <div class="onboarding-heading">
+        <div>
+          <p class="eyebrow">First-run guide</p>
+          <h2 id="onboarding-title">Your Pegarr path</h2>
+        </div>
+        <span id="onboarding-state" class="source-chip">Checking setup</span>
+      </div>
+      <p id="onboarding-summary" class="catalog-explainer">Pegarr is checking the server-owned configuration needed for discovery and subtitle preview.</p>
+      <ol id="onboarding-steps" class="onboarding-steps" aria-label="Pegarr setup steps"></ol>
+      <p id="onboarding-access" class="onboarding-access"></p>
+    </section>
+
+    <section id="subtitle-settings" class="settings-panel" aria-labelledby="subtitle-settings-title">
+      <div>
+        <p class="eyebrow">Subtitle policy</p>
+        <h2 id="subtitle-settings-title">What subtitles do you want?</h2>
+        <p class="catalog-explainer">Set the default languages Pegarr should verify before a title is added, then connect SubDL or OpenSubtitles below. Provider credentials are written to private server-side files and are never returned here.</p>
+      </div>
+      <form id="subtitle-settings-form" class="settings-form">
+        <label for="subtitle-languages"><span>Language codes</span></label>
+        <input id="subtitle-languages" type="text" maxlength="256" placeholder="pt-BR, en" autocomplete="off" spellcheck="false">
+        <div id="subtitle-language-preferences" class="subtitle-language-preferences" aria-label="Language preferences"></div>
+        <button id="subtitle-settings-save" class="secondary-button" type="submit">Save policy</button>
+      </form>
+      <p class="settings-hint">Enter comma-separated BCP 47 language codes, then choose whether each language is required, forced-only, or should prefer or avoid hearing-impaired subtitles.</p>
+      <div id="provider-configuration" class="provider-configuration" aria-label="Subtitle provider configuration"></div>
+      <p id="subtitle-settings-status" class="status-message" role="status" aria-live="polite"></p>
+    </section>
+  </aside>
 
   <main id="main" class="shell">
     <section class="hero" aria-labelledby="page-title">
@@ -50,36 +96,6 @@ export const dashboardPage = `<!doctype html>
     </section>
 
     <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
-
-    <section id="onboarding" class="onboarding-panel" aria-labelledby="onboarding-title" hidden>
-      <div class="onboarding-heading">
-        <div>
-          <p class="eyebrow">First-run guide</p>
-          <h2 id="onboarding-title">Your Pegarr path</h2>
-        </div>
-        <span id="onboarding-state" class="source-chip">Checking setup</span>
-      </div>
-      <p id="onboarding-summary" class="catalog-explainer">Pegarr is checking the server-owned configuration needed for discovery and subtitle preview.</p>
-      <ol id="onboarding-steps" class="onboarding-steps" aria-label="Pegarr setup steps"></ol>
-      <p id="onboarding-access" class="onboarding-access"></p>
-    </section>
-
-    <section id="subtitle-settings" class="settings-panel" aria-labelledby="subtitle-settings-title" hidden>
-      <div>
-        <p class="eyebrow">Subtitle policy</p>
-        <h2 id="subtitle-settings-title">What subtitles do you want?</h2>
-        <p class="catalog-explainer">Set the default languages Pegarr should verify before a title is added, then connect SubDL or OpenSubtitles below. Provider credentials are written to private server-side files and are never returned here.</p>
-      </div>
-      <form id="subtitle-settings-form" class="settings-form">
-        <label for="subtitle-languages"><span>Language codes</span></label>
-        <input id="subtitle-languages" type="text" maxlength="256" placeholder="pt-BR, en" autocomplete="off" spellcheck="false">
-        <div id="subtitle-language-preferences" class="subtitle-language-preferences" aria-label="Language preferences"></div>
-        <button id="subtitle-settings-save" class="secondary-button" type="submit">Save policy</button>
-      </form>
-      <p class="settings-hint">Enter comma-separated BCP 47 language codes, then choose whether each language is required, forced-only, or should prefer or avoid hearing-impaired subtitles.</p>
-      <div id="provider-configuration" class="provider-configuration" aria-label="Subtitle provider configuration"></div>
-      <p id="subtitle-settings-status" class="status-message" role="status" aria-live="polite"></p>
-    </section>
 
     <section id="catalog" class="catalog-panel" aria-labelledby="catalog-title" hidden>
       <div>

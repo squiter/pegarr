@@ -819,7 +819,7 @@ test("PEG-DASH-042 subtitle policy settings and pre-add coverage remain secret-s
   const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
   const assets = [page.body, client.body, styles.body].join("\n");
   assert.match(String(page.body), /What subtitles do you want|subtitle-languages|provider-configuration|Preview subtitles/u);
-  assert.match(String(client.body), /loadSubtitleSettings|saveSubtitleSettings|previewCatalogCoverage|catalog-subtitle-coverage|Credential configured/u);
+  assert.match(String(client.body), /loadSubtitleSettings|saveSubtitleSettings|previewCatalogCoverage|catalog-subtitle-coverage|Credential saved \(not verified\)/u);
   assert.match(String(styles.body), /settings-panel|provider-configuration-card|catalog-coverage|coverage-chip--unknown/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
@@ -892,6 +892,22 @@ test("PEG-DASH-048 first-run guidance distinguishes prerequisites, operator acti
   assert.match(String(client.body), /loadOnboarding|renderOnboarding|\/api\/v1\/onboarding|Missing setup never becomes a false No match found/u);
   assert.match(String(client.body), /Legacy token: search and preview only|Operator session: settings changes|separate administrator token/u);
   assert.match(String(styles.body), /onboarding-panel|onboarding-steps|onboarding-step--ready/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
+test("PEG-DASH-051 setup stays in a collapsible menu and opens automatically only when first-run work remains", async () => {
+  const page = await resolveRoute("GET", "/", tmpdir());
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const html = String(page.body);
+  const assets = [page.body, client.body, styles.body].join("\n");
+
+  assert.match(html, /setup-menu-toggle[^>]+aria-controls="setup-panel"[^>]+aria-expanded="false"|aria-controls="setup-panel"[^>]+setup-menu-toggle/u);
+  assert.match(html, /Setup &amp; settings|setup-panel-close|Close setup and settings/u);
+  assert.ok(html.indexOf('id="catalog"') < html.indexOf('id="dashboard"'));
+  assert.match(String(client.body), /setupPanelDismissed|if \(!ready && !setupPanelDismissed\) openSetupPanel\(true\)/u);
+  assert.match(String(client.body), /openSetupPanel|closeSetupPanel|aria-expanded|event\.key === "Escape"/u);
+  assert.match(String(styles.body), /setup-panel|setup-backdrop|setup-menu-state\[data-state="ready"\]/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 

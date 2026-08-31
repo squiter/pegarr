@@ -6,6 +6,11 @@ const elements = {
   accessToken: document.querySelector("#access-token"),
   loginUsername: document.querySelector("#login-username"),
   loginPassword: document.querySelector("#login-password"),
+  setupBackdrop: document.querySelector("#setup-backdrop"),
+  setupMenuState: document.querySelector("#setup-menu-state"),
+  setupMenuToggle: document.querySelector("#setup-menu-toggle"),
+  setupPanel: document.querySelector("#setup-panel"),
+  setupPanelClose: document.querySelector("#setup-panel-close"),
   onboarding: document.querySelector("#onboarding"),
   onboardingAccess: document.querySelector("#onboarding-access"),
   onboardingState: document.querySelector("#onboarding-state"),
@@ -119,6 +124,7 @@ let administratorToken;
 let historyAdministratorToken;
 let reconciliationContext;
 let catalogAddEnabled = false;
+let setupPanelDismissed = false;
 let subtitleLanguagePreferences = new Map();
 const feasibilityCache = new Map();
 const analysisByItem = new Map();
@@ -149,6 +155,15 @@ elements.catalogForm?.addEventListener("submit", searchCatalog);
 elements.subtitleSettingsForm?.addEventListener("submit", saveSubtitleSettings);
 elements.subtitleLanguages?.addEventListener("input", renderSubtitleLanguagePreferences);
 elements.sessionLogout?.addEventListener("click", signOut);
+elements.setupMenuToggle?.addEventListener("click", () => {
+  if (elements.setupPanel.hidden) openSetupPanel(true);
+  else closeSetupPanel(true, true);
+});
+elements.setupPanelClose?.addEventListener("click", () => closeSetupPanel(true, true));
+elements.setupBackdrop?.addEventListener("click", () => closeSetupPanel(true, true));
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !elements.setupPanel.hidden) closeSetupPanel(true, true);
+});
 
 elements.refreshButton?.addEventListener("click", loadInventory);
 elements.feasibilityRefresh?.addEventListener("click", () => selectedRow && loadFeasibility(selectedRow, true));
@@ -315,6 +330,7 @@ async function loadInventory() {
     elements.catalog.hidden = false;
     elements.subtitleSettings.hidden = false;
     elements.dashboard.hidden = false;
+    elements.setupMenuToggle.hidden = false;
     elements.sessionLogout.hidden = false;
     await Promise.all([loadSubtitleSettings(), loadOnboarding()]);
     renderInventory();
@@ -334,10 +350,13 @@ async function loadInventory() {
 }
 
 function showAccess(message) {
+  closeSetupPanel(false, false);
+  setupPanelDismissed = false;
   elements.dashboard.hidden = true;
   elements.onboarding.hidden = true;
   elements.catalog.hidden = true;
   elements.subtitleSettings.hidden = true;
+  elements.setupMenuToggle.hidden = true;
   elements.sessionLogout.hidden = true;
   elements.accessPanel.hidden = false;
   setStatus(message, "error");
@@ -359,6 +378,8 @@ async function loadOnboarding() {
   } catch {
     elements.onboardingState.className = "source-chip source-chip--integration_failure";
     elements.onboardingState.textContent = "Status unavailable";
+    elements.setupMenuState.textContent = "Unavailable";
+    elements.setupMenuState.dataset.state = "unavailable";
     elements.onboardingSummary.textContent = "Pegarr could not read the setup guide. Existing discovery actions remain unchanged.";
     elements.onboardingSteps.replaceChildren();
     elements.onboardingAccess.textContent = "No configuration was changed.";
@@ -401,6 +422,8 @@ function renderOnboarding(status) {
   const ready = status?.status === "ready";
   elements.onboardingState.className = `source-chip ${ready ? "source-chip--ready" : ""}`;
   elements.onboardingState.textContent = ready ? "Discovery ready" : "Setup needed";
+  elements.setupMenuState.textContent = ready ? "Ready" : "Setup needed";
+  elements.setupMenuState.dataset.state = ready ? "ready" : "needed";
   elements.onboardingSummary.textContent = ready
     ? "Catalog search and subtitle preview are ready. Adding and downloading remain separate explicit capabilities."
     : "Complete the required steps below. Missing setup never becomes a false No match found result.";
@@ -419,6 +442,23 @@ function renderOnboarding(status) {
       : "Controlled Grab is disabled; every analysis remains read-only.",
   );
   elements.onboardingAccess.textContent = capabilityMessages.join(" ");
+  if (!ready && !setupPanelDismissed) openSetupPanel(true);
+}
+
+function openSetupPanel(moveFocus) {
+  elements.setupPanel.hidden = false;
+  elements.setupBackdrop.hidden = false;
+  elements.setupMenuToggle.setAttribute("aria-expanded", "true");
+  if (moveFocus) elements.setupPanelClose.focus();
+}
+
+function closeSetupPanel(rememberDismissal, returnFocus) {
+  if (rememberDismissal) setupPanelDismissed = true;
+  const wasOpen = !elements.setupPanel.hidden;
+  elements.setupPanel.hidden = true;
+  elements.setupBackdrop.hidden = true;
+  elements.setupMenuToggle.setAttribute("aria-expanded", "false");
+  if (wasOpen && returnFocus && !elements.setupMenuToggle.hidden) elements.setupMenuToggle.focus();
 }
 
 function renderOnboardingStep(step) {
@@ -871,7 +911,7 @@ function renderSubtitleSettings(settings) {
     name.textContent = provider?.provider === "opensubtitles" ? "OpenSubtitles" : "SubDL";
     const state = document.createElement("span");
     state.className = `source-chip ${provider?.configured ? "source-chip--ready" : ""}`;
-    state.textContent = provider?.configured ? "Credential configured" : "Credential not configured";
+    state.textContent = provider?.configured ? "Credential saved (not verified)" : "Credential not saved";
     const mappings = document.createElement("small");
     const count = Array.isArray(provider?.languageMappings) ? provider.languageMappings.length : 0;
     const origin = provider?.origin === "ui" ? "Saved in Pegarr" : provider?.origin === "deployment" ? "Deployment secret" : "No credential";
@@ -1012,7 +1052,8 @@ async function saveProviderSettings(event, provider, mappingInput, keyInput, but
     });
     if (!response.ok) throw new Error("provider_settings_update_failed");
     renderSubtitleSettings(await response.json());
-    setSubtitleSettingsStatus(`${providerId === "subdl" ? "SubDL" : "OpenSubtitles"} is ready for pre-add coverage.`, "success");
+    await loadOnboarding();
+    setSubtitleSettingsStatus(`${providerId === "subdl" ? "SubDL" : "OpenSubtitles"} settings were saved. A coverage preview verifies whether the credential works.`, "success");
   } catch {
     setSubtitleSettingsStatus("Pegarr could not save that provider. The previous configuration remains active.", "error");
   } finally {
@@ -1056,6 +1097,7 @@ async function saveSubtitleSettings(event) {
     });
     if (!response.ok) throw new Error("settings_update_failed");
     renderSubtitleSettings(await response.json());
+    await loadOnboarding();
   } catch {
     setSubtitleSettingsStatus("Pegarr could not save that policy. The previous settings remain active.", "error");
   } finally {
