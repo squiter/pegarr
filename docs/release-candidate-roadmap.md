@@ -102,6 +102,12 @@ Authenticated read-only acceptance returned four Sonarr matches for `The Expanse
 
 Keep `PEG-MANUAL-003` open for installed Bazarr assignment reads and successful provider-cache evidence. Keep `PEG-MANUAL-005` and `PEG-MANUAL-006` open for valid provider credentials, successful sanitized responses, live language compatibility, quota evidence, and a cache hit. `PEG-MANUAL-004` and `PEG-MANUAL-007` remain open and separately authorized; this acceptance performed no add, automatic search, Grab, or download mutation.
 
+#### 2026-08-31 discovery-navigation production acceptance
+
+GitHub CI and the multi-platform container workflow passed for commit `f71b296`. Portainer then replaced only Pegarr with immutable digest `sha256:f4e60a22eff42c275f788b8f87c5552d0ad848de5c51b0805c85ecc87c1ea785`; the full stack definition was preserved byte-for-byte except for the one same-length image-digest replacement, and pruning plus forced re-pull remained disabled. Pegarr reached healthy state while Jellyfin, Sonarr, Radarr, Bazarr, Lidarr, and Prowlarr remained running.
+
+The live HTTPS endpoint returned `ready`, and its delivered HTML/JavaScript contain the **Setup & settings** drawer, catalog-first page order, automatic first-run opening, page-memory-only dismissal, and `Credential saved (not verified)` provider wording. An authenticated local-browser acceptance covered automatic opening, close-and-reopen behavior, keyboard semantics, desktop layout, and a 390-pixel mobile layout without horizontal overflow. The NAS container replacement expired the prior browser session, so those interactions were not relabeled as fresh authenticated NAS evidence. This acceptance made no provider search, catalog add, automatic search, Grab, or download mutation.
+
 ### 5. First public release
 
 After local acceptance and the read-only NAS smoke test:
