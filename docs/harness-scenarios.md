@@ -92,6 +92,7 @@
 | PEG-PROBE-009 | The one-shot OpenSubtitles search reports only bounded aggregate evidence | `src/probe-opensubtitles.test.ts` |
 | PEG-PROBE-010 | OpenSubtitles probe states stay distinct and invalid input remains redacted | `src/probe-opensubtitles.test.ts` |
 | PEG-DOCKER-026 | The packaged OpenSubtitles probe makes one redacted search on an internal-only network | `scripts/harness/docker-build.mjs` |
+| PEG-DOCKER-027 | Packaged login survives a container restart and logout remains durable | `scripts/harness/docker-build.mjs` |
 | PEG-SETTINGS-005 | UI-managed provider configuration drives existing-item analysis immediately | `src/runtime.test.ts` |
 | PEG-PORTAINER-001 | Portainer overlay requires an immutable image and native secret-safe configuration | `scripts/harness/architecture-contract.mjs` |
 | PEG-FLOW-001 | Resolved Bazarr policy drives one SubDL search per language and one report | `src/episode-feasibility.test.ts` |
@@ -134,6 +135,7 @@
 | PEG-ACCESS-001 | Bearer authentication uses one bounded in-memory token | `src/access-control.test.ts` |
 | PEG-ACCESS-005 | Username and password login is bounded and constant-time comparable | `src/access-control.test.ts` |
 | PEG-SESSION-001 | Server sessions are opaque, bounded, expiring, and CSRF-bound | `src/session-store.test.ts` |
+| PEG-SESSION-004 | Hashed browser sessions survive a safe process restart without extending expiry | `src/session-store.test.ts` |
 | PEG-SESSION-002 | Session login, restore, mutation, and logout preserve authentication boundaries | `src/app.test.ts` |
 | PEG-CONFIG-014 | Pegarr login loads its password only from a bounded secret file | `src/config.test.ts` |
 | PEG-SONARR-011 | Sonarr catalog lookup finds unadded series without private metadata | `src/adapters/sonarr.test.ts` |

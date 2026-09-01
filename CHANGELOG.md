@@ -9,6 +9,7 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 ### Added
 
 - Username/password sessions and a collapsible first-run setup experience.
+- Restart-safe username/password sessions backed by private hashed state in the persistent data volume.
 - Sonarr and Radarr catalog discovery for titles that are not yet in the library.
 - Explicit subtitle policy plus private server-side SubDL and OpenSubtitles settings.
 - Honest title-level subtitle availability that keeps provider failures distinct from no matches.

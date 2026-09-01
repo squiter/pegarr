@@ -1,4 +1,6 @@
 import { createServer } from "node:http";
+import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 
 import { AccessControl } from "./access-control.js";
 import { JsonTransportError } from "./adapters/http.js";
@@ -10,14 +12,17 @@ import { SessionStore } from "./session-store.js";
 
 const port = parsePort(process.env.PORT);
 const host = process.env.HOST ?? "0.0.0.0";
-const dataDirectory = process.env.DATA_DIR ?? "./data";
+const dataDirectory = resolve(process.env.DATA_DIR ?? "./data");
 
 async function start(): Promise<void> {
+  await mkdir(dataDirectory, { recursive: true, mode: 0o700 });
   const configuration = await loadRuntimeConfiguration(process.env);
   const services = createRuntimeServices(configuration, { environment: process.env, dataDirectory });
   const accessControl = new AccessControl(configuration.accessToken, configuration.login);
   const adminAccessControl = new AccessControl(configuration.controlledGrab?.adminToken);
-  const sessionStore = configuration.login === undefined ? undefined : new SessionStore();
+  const sessionStore = configuration.login === undefined
+    ? undefined
+    : new SessionStore({ databasePath: resolve(dataDirectory, "sessions.sqlite") });
   const server = createServer(createRequestHandler(dataDirectory, services, accessControl, {
     adminAccessControl,
     ...(sessionStore === undefined ? {} : { sessionStore }),
@@ -35,8 +40,18 @@ async function start(): Promise<void> {
     shuttingDown = true;
     process.stdout.write(`${JSON.stringify({ event: "shutdown_started", service: "pegarr", signal })}\n`);
     server.close((error) => {
-      services.close();
-      if (error) {
+      let failed = error !== undefined;
+      try {
+        services.close();
+      } catch {
+        failed = true;
+      }
+      try {
+        sessionStore?.close();
+      } catch {
+        failed = true;
+      }
+      if (failed) {
         process.stderr.write(`${JSON.stringify({ event: "shutdown_failed", service: "pegarr" })}\n`);
         process.exitCode = 1;
       }

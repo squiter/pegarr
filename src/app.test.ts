@@ -125,6 +125,7 @@ test("PEG-SESSION-002 login, restore, CSRF mutation, and logout use a bounded Ht
   assert.equal(logout.statusCode, 200);
   assert.match(logout.headers?.["set-cookie"] ?? "", /HttpOnly; SameSite=Strict; Secure; Max-Age=0/u);
   assert.equal(sessionStore.authenticate(sessionToken), false);
+  sessionStore.close();
 });
 
 test("PEG-ONBOARD-002 onboarding authenticates before work and projects the current access boundary", async () => {

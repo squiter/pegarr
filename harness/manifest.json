@@ -1413,6 +1413,12 @@
       "boundary": "Deterministic clock and synthetic opaque tokens in process memory only; no HTTP, persistence, or network"
     },
     {
+      "id": "PEG-SESSION-004",
+      "title": "Hashed browser sessions survive a safe process restart without extending expiry",
+      "evidence": "src/session-store.test.ts",
+      "boundary": "Temporary mode-0600 SQLite database, synthetic opaque tokens, and deterministic clock only"
+    },
+    {
       "id": "PEG-SESSION-002",
       "title": "Session login, restore, mutation, and logout preserve authentication boundaries",
       "evidence": "src/app.test.ts",
@@ -1771,6 +1777,12 @@
       "title": "Packaged OpenSubtitles probe makes one redacted search on an internal-only network",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Synthetic sibling container, search response, and secret; local Docker architecture only"
+    },
+    {
+      "id": "PEG-DOCKER-027",
+      "title": "Packaged login survives a container restart and logout remains durable",
+      "evidence": "scripts/harness/docker-build.mjs",
+      "boundary": "Temporary synthetic password and session in one network-none container; no live service or external network"
     },
     {
       "id": "PEG-SETTINGS-005",

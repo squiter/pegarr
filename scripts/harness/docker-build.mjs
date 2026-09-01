@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
@@ -109,6 +109,134 @@ async function smokeTest() {
     throw new Error(`${scenario} endpoint probe failed:\n${outputOf(result)}\nContainer logs:\n${outputOf(logs)}`);
   } finally {
     docker(["rm", "--force", containerName]);
+  }
+}
+
+async function packagedSessionRestartSmokeTest() {
+  const scenario = "PEG-DOCKER-027";
+  const containerName = `pegarr-harness-session-restart-${process.pid}`;
+  const artifactsDirectory = resolve(".artifacts");
+  mkdirSync(artifactsDirectory, { recursive: true });
+  const fixtureDirectory = mkdtempSync(join(artifactsDirectory, "pegarr-synthetic-session-docker-"));
+  const dataDirectory = join(fixtureDirectory, "data");
+  const secretPath = join(fixtureDirectory, "pegarr_password");
+  const username = "pegarr-user";
+  const password = "synthetic-session-password-value-000000001";
+  mkdirSync(dataDirectory, { mode: 0o777 });
+  chmodSync(dataDirectory, 0o777);
+  writeFileSync(secretPath, password, { mode: 0o444 });
+
+  const started = docker([
+    "run", "--detach", "--name", containerName, "--label", "pegarr.harness=true",
+    "--read-only", "--network", "none", "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+    "--mount", `type=bind,source=${dataDirectory},target=/data`,
+    "--mount", `type=bind,source=${secretPath},target=/run/secrets/pegarr_password,readonly`,
+    "--env", "DATA_DIR=/data", "--env", `PEGARR_USERNAME=${username}`,
+    "--env", "PEGARR_PASSWORD_FILE=/run/secrets/pegarr_password",
+    "--env", "PEGARR_SESSION_COOKIE_SECURE=false", "pegarr:harness",
+  ]);
+  if (started.status !== 0) {
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+    throw new Error(`${scenario} could not start the session container:\n${outputOf(started)}`);
+  }
+
+  const waitForReady = async () => {
+    const probe = "fetch('http://127.0.0.1:8080/health/ready').then((response) => { if (response.status !== 200) process.exit(1); }).catch(() => process.exit(1));";
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      if (docker(["exec", containerName, "node", "-e", probe]).status === 0) return;
+      await delay(250);
+    }
+    throw new Error(`${scenario} session container did not become ready`);
+  };
+
+  try {
+    await waitForReady();
+    const loginScript = [
+      "(async () => {",
+      "  const response = await fetch('http://127.0.0.1:8080/api/v1/session/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: process.env.PEGARR_TEST_USERNAME, password: process.env.PEGARR_TEST_PASSWORD }) });",
+      "  const body = await response.json();",
+      "  const cookie = response.headers.get('set-cookie')?.split(';', 1)[0];",
+      "  if (response.status !== 200 || typeof cookie !== 'string' || typeof body.csrfToken !== 'string' || typeof body.expiresAt !== 'string') throw new Error('login failed');",
+      "  process.stdout.write(JSON.stringify({ cookie, csrfToken: body.csrfToken, expiresAt: body.expiresAt }));",
+      "})().catch(() => process.exit(1));",
+    ].join("\n");
+    const login = docker(["exec", "--env", `PEGARR_TEST_USERNAME=${username}`, "--env", `PEGARR_TEST_PASSWORD=${password}`, containerName, "node", "-e", loginScript]);
+    if (login.status !== 0) throw new Error(`${scenario} synthetic login failed without exposing credentials`);
+    let loginState;
+    try {
+      loginState = JSON.parse(login.stdout);
+    } catch {
+      throw new Error(`${scenario} synthetic login returned malformed private state`);
+    }
+    if (typeof loginState.cookie !== "string" || typeof loginState.csrfToken !== "string" || typeof loginState.expiresAt !== "string") {
+      throw new Error(`${scenario} synthetic login omitted private session state`);
+    }
+    const rawSessionToken = loginState.cookie.startsWith("pegarr_session=") ? loginState.cookie.slice("pegarr_session=".length) : "";
+    if (rawSessionToken.length < 32) throw new Error(`${scenario} synthetic login returned an invalid cookie`);
+
+    const firstRestart = docker(["restart", containerName]);
+    if (firstRestart.status !== 0) throw new Error(`${scenario} first restart failed:\n${outputOf(firstRestart)}`);
+    await waitForReady();
+    const restoreScript = [
+      "(async () => {",
+      "  const response = await fetch('http://127.0.0.1:8080/api/v1/session', { headers: { cookie: process.env.PEGARR_TEST_COOKIE } });",
+      "  const body = await response.json();",
+      "  if (response.status !== 200 || body.status !== 'authenticated' || typeof body.csrfToken !== 'string' || body.expiresAt !== process.env.PEGARR_TEST_EXPIRY) throw new Error('restore failed');",
+      "  process.stdout.write(JSON.stringify({ csrfToken: body.csrfToken, expiresAt: body.expiresAt }));",
+      "})().catch(() => process.exit(1));",
+    ].join("\n");
+    const restore = docker(["exec", "--env", `PEGARR_TEST_COOKIE=${loginState.cookie}`, "--env", `PEGARR_TEST_EXPIRY=${loginState.expiresAt}`, containerName, "node", "-e", restoreScript]);
+    if (restore.status !== 0) throw new Error(`${scenario} session did not survive the first restart`);
+    let restoredState;
+    try {
+      restoredState = JSON.parse(restore.stdout);
+    } catch {
+      throw new Error(`${scenario} restored session returned malformed private state`);
+    }
+    if (typeof restoredState.csrfToken !== "string" || restoredState.expiresAt !== loginState.expiresAt) {
+      throw new Error(`${scenario} restored session changed its fixed boundary`);
+    }
+
+    const databasePath = join(dataDirectory, "sessions.sqlite");
+    if ((statSync(databasePath).mode & 0o777) !== 0o600) throw new Error(`${scenario} persistent session database is not mode 0600`);
+    const databaseBytes = readFileSync(databasePath).toString("latin1");
+    for (const rawSecret of [password, rawSessionToken, loginState.csrfToken, restoredState.csrfToken]) {
+      if (databaseBytes.includes(rawSecret)) throw new Error(`${scenario} persisted raw private session material`);
+    }
+    const database = new DatabaseSync(databasePath, { readOnly: true });
+    const row = database.prepare("SELECT session_digest, expires_at_ms FROM sessions").get();
+    database.close();
+    if (row?.session_digest !== createHash("sha256").update(rawSessionToken).digest("hex") || new Date(row.expires_at_ms).toISOString() !== loginState.expiresAt) {
+      throw new Error(`${scenario} persistent session digest or fixed expiry is invalid`);
+    }
+
+    const logoutScript = [
+      "(async () => {",
+      "  const response = await fetch('http://127.0.0.1:8080/api/v1/session/logout', { method: 'POST', headers: { cookie: process.env.PEGARR_TEST_COOKIE, 'x-pegarr-csrf': process.env.PEGARR_TEST_CSRF } });",
+      "  if (response.status !== 200) throw new Error('logout failed');",
+      "})().catch(() => process.exit(1));",
+    ].join("\n");
+    const logout = docker(["exec", "--env", `PEGARR_TEST_COOKIE=${loginState.cookie}`, "--env", `PEGARR_TEST_CSRF=${restoredState.csrfToken}`, containerName, "node", "-e", logoutScript]);
+    if (logout.status !== 0) throw new Error(`${scenario} durable logout failed`);
+
+    const secondRestart = docker(["restart", containerName]);
+    if (secondRestart.status !== 0) throw new Error(`${scenario} second restart failed:\n${outputOf(secondRestart)}`);
+    await waitForReady();
+    const rejected = docker(["exec", "--env", `PEGARR_TEST_COOKIE=${loginState.cookie}`, containerName, "node", "-e", "fetch('http://127.0.0.1:8080/api/v1/session', { headers: { cookie: process.env.PEGARR_TEST_COOKIE } }).then((response) => { if (response.status !== 401) process.exit(1); }).catch(() => process.exit(1));"]);
+    if (rejected.status !== 0) throw new Error(`${scenario} logout did not remain effective after restart`);
+    const afterLogout = new DatabaseSync(databasePath, { readOnly: true });
+    const remaining = afterLogout.prepare("SELECT COUNT(*) AS count FROM sessions").get();
+    afterLogout.close();
+    if (remaining?.count !== 0) throw new Error(`${scenario} logout left a durable session row`);
+
+    const logs = outputOf(docker(["logs", containerName]));
+    for (const rawSecret of [password, rawSessionToken, loginState.csrfToken, restoredState.csrfToken]) {
+      if (logs.includes(rawSecret)) throw new Error(`${scenario} container logs exposed private session material`);
+    }
+    process.stdout.write(`${scenario} packaged login=restored after restart, fixed expiry=preserved, logout=durable (hashed mode-0600 state, network=none)\n`);
+  } finally {
+    docker(["rm", "--force", containerName]);
+    rmSync(fixtureDirectory, { recursive: true, force: true });
   }
 }
 
@@ -1255,6 +1383,7 @@ export async function main() {
   if (first.status === 0) {
     process.stdout.write(firstOutput);
     await smokeTest();
+    await packagedSessionRestartSmokeTest();
     await configuredArrSmokeTest({
       scenario: "PEG-DOCKER-002",
       integration: "sonarr",
@@ -1290,6 +1419,7 @@ export async function main() {
   if (fallback.status === 0) {
     process.stdout.write(fallbackOutput);
     await smokeTest();
+    await packagedSessionRestartSmokeTest();
     await configuredArrSmokeTest({
       scenario: "PEG-DOCKER-002",
       integration: "sonarr",

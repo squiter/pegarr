@@ -256,8 +256,12 @@ for (const contract of ['createHash("sha256")', "timingSafeEqual", "authorizatio
 }
 
 const sessionStore = readFileSync(resolve(repoRoot, "src/session-store.ts"), "utf8");
-for (const contract of ["randomBytes(32)", "createHash(\"sha256\")", "timingSafeEqual", "#prune(now)", "maxSessions", "csrfDigest"]) {
+for (const contract of ["randomBytes(32)", "createHash(\"sha256\")", "timingSafeEqual", "#prune(now)", "maxSessions", "csrfDigest", "session_digest", "csrf_digest", "chmodSync(path, 0o600)"]) {
   if (!sessionStore.includes(contract)) issues.push(`The bounded session store must retain ${contract}`);
+}
+const runtimeEntry = readFileSync(resolve(repoRoot, "src/index.ts"), "utf8");
+if (!runtimeEntry.includes('new SessionStore({ databasePath: resolve(dataDirectory, "sessions.sqlite") })')) {
+  issues.push("PEG-SESSION-004 runtime login sessions must use the persistent private data directory");
 }
 
 const grabAudit = readFileSync(resolve(repoRoot, "src/grab-audit.ts"), "utf8");
