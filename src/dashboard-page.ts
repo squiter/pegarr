@@ -15,7 +15,7 @@ export const dashboardPage = `<!doctype html>
       <span><strong>Pegarr</strong><small>Subtitle-aware release selection</small></span>
     </a>
     <div class="topbar-actions">
-      <span class="phase-badge">Discovery-first P0</span>
+      <span class="phase-badge">Read-only by default</span>
       <button id="setup-menu-toggle" class="quiet-button setup-menu-toggle" type="button" aria-controls="setup-panel" aria-expanded="false" hidden>
         <span>Setup &amp; settings</span>
         <span id="setup-menu-state" class="setup-menu-state">Checking</span>
@@ -70,7 +70,7 @@ export const dashboardPage = `<!doctype html>
     <section class="hero" aria-labelledby="page-title">
       <p class="eyebrow">Discover before you add</p>
       <h1 id="page-title">Find the version with your subtitles.</h1>
-      <p class="lede">Search the Sonarr and Radarr catalogs for a new series or movie. Pegarr is building the complete path from subtitle coverage preview to explicit add and exact release selection.</p>
+      <p class="lede">Search the Sonarr and Radarr catalogs, preview subtitle availability, add a title explicitly, and compare exact release candidates without leaving Pegarr.</p>
     </section>
 
     <section id="access-panel" class="access-panel" aria-labelledby="access-title">

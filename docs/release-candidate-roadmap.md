@@ -132,6 +132,12 @@ Commits `a65b337` and `0d821b0` moved username/password sessions from process me
 
 The replacement became healthy at revision `0d821b041d930a79e5d6950671a020a6ce4bfad1`; HTTPS readiness returned `200`, unauthenticated session access returned `401`, and Jellyfin, Sonarr, Radarr, Bazarr, Lidarr, and Prowlarr remained running with their earlier creation timestamps. After one expected migration login from the superseded memory-only release, Portainer restarted only `jellyfin-pegarr-1`. The bounded log sequence recorded `shutdown_started`, a fresh `server_started`, and then authenticated `session_status=200`; reloading the same browser tab showed **Sign out**, restored **Setup & settings: Ready**, and loaded the 50-item inventory without another login. A post-restart read-only catalog search returned 31 Game of Thrones matches and its series preview returned **Pt-Br: Available (30 Matches)** from SubDL. No catalog add, automatic search, controlled Grab, or download mutation was performed.
 
+#### 2026-09-01 installed exact-analysis and provider-cache acceptance
+
+The same authenticated deployment completed a read-only analysis of Severance S02E10 against installed Sonarr and Bazarr. It resolved the **PT-BR + English** Bazarr series profile and assignment, preserved the required and cutoff semantics, returned 29 exact Sonarr candidates, and kept every Arr decision and reason visible. SubDL successfully supplied Brazilian-Portuguese release evidence, reported 1,978 of 2,000 requests remaining, and stored the result in the private provider cache. An explicit analysis refresh re-read Sonarr and Bazarr, reused the SubDL cache entry, made no new SubDL quota request, and kept the quota value at 1,978. OpenSubtitles authentication failure and the missing English mapping remained separate Unknown/unsupported evidence instead of becoming Not found.
+
+This closes `PEG-MANUAL-005` and proves the Sonarr side of `PEG-MANUAL-001`, the installed Bazarr series side of `PEG-MANUAL-002`, the cache-reuse portion of `PEG-MANUAL-003`, and the post-fix Sonarr continuation portion of `PEG-MANUAL-007`. Exact installed Radarr analysis/add, installed Bazarr movie assignment, successful OpenSubtitles evidence, remaining provider-secret permissions, and an operator-owned harmless controlled Grab stay open. No catalog add, automatic search, controlled Grab, or download mutation was performed during this acceptance.
+
 ### 5. First public release
 
 After local acceptance and the read-only NAS smoke test:

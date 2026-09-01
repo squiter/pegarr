@@ -4,7 +4,7 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 
 ## [Unreleased]
 
-## [0.1.0] - Pending
+## [0.1.0] - 2026-09-01
 
 ### Added
 
@@ -25,7 +25,7 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 - Provider errors, timeouts, and quota exhaustion remain `Unknown`, never `No match found`.
 - OpenSubtitles supports exact movie and episode searches but not season packs.
 - Specials season `0` remains unsupported until provider season identity is validated.
-- Synthetic coverage does not prove installed-service compatibility. Successful OpenSubtitles/cache evidence, installed Bazarr assignment reads, Radarr catalog add, a fresh post-add exact Sonarr continuation, and an operator-owned harmless controlled Grab remain explicit manual acceptance boundaries.
+- Synthetic coverage does not prove installed-service compatibility. A successful OpenSubtitles response, installed Radarr exact analysis and catalog add, installed Bazarr movie assignment, and an operator-owned harmless controlled Grab remain explicit manual acceptance boundaries.
 
 [Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/squiter/pegarr/releases/tag/v0.1.0

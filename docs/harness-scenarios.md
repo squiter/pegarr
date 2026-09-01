@@ -142,7 +142,7 @@
 | PEG-RADARR-010 | Radarr catalog lookup finds unadded movies without private metadata | `src/adapters/radarr.test.ts` |
 | PEG-CATALOG-001 | Catalog search fans out and preserves partial Arr availability | `src/runtime.test.ts` |
 | PEG-CATALOG-002 | Catalog search authenticates before bounded read-only work | `src/app.test.ts` |
-| PEG-DASH-041 | Discovery and username-password login stay secret-safe | `src/app.test.ts` |
+| PEG-DASH-041 | Discovery uses public product language and secret-safe username-password login | `src/app.test.ts` |
 | PEG-SESSION-003 | Dashboard sessions restore and sign out without browser-stored credentials | `src/app.test.ts` |
 | PEG-SETTINGS-001 | Subtitle policy persists atomically without provider secrets | `src/subtitle-settings.test.ts` |
 | PEG-SETTINGS-002 | Invalid, duplicate, oversized, and corrupt policy fails closed | `src/subtitle-settings.test.ts` |
@@ -309,12 +309,11 @@
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima proved status, missing-page, and release-search envelopes; the NAS later proved installed Sonarr/Radarr status, catalog lookup, and a monitored Severance Sonarr add without automatic search, while exact installed release analysis remains open |
-| PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima refreshed the authenticated profile-list envelope on 2026-08-30 and measured one profile with one language item after targeted series-assignment shapes were verified on 2026-08-28; installed NAS compatibility remains intentionally untested |
-| PEG-MANUAL-003 | NAS runtime smoke test | Immutable digest `c16c6c…` is healthy with HTTPS readiness, six unaffected sibling services, restart-safe authenticated browser state, restored settings and inventory, private hashed sessions, and successful SubDL evidence; installed Bazarr assignments, remaining provider-secret permissions, cache reuse, and fresh installed exact-release analysis remain open |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | The NAS proves installed status, catalog lookup, Sonarr add, and exact Sonarr episode release analysis with 29 candidates; exact installed Radarr release analysis remains open |
+| PEG-MANUAL-002 | Live Bazarr policy resolution | The installed NAS resolved the `PT-BR + English` series profile and assignment during exact Sonarr analysis; equivalent installed movie-assignment evidence remains open |
+| PEG-MANUAL-003 | NAS runtime smoke test | Immutable digest `c16c6c…` is healthy with restart-safe authentication, hardening controls, restored settings/inventory, exact Sonarr/Bazarr analysis, and a successful SubDL cache hit without quota change; Radarr exact analysis, Bazarr movie assignment, and remaining provider-secret permissions remain open |
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
-| PEG-MANUAL-005 | Live SubDL v2 compatibility | The live image returned 30 pt-br matches for Game of Thrones and one for The Adventures of Tintin, proving authenticated series/movie responses and mapping compatibility; sanitized quota and cache-hit evidence remain open |
 | PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The live image invoked OpenSubtitles for a movie and kept its temporary unavailability distinct from SubDL's positive pt-br result; a successful response, rate headers, mapping compatibility, and cache reuse remain open |
-| PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | The live Severance flow proved installed Sonarr add and title-scoped automatic-search suppression; the scope race fix is deployed, while fresh post-fix exact continuation and the equivalent Radarr add remain manual |
+| PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | The live Severance flow proved installed Sonarr add, title-scoped automatic-search suppression, and post-fix exact episode continuation; the equivalent Radarr add remains manual |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.

@@ -820,6 +820,8 @@ test("PEG-DASH-041 PEG-SESSION-003 discovery login uses a restorable server sess
   const assets = [page.body, client.body, styles.body].join("\n");
 
   assert.match(String(page.body), /Discover before you add|login-username|login-password|catalog-query|Search for something new/u);
+  assert.match(String(page.body), /Read-only by default|preview subtitle availability|compare exact release candidates/u);
+  assert.doesNotMatch(String(page.body), /Discovery-first P0|building the complete path/u);
   assert.match(String(client.body), /establishSession|restoreSession|signOut|\/api\/v1\/session\/login|\/api\/v1\/catalog\/search|renderCatalogItem/u);
   assert.match(String(client.body), /sessionCsrfToken|x-pegarr-csrf|credentials: "same-origin"|libraryHeaders/u);
   assert.match(String(page.body), /private, expiring server session|session-logout/u);

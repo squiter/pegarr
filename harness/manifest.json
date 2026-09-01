@@ -1456,7 +1456,7 @@
     },
     {
       "id": "PEG-DASH-041",
-      "title": "Discovery and username-password login remain secret-safe assets",
+      "title": "Discovery uses public product language and secret-safe username-password login",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard assets with no script-readable cookie or browser storage, network, or mutation"
     },
@@ -1801,27 +1801,22 @@
     {
       "id": "PEG-MANUAL-001",
       "title": "Live Sonarr and Radarr API compatibility",
-      "reason": "Local Colima refreshed the authenticated Sonarr 4.0.16.2944 status and a bounded one-row monitored missing-page envelope on 2026-08-30, after a 100-row episode release search was measured on 2026-08-26; on 2026-08-31 the NAS reported Sonarr 4.0.19.2979 and Radarr 6.3.0.10514 available, restored bounded missing items, returned bounded Sonarr and Radarr catalog matches, and accepted a monitored Severance series add without automatic search, while exact installed release-analysis compatibility remains unproven"
+      "reason": "Local Colima proved bounded Sonarr status, inventory, and release search; the NAS later reported Sonarr 4.0.19.2979 and Radarr 6.3.0.10514 available, restored bounded missing items, returned both catalogs, accepted a monitored Severance series add without automatic search, and on 2026-09-01 completed exact installed Sonarr episode analysis with 29 releases; exact installed Radarr release analysis remains unproven"
     },
     {
       "id": "PEG-MANUAL-002",
       "title": "Live Bazarr profile resolution and provider policy",
-      "reason": "Local Colima refreshed the authenticated Bazarr profile-list envelope on 2026-08-30 and measured one profile with one language item, after targeted series-assignment shapes were verified on 2026-08-28; on 2026-08-31 the NAS dashboard restored one required pt-br policy language without retaining private profile contents, while installed Bazarr profile and assignment reads remain unproven"
+      "reason": "Local Colima proved bounded profile-list and targeted assignment shapes; on 2026-09-01 the installed NAS resolved the PT-BR + English Bazarr series profile and assignment during exact Sonarr analysis while preserving required and cutoff semantics; equivalent installed movie-assignment evidence remains unproven"
     },
     {
       "id": "PEG-MANUAL-003",
       "title": "NAS pull, startup, persistence, and architecture smoke test",
-      "reason": "The live NAS has repeatedly pulled immutable multi-architecture Pegarr images while preserving the seven-service Jellyfin stack and hardening controls; on 2026-09-01 digest sha256:c16c6ccdb58d82a3885fbb737812049f7ccdfd30fcbaf6c0e83ba45f96537f8c became healthy after exactly one image-reference replacement, left all six sibling services running, returned HTTPS readiness 200 and unauthenticated session 401, and then preserved the authenticated browser session, settings, and 50-item inventory through a Pegarr-only restart before returning 30 bounded pt-br SubDL matches for Game of Thrones; earlier acceptance confirmed native read-only Arr/Bazarr mounts, secure cookies, the node user, read-only root, dropped capabilities, no-new-privileges, mount write boundaries, a node:node mode-0600 password file, and the single-button add flow; installed Bazarr assignment reads, remaining provider-secret permissions, provider-cache reuse, and fresh installed exact-release analysis remain open"
+      "reason": "The live NAS repeatedly pulled immutable multi-architecture images while preserving the seven-service Jellyfin stack, hardening controls, HTTPS readiness, authentication, settings, and inventory across replacement and restart; on 2026-09-01 digest sha256:c16c6ccdb58d82a3885fbb737812049f7ccdfd30fcbaf6c0e83ba45f96537f8c completed fresh exact Sonarr/Bazarr analysis, then reused the successful SubDL result from provider cache with the quota remaining unchanged at 1,978 of 2,000; installed Radarr exact analysis, Bazarr movie assignment, and remaining provider-secret permissions remain open"
     },
     {
       "id": "PEG-MANUAL-004",
       "title": "Live controlled Grab and unknown-outcome reconciliation",
       "reason": "Synthetic tests prove the safety flow, but a harmless operator-confirmed Sonarr/Radarr Grab and timeout reconciliation must be validated manually; automated tests never mutate live services"
-    },
-    {
-      "id": "PEG-MANUAL-005",
-      "title": "Live SubDL v2 search and language-code compatibility",
-      "reason": "The official request, quota contract, live route, and authentication boundary are pinned; on 2026-08-31 actionable-discovery digest sha256:bd9cacdf6935fbeba7bf4fb729ba42b88ccae5e520858fff6697762394992b60 returned 30 bounded pt-br matches for Game of Thrones and one for The Adventures of Tintin from SubDL, proving successful authenticated series and movie responses plus live language mapping compatibility; the first series attempt received a transient rejection and remained Could Not Check before the uncached retry succeeded; sanitized quota and cache-hit evidence remain open"
     },
     {
       "id": "PEG-MANUAL-006",
@@ -1831,7 +1826,7 @@
     {
       "id": "PEG-MANUAL-007",
       "title": "Live Sonarr and Radarr catalog-add compatibility and automatic-search suppression",
-      "reason": "Synthetic tests prove exact add bodies, safe continuation, and the single-button action; on 2026-08-31 the authorized live Severance flow returned 29 pt-br matches, created a monitored Sonarr series with the selected tv root and Any profile, populated both seasons, and produced no title-scoped queue or history activity, proving installed Sonarr add compatibility and automatic-search suppression; the immediate scope read exposed a transient empty-episode race now fixed and deployed at digest sha256:03842df75d9778caf8c60f00b689dfd2e50670067b1ae6e886daea1a169d7c51; fresh post-fix Sonarr exact-analysis continuation and equivalent Radarr add compatibility remain open"
+      "reason": "Synthetic tests prove exact add bodies, safe continuation, and the single-button action; the authorized live Severance flow created a monitored Sonarr series with automatic search disabled and no title-scoped queue or history activity, and on 2026-09-01 the deployed scope-race fix continued that title into exact episode analysis with 29 releases; equivalent installed Radarr add compatibility remains open"
     }
   ]
 }
