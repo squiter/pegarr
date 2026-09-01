@@ -45,7 +45,7 @@ For a repeatable NAS deployment, copy the example environment file and pin the r
 
 ```console
 cp .env.example .env
-# Set PEGARR_IMAGE=ghcr.io/squiter/pegarr:0.1.2 in .env
+# Set PEGARR_IMAGE=ghcr.io/squiter/pegarr:0.1.3 in .env
 docker compose -f deploy/compose.nas.yaml pull
 docker compose -f deploy/compose.nas.yaml up -d
 ```
@@ -62,7 +62,7 @@ The image supports `linux/amd64` and `linux/arm64`. Never put passwords, access 
 
 ## Documentation
 
-- [Latest release notes](docs/releases/v0.1.2.md), [v0.1.1 notes](docs/releases/v0.1.1.md), and [changelog](CHANGELOG.md)
+- [Latest release notes](docs/releases/v0.1.3.md), [v0.1.2 notes](docs/releases/v0.1.2.md), and [changelog](CHANGELOG.md)
 - [Missing-item dashboard](docs/missing-item-dashboard.md) and [item feasibility API](docs/item-feasibility-api.md)
 - [Provider cache](docs/provider-search-cache.md) and [integration contracts](docs/contracts/)
 - [Release-candidate acceptance record](docs/release-candidate-roadmap.md) and [release guide](docs/releasing.md)

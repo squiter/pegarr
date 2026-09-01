@@ -72,7 +72,7 @@ docker compose \
   up -d
 ```
 
-Pegarr rejects a direct `PEGARR_PASSWORD`, incomplete login pairs, unsafe usernames, passwords shorter than 32 characters, and secret files larger than 4096 bytes. The dashboard sends the username and password once to `POST /api/v1/session/login`, clears the password immediately, and receives an opaque host-only `HttpOnly`, `SameSite=Strict` cookie. Sessions expire after eight hours and are limited to 100 concurrent entries. Their SHA-256 session and CSRF digests, fixed expiry, and insertion order are stored in the mode-`0600` `DATA_DIR/sessions.sqlite` file; the configured password and raw browser tokens are never persisted there. A safe process or container restart restores an unexpired session without extending its original expiry. Reloading restores the page-memory CSRF token through `GET /api/v1/session`, while `POST /api/v1/session/logout` durably invalidates the session and clears the cookie.
+Pegarr rejects a direct `PEGARR_PASSWORD`, incomplete login pairs, unsafe usernames, passwords shorter than 32 characters, and secret files larger than 4096 bytes. The dashboard sends the username and password once to `POST /api/v1/session/login`, clears the password immediately, and receives an opaque host-only `HttpOnly`, `SameSite=Strict` cookie. Sessions expire after 30 days without authenticated use and are limited to 100 concurrent entries. Their SHA-256 session and CSRF digests, current expiry, and insertion order are stored in the mode-`0600` `DATA_DIR/sessions.sqlite` file; the configured password and raw browser tokens are never persisted there. A safe process or container restart restores an unexpired session without implicitly extending it. Reloading restores the page-memory CSRF token through `GET /api/v1/session` and renews the bounded inactivity window, while `POST /api/v1/session/logout` durably invalidates the session and clears the cookie.
 
 State-changing login routes also require a separate CSRF token kept only in page memory. Reload rotates that token. Set `PEGARR_SESSION_COOKIE_SECURE=true` when Pegarr is served through HTTPS so the cookie also carries `Secure`; leave it false only for a trusted private HTTP deployment. Basic authentication does not encrypt traffic, so HTTPS or a trusted private network remains mandatory.
 
@@ -82,7 +82,7 @@ GET  /api/v1/session         restores the page-memory CSRF token
 POST /api/v1/session/logout  requires X-Pegarr-CSRF and clears the session
 ```
 
-The opaque session token is returned only as the `HttpOnly` cookie. Login and restore responses return the CSRF token and fixed expiry, never the session token or configured password.
+The opaque session token is returned only as the `HttpOnly` cookie. Login and restore responses return the CSRF token and current expiry, never the session token or configured password.
 
 The authenticated onboarding route returns only safe counts, configured/not-configured prerequisite states, deployment capability flags, and the current access class. It never probes a subtitle provider, returns a hostname or API key, or claims an unavailable provider is a subtitle miss. A username/password session is described as an operator session for settings and optional catalog add; legacy bearer access is described as read-only; controlled Grab always remains behind the independent administrator token.
 

@@ -169,6 +169,14 @@ The follow-up `v0.1.2` patch contains only that continuation-refresh fix and the
 
 Portainer again preserved the exact 5,277-character stack definition and changed only the Pegarr digest. The replacement became healthy at version `0.1.2` and the exact release revision while every sibling container retained its earlier timestamp. The existing login survived, the 51-item inventory restored, and the served browser asset contained the continuation-specific refresh route. A sanitized node-user console check recorded mode `0700` on `/data/provider-secrets` and mode `0600` on both provider API-key files, provider settings, subtitle settings, and the session database; no value was read. This closes `PEG-MANUAL-003`. The deployment did not repeat the catalog add, start automatic search, prepare a Grab, or download a release.
 
+#### 2026-09-01 remaining Bazarr acceptance and v0.1.3 session fix
+
+The authenticated installed Bazarr movie inventory listed 13 file-backed Radarr movies. **The Matrix Resurrections** at movie ID `7` displayed the assigned **PT-BR + English** profile in both the bounded inventory row and its edit view. Combined with the previously proven live series resolution and the deterministic targeted-assignment adapter contracts, this closes the installed movie side and therefore `PEG-MANUAL-002`. No assignment, profile, file, subtitle, or service setting was changed.
+
+The same browser acceptance exposed the reason for repeated Pegarr sign-ins: the server intentionally used a fixed eight-hour browser session and did not renew it on authenticated use. `PEG-SESSION-005` changes that UX to a bounded 30-day inactivity window. Loading an authenticated app rotates the page-memory CSRF token, renews the private server-side expiry and host-only cookie, and still keeps the opaque session token out of JavaScript and persistent browser storage. `PEG-DOCKER-027` proves the packaged session survives restart, renews after authenticated restore, stores only hashed private state at mode `0600`, and remains durably invalid after logout.
+
+OpenSubtitles still needs a successful installed response with sanitized rate, mapping, and cache evidence under `PEG-MANUAL-006`. The only live controlled-Grab gap remains `PEG-MANUAL-004`, which is intentionally operator-owned and was not exercised by this work.
+
 ## Known implementation limitations
 
 These are honest follow-up candidates, not regressions in the completed Phase 3 contract:

@@ -32,7 +32,8 @@ interface SessionRow {
   readonly expires_at_ms: number;
 }
 
-const defaultTtlMs = 8 * 60 * 60_000;
+const defaultTtlMs = 30 * 24 * 60 * 60_000;
+const maximumTtlMs = 90 * 24 * 60 * 60_000;
 const defaultMaxSessions = 100;
 
 export class SessionStore {
@@ -45,7 +46,7 @@ export class SessionStore {
   constructor(options: SessionStoreOptions = {}) {
     this.#now = options.now ?? Date.now;
     this.#randomToken = options.randomToken ?? (() => randomBytes(32).toString("base64url"));
-    this.#ttlMs = boundedInteger(options.ttlMs ?? defaultTtlMs, 60_000, 24 * 60 * 60_000, "ttlMs");
+    this.#ttlMs = boundedInteger(options.ttlMs ?? defaultTtlMs, 60_000, maximumTtlMs, "ttlMs");
     this.#maxSessions = boundedInteger(options.maxSessions ?? defaultMaxSessions, 1, 1_000, "maxSessions");
     const databasePath = options.databasePath ?? ":memory:";
     if (databasePath !== ":memory:" && !isAbsolute(databasePath)) {
@@ -108,13 +109,15 @@ export class SessionStore {
   }
 
   refresh(token: string | undefined): RefreshedSession | undefined {
-    const session = this.#read(token);
+    const now = safeNow(this.#now());
+    const session = this.#read(token, now);
     if (session === undefined || token === undefined) return undefined;
     const csrfToken = opaqueToken(this.#randomToken(), "CSRF token");
+    const expiresAtMs = Math.min(8.64e15, now + this.#ttlMs);
     this.#database.prepare(`
-      UPDATE sessions SET csrf_digest = ? WHERE session_digest = ?
-    `).run(digest(csrfToken), digestHex(token));
-    return { csrfToken, expiresAt: new Date(session.expiresAtMs).toISOString() };
+      UPDATE sessions SET csrf_digest = ?, expires_at_ms = ? WHERE session_digest = ?
+    `).run(digest(csrfToken), expiresAtMs, digestHex(token));
+    return { csrfToken, expiresAt: new Date(expiresAtMs).toISOString() };
   }
 
   destroy(token: string | undefined): void {
@@ -126,9 +129,8 @@ export class SessionStore {
     this.#database.close();
   }
 
-  #read(token: string | undefined): StoredSession | undefined {
+  #read(token: string | undefined, now = safeNow(this.#now())): StoredSession | undefined {
     if (!validToken(token)) return undefined;
-    const now = safeNow(this.#now());
     this.#prune(now);
     const row = this.#database.prepare(`
       SELECT csrf_digest, expires_at_ms

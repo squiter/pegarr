@@ -1414,9 +1414,15 @@
     },
     {
       "id": "PEG-SESSION-004",
-      "title": "Hashed browser sessions survive a safe process restart without extending expiry",
+      "title": "Hashed browser sessions survive a safe process restart without implicit renewal",
       "evidence": "src/session-store.test.ts",
       "boundary": "Temporary mode-0600 SQLite database, synthetic opaque tokens, and deterministic clock only"
+    },
+    {
+      "id": "PEG-SESSION-005",
+      "title": "Authenticated browser activity renews a bounded inactivity expiry",
+      "evidence": "src/app.test.ts",
+      "boundary": "Temporary mode-0600 SQLite database, in-process routes, synthetic opaque tokens, and deterministic clock only"
     },
     {
       "id": "PEG-SESSION-002",
@@ -1792,7 +1798,7 @@
     },
     {
       "id": "PEG-DOCKER-027",
-      "title": "Packaged login survives a container restart and logout remains durable",
+      "title": "Packaged login survives restart, renews bounded expiry, and keeps logout durable",
       "evidence": "scripts/harness/docker-build.mjs",
       "boundary": "Temporary synthetic password and session in one network-none container; no live service or external network"
     },
@@ -1810,11 +1816,6 @@
     }
   ],
   "manualGaps": [
-    {
-      "id": "PEG-MANUAL-002",
-      "title": "Live Bazarr profile resolution and provider policy",
-      "reason": "Local Colima proved bounded profile-list and targeted assignment shapes; on 2026-09-01 the installed NAS resolved the PT-BR + English Bazarr series profile and assignment during exact Sonarr analysis while preserving required and cutoff semantics; equivalent installed movie-assignment evidence remains unproven"
-    },
     {
       "id": "PEG-MANUAL-004",
       "title": "Live controlled Grab and unknown-outcome reconciliation",

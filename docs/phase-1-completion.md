@@ -23,11 +23,10 @@ The ledger contains the exact scenario IDs for every criterion. The harness repo
 
 These gaps stay explicit and do not masquerade as automated coverage:
 
-- `PEG-MANUAL-002`: installed Bazarr series policy is proven; an equivalent file-backed movie assignment remains production validation.
 - `PEG-MANUAL-004`: controlled Grab has complete synthetic coverage, but the harmless operator-owned live mutation and timeout-reconciliation drill remain manual.
 - `PEG-MANUAL-006`: OpenSubtitles failures remain honest, but a successful installed response, rate evidence, mapping compatibility, and cache reuse remain open.
 
-Installed Sonarr, Radarr, and SubDL compatibility are now live-proven. The remaining boundaries are not repaired with private fixtures, hidden network calls, or false green labels.
+Installed Sonarr, Radarr, SubDL, and Bazarr policy compatibility are now live-proven. The remaining boundaries are not repaired with private fixtures, hidden network calls, or false green labels.
 
 ## Phase boundary
 

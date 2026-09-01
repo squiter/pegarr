@@ -59,7 +59,7 @@ This is one Pegarr workflow; the user does not need to visit the Arr UI. Exact p
 
 - Replace the access-token prompt with a conventional Pegarr username/password form.
 - Credentials remain server-owned configuration and must never enter URLs, logs, committed files, or browser storage.
-- The target design uses a short-lived server-side session in an `HttpOnly`, `SameSite=Strict`, `Secure` cookie when served over HTTPS, with logout and bounded expiry.
+- The target design uses a bounded server-side inactivity session in an `HttpOnly`, `SameSite=Strict`, `Secure` cookie when served over HTTPS, with explicit logout and expiry.
 - Keep bearer-token compatibility during migration for API clients and existing installations.
 - Administrator mutations require an explicit authorization capability beyond ordinary browsing access.
 

@@ -238,9 +238,13 @@ export async function resolveRoute(
   if (sessionStatus) {
     if (access?.sessionAuthenticated !== true) return { statusCode: 401, body: { service: "pegarr", status: "unauthorized" } };
     const session = access.sessionStore?.refresh(access.sessionToken);
-    return session === undefined
+    return session === undefined || access.sessionToken === undefined
       ? { statusCode: 401, body: { service: "pegarr", status: "unauthorized" } }
-      : { statusCode: 200, body: { kind: "session", status: "authenticated", ...session } };
+      : {
+          statusCode: 200,
+          headers: { "set-cookie": sessionCookie(access.sessionToken, session.expiresAt, access.secureSessionCookie === true) },
+          body: { kind: "session", status: "authenticated", ...session },
+        };
   }
 
   if (sessionLogin) {

@@ -69,12 +69,13 @@ test("PEG-RELEASE-001 version identity is public, read-only, and safely classifi
   assert.equal(requestLogEntry("GET", "/api/v1/version?token=private", 200, 0, 1).route, "version");
 });
 
-test("PEG-SESSION-002 login, restore, CSRF mutation, and logout use a bounded HttpOnly server session", async () => {
+test("PEG-SESSION-002 PEG-SESSION-005 login, restore, renewal, CSRF mutation, and logout use a bounded HttpOnly server session", async () => {
   const username = "pegarr-user";
   const password = "synthetic-password-value-00000000001";
   let sequence = 0;
+  let now = 1_000;
   const sessionStore = new SessionStore({
-    now: () => 1_000,
+    now: () => now,
     randomToken: () => `session_${String(++sequence).padStart(40, "0")}`,
   });
   const control = new AccessControl(undefined, { username, password: new SecretValue(password) });
@@ -112,9 +113,13 @@ test("PEG-SESSION-002 login, restore, CSRF mutation, and logout use a bounded Ht
   })).statusCode, 403);
   assert.equal(updates, 0);
 
+  now = 61_000;
   const restored = await resolveRoute("GET", "/api/v1/session", tmpdir(), services, authenticatedAccess);
   assert.equal(restored.statusCode, 200);
-  const restoredCsrf = (restored.body as { csrfToken: string }).csrfToken;
+  const restoredBody = restored.body as { csrfToken: string; expiresAt: string };
+  const restoredCsrf = restoredBody.csrfToken;
+  assert.ok(Date.parse(restoredBody.expiresAt) > Date.parse(loginBody.expiresAt));
+  assert.match(restored.headers?.["set-cookie"] ?? "", new RegExp(`^pegarr_session=${sessionToken};`));
   assert.equal(sessionStore.authorizeMutation(sessionToken, loginBody.csrfToken), false);
   assert.equal(sessionStore.authorizeMutation(sessionToken, restoredCsrf), true);
   const mutationAccess = { ...authenticatedAccess, sessionMutationAuthorized: true };

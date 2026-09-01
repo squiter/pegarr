@@ -34,6 +34,8 @@ The authorized live Radarr flow added **The Adventures of Tintin** as monitored 
 
 The stable `v0.1.2` image at `ghcr.io/squiter/pegarr@sha256:fca18d1dfb9bcab34ab4ba57b1f9d2f7f6e3c625a6d7e06a79d71ed1fcc2b48f` then replaced only Pegarr in the saved 5,277-character definition. It became healthy at version `0.1.2` and revision `cf846794d167034341c39e733b2323f6da5d5f65`; the existing login and 51-item inventory survived, the corrected refresh route was served, and all six sibling containers retained their earlier creation times. A sanitized console check as the `node` user reported `/data/provider-secrets` at mode `0700` and its two API-key files, provider settings, subtitle settings, and session database at mode `0600`, all owned by `node:node`. No secret value, second catalog add, automatic search, controlled Grab, or download was involved.
 
+The final read-only Bazarr acceptance used the installed web UI to verify 13 file-backed Radarr movies and an assigned `PT-BR + English` profile on movie ID `7`; the same value appeared in its edit view. This closes `PEG-MANUAL-002` without changing or exposing any library path, profile, provider, or subtitle data. The subsequent `v0.1.3` candidate changes browser login expiry from a fixed eight-hour boundary to a bounded 30-day inactivity window renewed by authenticated app restore; deployment must still preserve the existing `/data` volume because it contains the hashed session database.
+
 Port `8080` was occupied on the NAS, so the overlay publishes Pegarr on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
 
 ## Configuration and credentials

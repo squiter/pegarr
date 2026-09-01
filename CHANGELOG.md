@@ -4,6 +4,17 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-01
+
+### Fixed
+
+- Active username/password sessions now renew a bounded 30-day inactivity window when Pegarr restores the authenticated app, avoiding repeated daily sign-ins while preserving server-side expiry, private hashed storage, CSRF rotation, and durable logout.
+
+### Acceptance
+
+- The installed Bazarr listed a file-backed Radarr movie with the `PT-BR + English` profile and exposed the same assignment in its edit view, completing the live movie side of the Bazarr policy boundary.
+- OpenSubtitles successful-response, rate-header, language-mapping, and cache-reuse evidence remains an explicit manual gap; provider failure is still kept distinct from no subtitle matches.
+
 ## [0.1.2] - 2026-09-01
 
 ### Fixed
@@ -44,7 +55,8 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 - Specials season `0` remains unsupported until provider season identity is validated.
 - Synthetic coverage does not prove installed-service compatibility. A successful OpenSubtitles response, installed Radarr exact analysis and catalog add, installed Bazarr movie assignment, and an operator-owned harmless controlled Grab remain explicit manual acceptance boundaries.
 
-[Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/squiter/pegarr/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/squiter/pegarr/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/squiter/pegarr/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/squiter/pegarr/releases/tag/v0.1.0

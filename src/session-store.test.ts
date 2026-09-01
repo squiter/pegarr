@@ -25,9 +25,10 @@ test("PEG-SESSION-001 sessions are opaque, bounded, expiring, and mutation-bound
   assert.equal(store.authorizeMutation(first.token, second.csrfToken), false);
   assert.equal(store.authorizeMutation(first.csrfToken, first.csrfToken), false);
   assert.equal(first.expiresAt, "1970-01-01T00:01:01.000Z");
+  now = 31_000;
   const refreshed = store.refresh(first.token);
   assert.ok(refreshed);
-  assert.equal(refreshed.expiresAt, first.expiresAt);
+  assert.equal(refreshed.expiresAt, "1970-01-01T00:01:31.000Z");
   assert.equal(store.authorizeMutation(first.token, first.csrfToken), false);
   assert.equal(store.authorizeMutation(first.token, refreshed.csrfToken), true);
 
@@ -38,7 +39,7 @@ test("PEG-SESSION-001 sessions are opaque, bounded, expiring, and mutation-bound
   store.destroy(second.token);
   assert.equal(store.authenticate(second.token), false);
 
-  now = 61_000;
+  now = 91_000;
   assert.equal(store.authenticate(third.token), false);
   store.close();
   assert.throws(() => new SessionStore({ ttlMs: 59_999 }), /ttlMs/u);
@@ -46,7 +47,7 @@ test("PEG-SESSION-001 sessions are opaque, bounded, expiring, and mutation-bound
   assert.throws(() => new SessionStore({ databasePath: "relative.sqlite" }), /absolute/u);
 });
 
-test("PEG-SESSION-004 hashed sessions survive a store restart without extending expiry", async () => {
+test("PEG-SESSION-004 PEG-SESSION-005 hashed sessions survive restart and renew only after authenticated activity", async () => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-sessions-"));
   const databasePath = join(directory, "sessions.sqlite");
   let now = 1_000;
@@ -61,9 +62,14 @@ test("PEG-SESSION-004 hashed sessions survive a store restart without extending 
     const reopenedStore = new SessionStore({ databasePath, now: () => now, ttlMs: 60_000, randomToken });
     assert.equal(reopenedStore.authenticate(created.token), true);
     assert.equal(reopenedStore.authorizeMutation(created.token, created.csrfToken), true);
+    const beforeRefresh = new DatabaseSync(databasePath, { readOnly: true });
+    const originalExpiry = beforeRefresh.prepare("SELECT expires_at_ms FROM sessions").get() as { readonly expires_at_ms: number };
+    beforeRefresh.close();
+    assert.equal(originalExpiry.expires_at_ms, 61_000);
+    now = 31_000;
     const refreshed = reopenedStore.refresh(created.token);
     assert.ok(refreshed);
-    assert.equal(refreshed.expiresAt, created.expiresAt);
+    assert.equal(refreshed.expiresAt, "1970-01-01T00:01:31.000Z");
     assert.equal(reopenedStore.authorizeMutation(created.token, created.csrfToken), false);
     assert.equal(reopenedStore.authorizeMutation(created.token, refreshed.csrfToken), true);
     reopenedStore.close();
@@ -77,14 +83,19 @@ test("PEG-SESSION-004 hashed sessions survive a store restart without extending 
     database.close();
     assert.equal(row.session_digest, createHash("sha256").update(created.token).digest("hex"));
     assert.equal(row.csrf_digest.byteLength, 32);
-    assert.equal(row.expires_at_ms, 61_000);
+    assert.equal(row.expires_at_ms, 91_000);
     assert.equal((await stat(databasePath)).mode & 0o777, 0o600);
     const persistedBytes = (await readFile(databasePath)).toString("latin1");
     assert.equal(persistedBytes.includes(created.token), false);
     assert.equal(persistedBytes.includes(created.csrfToken), false);
     assert.equal(persistedBytes.includes(refreshed.csrfToken), false);
 
-    now = 61_000;
+    now = 90_999;
+    const renewedStore = new SessionStore({ databasePath, now: () => now, ttlMs: 60_000, randomToken });
+    assert.equal(renewedStore.authenticate(created.token), true);
+    renewedStore.close();
+
+    now = 91_000;
     const expiredStore = new SessionStore({ databasePath, now: () => now, ttlMs: 60_000, randomToken });
     assert.equal(expiredStore.authenticate(created.token), false);
     expiredStore.close();

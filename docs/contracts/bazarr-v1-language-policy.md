@@ -62,4 +62,4 @@ On 2026-08-26, a read-only check without credentials confirmed that all three HT
 
 The packaged `probe:bazarr` command is now hermetically exercised against a synthetic sibling container on an internal-only Docker network. It reports only profile count, total language-item count, bounded response bytes, transport category, latency, and observation time.
 
-`PEG-MANUAL-002` remains open until that probe is run against the installed Bazarr and a separately authorized read verifies a sanitized copy of the live assignment shapes. Provider internals and subtitle downloads are outside this adapter.
+Installed acceptance on 2026-09-01 resolved the `PT-BR + English` series profile through Pegarr exact analysis and separately verified the same assigned profile on a file-backed Radarr movie in Bazarr's bounded inventory and edit view. Together with the deterministic targeted-assignment shapes above, this closes `PEG-MANUAL-002` without retaining paths, provider internals, raw responses, or subtitle downloads.

@@ -184,7 +184,8 @@ async function packagedSessionRestartSmokeTest() {
       "(async () => {",
       "  const response = await fetch('http://127.0.0.1:8080/api/v1/session', { headers: { cookie: process.env.PEGARR_TEST_COOKIE } });",
       "  const body = await response.json();",
-      "  if (response.status !== 200 || body.status !== 'authenticated' || typeof body.csrfToken !== 'string' || body.expiresAt !== process.env.PEGARR_TEST_EXPIRY) throw new Error('restore failed');",
+      "  const renewedCookie = response.headers.get('set-cookie')?.split(';', 1)[0];",
+      "  if (response.status !== 200 || body.status !== 'authenticated' || typeof body.csrfToken !== 'string' || Date.parse(body.expiresAt) <= Date.parse(process.env.PEGARR_TEST_EXPIRY) || renewedCookie !== process.env.PEGARR_TEST_COOKIE) throw new Error('restore failed');",
       "  process.stdout.write(JSON.stringify({ csrfToken: body.csrfToken, expiresAt: body.expiresAt }));",
       "})().catch(() => process.exit(1));",
     ].join("\n");
@@ -196,8 +197,8 @@ async function packagedSessionRestartSmokeTest() {
     } catch {
       throw new Error(`${scenario} restored session returned malformed private state`);
     }
-    if (typeof restoredState.csrfToken !== "string" || restoredState.expiresAt !== loginState.expiresAt) {
-      throw new Error(`${scenario} restored session changed its fixed boundary`);
+    if (typeof restoredState.csrfToken !== "string" || Date.parse(restoredState.expiresAt) <= Date.parse(loginState.expiresAt)) {
+      throw new Error(`${scenario} restored session did not renew its bounded inactivity window`);
     }
 
     const persistedStateScript = [
@@ -217,7 +218,7 @@ async function packagedSessionRestartSmokeTest() {
       "exec",
       "--env", `PEGARR_TEST_RAW_SECRETS=${JSON.stringify([password, rawSessionToken, loginState.csrfToken, restoredState.csrfToken])}`,
       "--env", `PEGARR_TEST_DIGEST=${createHash("sha256").update(rawSessionToken).digest("hex")}`,
-      "--env", `PEGARR_TEST_EXPIRY=${loginState.expiresAt}`,
+      "--env", `PEGARR_TEST_EXPIRY=${restoredState.expiresAt}`,
       containerName, "node", "-e", persistedStateScript,
     ]);
     if (persistedState.status !== 0) throw new Error(`${scenario} persistent mode-0600 hashed state is invalid`);
@@ -246,7 +247,7 @@ async function packagedSessionRestartSmokeTest() {
     for (const rawSecret of [password, rawSessionToken, loginState.csrfToken, restoredState.csrfToken]) {
       if (logs.includes(rawSecret)) throw new Error(`${scenario} container logs exposed private session material`);
     }
-    process.stdout.write(`${scenario} packaged login=restored after restart, fixed expiry=preserved, logout=durable (hashed mode-0600 state, network=none)\n`);
+    process.stdout.write(`${scenario} packaged login=restored after restart, bounded inactivity expiry=renewed, logout=durable (hashed mode-0600 state, network=none)\n`);
   } finally {
     docker(["rm", "--force", containerName]);
     rmSync(fixtureDirectory, { recursive: true, force: true });
