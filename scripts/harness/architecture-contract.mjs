@@ -471,6 +471,17 @@ if (!ciWorkflow.includes("path: .artifacts/harness/")) {
   issues.push("CI must retain harness evidence on success and failure");
 }
 
+const dockerfile = readFileSync(resolve(repoRoot, "Dockerfile"), "utf8");
+const containerWorkflow = readFileSync(resolve(repoRoot, ".github/workflows/container.yml"), "utf8");
+for (const contract of ["ARG PEGARR_REVISION=unknown", "PEGARR_REVISION=${PEGARR_REVISION}"]) {
+  if (!dockerfile.includes(contract)) {
+    issues.push(`PEG-RELEASE-001 Docker builds must retain ${contract}`);
+  }
+}
+if (!containerWorkflow.includes("PEGARR_REVISION=${{ github.sha }}")) {
+  issues.push("PEG-RELEASE-001 published containers must embed the exact Git revision");
+}
+
 const manifest = readJson("harness/manifest.json");
 if (/^phase-[01]-/u.test(manifest.phase)) {
   const app = readFileSync(resolve(repoRoot, "src/app.ts"), "utf8");

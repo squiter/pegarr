@@ -13,10 +13,13 @@ RUN npm run build && npm prune --omit=dev
 
 FROM node:24-alpine AS runtime
 
+ARG PEGARR_REVISION=unknown
+
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8080 \
-    DATA_DIR=/data
+    DATA_DIR=/data \
+    PEGARR_REVISION=${PEGARR_REVISION}
 
 WORKDIR /app
 

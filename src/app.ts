@@ -3,6 +3,7 @@ import { access } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { AccessControl } from "./access-control.js";
+import { currentBuildInfo } from "./build-info.js";
 import { dashboardAsset, type DashboardAssetName } from "./dashboard-assets.js";
 import { dashboardPage } from "./dashboard-page.js";
 import { demoFeasibilityInput } from "./fixtures/demo.js";
@@ -45,7 +46,7 @@ export interface RequestLogEntry {
   readonly event: "http_request";
   readonly service: "pegarr";
   readonly method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "OTHER";
-  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "session_status" | "session_login" | "session_logout" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "onboarding" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "catalog_continuation" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
+  readonly route: "dashboard" | "dashboard_asset" | "health" | "readiness" | "version" | "session_status" | "session_login" | "session_logout" | "demo_feasibility" | "sonarr_status" | "radarr_status" | "arr_instances" | "onboarding" | "catalog_search" | "catalog_coverage" | "catalog_add_options" | "catalog_add" | "catalog_continuation" | "subtitle_settings" | "provider_settings" | "missing_inventory" | "item_feasibility" | "grab_prepare" | "grab_execute" | "grab_history" | "grab_reconcile" | "not_found";
   readonly statusCode: number;
   readonly durationMs: number;
 }
@@ -133,6 +134,7 @@ export async function resolveRoute(
     "/",
     "/health",
     "/health/ready",
+    "/api/v1/version",
     "/api/v1/feasibility/demo",
     "/api/v1/integrations/sonarr/status",
     "/api/v1/integrations/radarr/status",
@@ -224,6 +226,13 @@ export async function resolveRoute(
 
   if (pathname === "/health/ready") {
     return readinessResponse(dataDirectory);
+  }
+
+  if (pathname === "/api/v1/version") {
+    return {
+      statusCode: 200,
+      body: { kind: "build-info", ...currentBuildInfo },
+    };
   }
 
   if (sessionStatus) {
@@ -1076,6 +1085,7 @@ function safeRequestRoute(requestUrl: string | undefined): RequestLogEntry["rout
   if (dashboardAssetRoutes.has(pathname)) return "dashboard_asset";
   if (pathname === "/health") return "health";
   if (pathname === "/health/ready") return "readiness";
+  if (pathname === "/api/v1/version") return "version";
   if (pathname === "/api/v1/session/login") return "session_login";
   if (pathname === "/api/v1/session/logout") return "session_logout";
   if (pathname === "/api/v1/session") return "session_status";

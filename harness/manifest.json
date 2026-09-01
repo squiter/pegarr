@@ -27,6 +27,12 @@
       "boundary": "Pure safe-route classification without recording URLs, item IDs, query strings, headers, or credentials"
     },
     {
+      "id": "PEG-RELEASE-001",
+      "title": "Public builds expose a bounded semantic version and safe Git revision",
+      "evidence": "src/build-info.test.ts",
+      "boundary": "Package metadata, sanitized build arguments, and in-process public route only; no credentials or external service"
+    },
+    {
       "id": "PEG-API-001",
       "title": "Read-only routes reject mutation methods",
       "evidence": "src/app.test.ts",

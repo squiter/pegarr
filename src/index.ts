@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { AccessControl } from "./access-control.js";
 import { JsonTransportError } from "./adapters/http.js";
 import { createRequestHandler } from "./app.js";
+import { currentBuildInfo } from "./build-info.js";
 import { ConfigurationError, loadRuntimeConfiguration } from "./config.js";
 import { createRuntimeServices } from "./runtime.js";
 import { SessionStore } from "./session-store.js";
@@ -25,7 +26,7 @@ async function start(): Promise<void> {
   }));
 
   server.listen(port, host, () => {
-    process.stdout.write(`${JSON.stringify({ event: "server_started", service: "pegarr", port })}\n`);
+    process.stdout.write(`${JSON.stringify({ event: "server_started", ...currentBuildInfo, port })}\n`);
   });
 
   let shuttingDown = false;

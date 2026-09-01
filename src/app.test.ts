@@ -55,6 +55,18 @@ test("PEG-OPS-003 structured request logs are bounded and redact URLs, IDs, and 
   });
 });
 
+test("PEG-RELEASE-001 version identity is public, read-only, and safely classified", async () => {
+  const result = await resolveRoute("GET", "/api/v1/version", tmpdir());
+  assert.equal(result.statusCode, 200);
+  const body = result.body as { kind: string; service: string; version: string; revision?: string };
+  assert.equal(body.kind, "build-info");
+  assert.equal(body.service, "pegarr");
+  assert.equal(body.version, "0.1.0");
+  if (body.revision !== undefined) assert.match(body.revision, /^[0-9a-f]{7,64}$/u);
+  assert.equal((await resolveRoute("POST", "/api/v1/version", tmpdir())).statusCode, 405);
+  assert.equal(requestLogEntry("GET", "/api/v1/version?token=private", 200, 0, 1).route, "version");
+});
+
 test("PEG-SESSION-002 login, restore, CSRF mutation, and logout use a bounded HttpOnly server session", async () => {
   const username = "pegarr-user";
   const password = "synthetic-password-value-00000000001";

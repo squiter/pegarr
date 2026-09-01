@@ -66,11 +66,12 @@ async function smokeTest() {
     }
 
     const probe = [
-      "const checks = ['/health/ready', '/api/v1/feasibility/demo', '/api/v1/integrations/sonarr/status', '/api/v1/integrations/radarr/status'];",
+      "const checks = ['/health/ready', '/api/v1/version', '/api/v1/feasibility/demo', '/api/v1/integrations/sonarr/status', '/api/v1/integrations/radarr/status'];",
       "Promise.all(checks.map(async (path) => {",
       "  const response = await fetch('http://127.0.0.1:8080' + path);",
       "  const body = await response.json();",
       "  if (response.status !== 200) throw new Error(path + ' returned ' + response.status);",
+      "  if (path.endsWith('/version') && (body.kind !== 'build-info' || body.service !== 'pegarr' || body.version !== '0.1.0' || body.revision !== undefined)) throw new Error('local build identity is not bounded');",
       "  if (path.endsWith('/demo') && body.mode !== 'read_only') throw new Error('demo is not read_only');",
       "  if (path.endsWith('/sonarr/status') && (body.mode !== 'read_only' || body.state !== 'disabled')) throw new Error('Sonarr status is not safely disabled');",
       "  if (path.endsWith('/radarr/status') && (body.mode !== 'read_only' || body.state !== 'disabled')) throw new Error('Radarr status is not safely disabled');",

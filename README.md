@@ -85,7 +85,7 @@ npm run check
 npm start
 ```
 
-Then open <http://localhost:8080/> for the dashboard, <http://localhost:8080/health> for liveness, or inspect the synthetic report at <http://localhost:8080/api/v1/feasibility/demo>. Sonarr and Radarr integration state is available at `/api/v1/integrations/<integration>/status`; each reports `disabled` until explicitly configured. Live missing-item data is available only after the access boundary documented in the [access-control guide](docs/access-control.md) is enabled.
+Then open <http://localhost:8080/> for the dashboard, <http://localhost:8080/health> for liveness, or inspect the synthetic report at <http://localhost:8080/api/v1/feasibility/demo>. The public, read-only `/api/v1/version` endpoint reports the semantic Pegarr version and, for published containers, its sanitized Git revision. Sonarr and Radarr integration state is available at `/api/v1/integrations/<integration>/status`; each reports `disabled` until explicitly configured. Live missing-item data is available only after the access boundary documented in the [access-control guide](docs/access-control.md) is enabled.
 
 The demo maps a sanitized synthetic Sonarr v3 response into four release candidates, then associates synthetic SubDL evidence with them. It intentionally includes a rejected video release and a rate-limited provider so clients can verify that video decisions remain separate and provider failures are reported honestly. Authenticated dashboard selections use the [item feasibility API](docs/item-feasibility-api.md); the explicit one-shot commands remain available for controlled diagnostics.
 

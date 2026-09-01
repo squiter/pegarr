@@ -9,6 +9,7 @@
 | PEG-OPS-001 | Liveness is healthy | `src/app.test.ts` |
 | PEG-OPS-002 | Readiness reflects data-directory access | `src/app.test.ts` |
 | PEG-OPS-003 | Structured request logs are bounded and redact request identity | `src/app.test.ts` |
+| PEG-RELEASE-001 | Public builds expose a bounded semantic version and safe Git revision | `src/build-info.test.ts` |
 | PEG-API-001 | Read-only routes reject mutations | `src/app.test.ts` |
 | PEG-API-002 | The synthetic feasibility report is read-only and explainable | `src/app.test.ts` |
 | PEG-API-003 | Unknown routes do not reflect request secrets | `src/app.test.ts` |
