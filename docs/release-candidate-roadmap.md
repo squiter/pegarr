@@ -112,6 +112,12 @@ GitHub CI and the multi-platform container workflow passed for commit `f71b296`.
 
 The live HTTPS endpoint returned `ready`, and its delivered HTML/JavaScript contain the **Setup & settings** drawer, catalog-first page order, automatic first-run opening, page-memory-only dismissal, and `Credential saved (not verified)` provider wording. An authenticated local-browser acceptance covered automatic opening, close-and-reopen behavior, keyboard semantics, desktop layout, and a 390-pixel mobile layout without horizontal overflow. The NAS container replacement expired the prior browser session, so those interactions were not relabeled as fresh authenticated NAS evidence. This acceptance made no provider search, catalog add, automatic search, Grab, or download mutation.
 
+#### 2026-08-31 single-button catalog-add production acceptance
+
+Commit `95c794b` removed the catalog-add confirmation phrase from both the authenticated UI and the exact POST contract. Its multi-architecture image at immutable digest `sha256:ce7c4bac6c245e0c5e7f9dc17ed6a08028fd9430179be650fe234567542c4fe1` passed GitHub CI and container publication before Portainer replaced exactly one Pegarr image reference. Pegarr reached healthy state while all six sibling services remained running.
+
+The live HTTPS endpoint returned `ready`, unauthenticated session access remained `401`, and the served dashboard JavaScript contained the single **Add to Sonarr/Radarr** action without the typed phrase, confirmation view, or confirmation payload. The independently guarded controlled-Grab phrase remains unchanged. `PEG-MANUAL-007` stays open because this acceptance intentionally did not press Add or claim that installed Sonarr/Radarr automatic-search suppression was live-proven.
+
 ### 5. First public release
 
 After local acceptance and the read-only NAS smoke test:
