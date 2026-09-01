@@ -482,6 +482,29 @@ if (!containerWorkflow.includes("PEGARR_REVISION=${{ github.sha }}")) {
   issues.push("PEG-RELEASE-001 published containers must embed the exact Git revision");
 }
 
+const releaseGuide = readFileSync(resolve(repoRoot, "docs/releasing.md"), "utf8");
+const readme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
+for (const contract of [
+  "npm run check",
+  "git diff --check",
+  "PEG-MANUAL-*",
+  "linux/amd64",
+  "linux/arm64",
+  "/api/v1/version",
+  "git tag -a v0.1.0",
+  "immutable digest",
+  "Never use a live Grab as an automated release check",
+]) {
+  if (!releaseGuide.includes(contract)) {
+    issues.push(`PEG-RELEASE-002 release guide must retain ${contract}`);
+  }
+}
+for (const contract of ["[changelog](CHANGELOG.md)", "[release guide](docs/releasing.md)"]) {
+  if (!readme.includes(contract)) {
+    issues.push(`PEG-RELEASE-002 README must retain ${contract}`);
+  }
+}
+
 const manifest = readJson("harness/manifest.json");
 if (/^phase-[01]-/u.test(manifest.phase)) {
   const app = readFileSync(resolve(repoRoot, "src/app.ts"), "utf8");

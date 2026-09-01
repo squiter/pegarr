@@ -33,6 +33,12 @@
       "boundary": "Package metadata, sanitized build arguments, and in-process public route only; no credentials or external service"
     },
     {
+      "id": "PEG-RELEASE-002",
+      "title": "Release procedure binds tags to exact-commit gates, public image verification, and explicit manual boundaries",
+      "evidence": "scripts/harness/architecture-contract.mjs",
+      "boundary": "Repository-owned release documentation and workflow contracts only; no tag, release, registry mutation, or live Grab"
+    },
+    {
       "id": "PEG-API-001",
       "title": "Read-only routes reject mutation methods",
       "evidence": "src/app.test.ts",
