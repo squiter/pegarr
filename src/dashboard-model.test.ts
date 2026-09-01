@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { activeInventoryFilterCount, catalogAddConfirmationView, catalogCoverageView, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases, subtitleLanguageRequirements } from "./web/dashboard-model.js";
+import { activeInventoryFilterCount, catalogCoverageView, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases, subtitleLanguageRequirements } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -76,27 +76,6 @@ test("PEG-DASH-053 catalog coverage distinguishes availability from actionable p
     state: "ready",
     languages: [{ code: "pt-BR", state: "unknown", label: "pt-BR: Could not check" }],
     providers: [{ id: "subdl", name: "SubDL", status: "unauthorized", message: "SubDL: rejected this request. Try again; if it keeps failing, update the API key in Setup & settings." }],
-  });
-});
-
-test("PEG-DASH-054 catalog add explains why confirmation is disabled and enables only the exact phrase", () => {
-  assert.deepEqual(catalogAddConfirmationView("ADD Game of Thrones TO SONARR", "", "sonarr"), {
-    matches: false,
-    buttonLabel: "Type the confirmation phrase to continue",
-    message: "Type or paste the exact phrase shown above to enable the add button.",
-    state: "waiting",
-  });
-  assert.deepEqual(catalogAddConfirmationView("ADD Game of Thrones TO SONARR", "add game of thrones to sonarr", "sonarr"), {
-    matches: false,
-    buttonLabel: "Confirmation phrase does not match",
-    message: "The phrase does not match yet. Copy it exactly, including capitalization.",
-    state: "mismatch",
-  });
-  assert.deepEqual(catalogAddConfirmationView("ADD Game of Thrones TO SONARR", "ADD Game of Thrones TO SONARR", "sonarr"), {
-    matches: true,
-    buttonLabel: "Confirm add to Sonarr",
-    message: "Confirmation matches. Sonarr will add only the title; automatic search stays off.",
-    state: "ready",
   });
 });
 

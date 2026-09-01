@@ -17,8 +17,7 @@ Pegarr refuses to start when catalog add is enabled without username/password lo
 1. Search the catalog and preview subtitle coverage.
 2. Select **Add to Sonarr** or **Add to Radarr**.
 3. Choose a server-owned root folder and quality profile plus monitoring defaults.
-4. Type or paste the exact server-provided confirmation phrase. The add button explains that it is waiting for this phrase, reports a mismatch, and becomes active only when the text matches exactly.
-5. Confirm the add.
+4. Select **Add to Sonarr** or **Add to Radarr**. This single submit button is the explicit add action.
 
 Catalog result status is descriptive, not an action: **Not in Sonarr** and **Not in Radarr** mean the title is absent from that library. When catalog add is enabled, a separate **Add to Sonarr** or **Add to Radarr** button is shown. When it is disabled, Pegarr says **Adding disabled** instead of presenting an availability badge that looks actionable.
 
@@ -36,7 +35,7 @@ POST /api/v1/catalog/sonarr/<instance>/tvdb/<id>/add
 POST /api/v1/catalog/radarr/<instance>/tmdb/<id>/add
 ```
 
-The POST body is exact and bounded. Sonarr accepts root-folder/profile IDs, `monitored`, a supported monitor mode, and the confirmation. Radarr accepts root-folder/profile IDs, `monitored`, a supported minimum availability, and the confirmation. Extra fields—including any automatic-search request—are rejected.
+The POST body is exact and bounded. Sonarr accepts root-folder/profile IDs, `monitored`, and a supported monitor mode. Radarr accepts root-folder/profile IDs, `monitored`, and a supported minimum availability. Extra fields—including a typed confirmation or any automatic-search request—are rejected.
 
 A successful response returns only a safe Arr ID, title, application/instance identity, `automaticSearch: false`, and a short-lived opaque Pegarr continuation. Before issuing it, Pegarr re-reads the created Arr record by internal ID and verifies that its TVDB or TMDB identity still matches the selected catalog title.
 

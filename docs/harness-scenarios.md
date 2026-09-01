@@ -180,7 +180,7 @@
 | PEG-DASH-051 | Setup stays in a collapsible menu and opens only while first-run work remains | `src/app.test.ts` |
 | PEG-DASH-052 | Modal setup drawer traps keyboard focus and background scrolling until it closes | `src/app.test.ts` |
 | PEG-DASH-053 | Pre-add coverage distinguishes availability from actionable provider failures | `src/dashboard-model.test.ts` |
-| PEG-DASH-054 | Catalog add explains its disabled state and enables only for the exact confirmation phrase | `src/dashboard-model.test.ts` |
+| PEG-DASH-054 | Catalog add uses one clear submit button without a typed confirmation | `src/app.test.ts` |
 | PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
 | PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
 | PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |
@@ -309,6 +309,6 @@
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live image returned 30 pt-br matches for Game of Thrones and one for The Adventures of Tintin, proving authenticated series/movie responses and mapping compatibility; sanitized quota and cache-hit evidence remain open |
 | PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The live image invoked OpenSubtitles for a movie and kept its temporary unavailability distinct from SubDL's positive pt-br result; a successful response, rate headers, mapping compatibility, and cache reuse remain open |
-| PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | The enabled live UI loaded installed Sonarr defaults and the exact confirmation gate, then canceled without submission; the harmless POST and automatic-search suppression remain manual |
+| PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | The enabled live UI loaded installed Sonarr defaults with the earlier typed-confirmation design and canceled without submission; the current single-button flow still needs a harmless POST and automatic-search suppression check |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.

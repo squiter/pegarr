@@ -836,23 +836,22 @@ function parseCatalogAddBody(
   value: unknown,
 ): import("./runtime.js").CatalogAddInput {
   const expected = application === "sonarr"
-    ? ["rootFolderId", "qualityProfileId", "monitored", "monitor", "confirmation"]
-    : ["rootFolderId", "qualityProfileId", "monitored", "minimumAvailability", "confirmation"];
+    ? ["rootFolderId", "qualityProfileId", "monitored", "monitor"]
+    : ["rootFolderId", "qualityProfileId", "monitored", "minimumAvailability"];
   const body = requestRecord(value, expected);
   const rootFolderId = requestPositiveInteger(body.rootFolderId, "rootFolderId");
   const qualityProfileId = requestPositiveInteger(body.qualityProfileId, "qualityProfileId");
   if (typeof body.monitored !== "boolean") throw new InvalidRequestBodyError("monitored is invalid");
-  const confirmation = requestString(body.confirmation, "confirmation", 2_048);
   if (application === "sonarr") {
     const monitor = requestString(body.monitor, "monitor", 32);
     if (!["all", "future", "missing", "existing", "firstSeason", "lastSeason", "pilot", "recent", "none"].includes(monitor)) {
       throw new InvalidRequestBodyError("monitor is invalid");
     }
-    return { rootFolderId, qualityProfileId, monitored: body.monitored, monitor: monitor as NonNullable<import("./runtime.js").CatalogAddInput["monitor"]>, confirmation };
+    return { rootFolderId, qualityProfileId, monitored: body.monitored, monitor: monitor as NonNullable<import("./runtime.js").CatalogAddInput["monitor"]> };
   }
   const minimumAvailability = requestString(body.minimumAvailability, "minimumAvailability", 32);
   if (!["announced", "inCinemas", "released"].includes(minimumAvailability)) throw new InvalidRequestBodyError("minimumAvailability is invalid");
-  return { rootFolderId, qualityProfileId, monitored: body.monitored, minimumAvailability: minimumAvailability as NonNullable<import("./runtime.js").CatalogAddInput["minimumAvailability"]>, confirmation };
+  return { rootFolderId, qualityProfileId, monitored: body.monitored, minimumAvailability: minimumAvailability as NonNullable<import("./runtime.js").CatalogAddInput["minimumAvailability"]> };
 }
 
 function requestRecord(value: unknown, expectedKeys: readonly string[]): Readonly<Record<string, unknown>> {

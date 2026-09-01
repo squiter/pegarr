@@ -481,7 +481,6 @@ test("PEG-CATALOG-006 catalog add-option reads authenticate before upstream work
         kind: "catalog-add-options",
         mode: "catalog_add",
         title: "Synthetic Add",
-        confirmation: "ADD Synthetic Add TO SONARR",
         rootFolders: [{ id: 1, label: "TV", accessible: true }],
         qualityProfiles: [{ id: 2, name: "HD" }],
         defaults: { monitored: true, monitor: "all" },
@@ -499,7 +498,7 @@ test("PEG-CATALOG-006 catalog add-option reads authenticate before upstream work
   assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: basic })).statusCode, 405);
 });
 
-test("PEG-CATALOG-007 catalog add requires feature flag, login, and exact bounded input", async () => {
+test("PEG-CATALOG-007 catalog add requires feature flag, login, and exact bounded server-owned input", async () => {
   const username = "pegarr-user";
   const password = "synthetic-password-value-00000000001";
   const token = "synthetic-access-token-value-0000000001";
@@ -507,7 +506,7 @@ test("PEG-CATALOG-007 catalog add requires feature flag, login, and exact bounde
   const basic = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
   const bearer = `Bearer ${token}`;
   const path = "/api/v1/catalog/radarr/main/tmdb/42/add";
-  const body = { rootFolderId: 1, qualityProfileId: 2, monitored: true, minimumAvailability: "released", confirmation: "ADD Synthetic Add TO RADARR" };
+  const body = { rootFolderId: 1, qualityProfileId: 2, monitored: true, minimumAvailability: "released" };
   const disabled = fakeServices(async () => ({ kind: "missing-item-inventory", mode: "read_only", status: "disabled" }));
   assert.equal((await resolveRoute("POST", path, tmpdir(), disabled, { control, authorization: basic }, body)).statusCode, 404);
 
@@ -517,7 +516,7 @@ test("PEG-CATALOG-007 catalog add requires feature flag, login, and exact bounde
     readOptions: async () => { throw new Error("not expected"); },
     add: async (_selection: import("./runtime.js").CatalogAddSelection, input: import("./runtime.js").CatalogAddInput) => {
       adds += 1;
-      assert.equal(input.confirmation, body.confirmation);
+      assert.deepEqual(input, body);
       return {
         kind: "catalog-add",
         mode: "catalog_add",
@@ -530,6 +529,8 @@ test("PEG-CATALOG-007 catalog add requires feature flag, login, and exact bounde
   assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: bearer }, body)).statusCode, 403);
   assert.equal(adds, 0);
   assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: basic }, { ...body, automaticSearch: true })).statusCode, 400);
+  assert.equal(adds, 0);
+  assert.equal((await resolveRoute("POST", path, tmpdir(), services, { control, authorization: basic }, { ...body, confirmation: "unused" })).statusCode, 400);
   assert.equal(adds, 0);
   const response = await resolveRoute("POST", path, tmpdir(), services, { control, authorization: basic }, body);
   assert.equal(response.statusCode, 200);
@@ -863,15 +864,13 @@ test("PEG-DASH-053 pre-add coverage exposes actionable provider diagnostics", as
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
-test("PEG-DASH-054 catalog add makes the exact confirmation requirement actionable", async () => {
+test("PEG-DASH-054 catalog add uses one clear submit button without a typed confirmation", async () => {
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
-  const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
-  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
-  const assets = [client.body, model.body, styles.body].join("\n");
+  const assets = String(client.body);
 
-  assert.match(String(client.body), /Confirmation required before adding|Paste or type the exact phrase shown above|catalogAddConfirmationView|confirmation\.focus/u);
-  assert.match(String(model.body), /Type the confirmation phrase to continue|Confirmation phrase does not match|automatic search stays off/u);
-  assert.match(String(styles.body), /catalog-add-confirmation-hint|cursor: not-allowed/u);
+  assert.match(String(client.body), /submit\.textContent = `Add to \$\{item\.application/u);
+  assert.match(String(client.body), /submit\.focus\(\)|automatic search disabled/u);
+  assert.doesNotMatch(String(client.body), /catalogAddConfirmationView|Confirmation required before adding|Paste or type the exact phrase shown above/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 

@@ -77,7 +77,7 @@ PT-BR is the motivating use case, but the design must support any Bazarr languag
 
 The application must use Sonarr/Radarr catalog lookup and add APIs rather than inventing a parallel media catalog. It must not duplicate indexer, quality-profile, rejection, or download-client logic. It should consume the release candidates and decisions returned by Sonarr/Radarr, enrich them, and send the selected candidate back through the supported Grab operation.
 
-The supported Arr interactive-release endpoints require internal Arr IDs. Pegarr therefore previews provider coverage before add, adds with automatic search disabled after explicit confirmation, and then continues to exact release selection. It must not claim that catalog lookup provides exact pre-add release rows.
+The supported Arr interactive-release endpoints require internal Arr IDs. Pegarr therefore previews provider coverage before add, uses the explicit **Add to Sonarr/Radarr** button as the confirmation while keeping automatic search disabled, and then continues to exact release selection. It must not claim that catalog lookup provides exact pre-add release rows.
 
 An *Arr-rejected release must remain visibly rejected. Subtitle availability must never silently override an *Arr rejection.
 

@@ -38,34 +38,6 @@ export function catalogCoverageView(value) {
   return { state: "ready", languages, providers };
 }
 
-export function catalogAddConfirmationView(expected, entered, application) {
-  const target = application === "sonarr" ? "Sonarr" : "Radarr";
-  const phrase = typeof expected === "string" ? expected : "";
-  const value = typeof entered === "string" ? entered : "";
-  if (phrase.length > 0 && value === phrase) {
-    return {
-      matches: true,
-      buttonLabel: `Confirm add to ${target}`,
-      message: `Confirmation matches. ${target} will add only the title; automatic search stays off.`,
-      state: "ready",
-    };
-  }
-  if (value.length === 0) {
-    return {
-      matches: false,
-      buttonLabel: "Type the confirmation phrase to continue",
-      message: "Type or paste the exact phrase shown above to enable the add button.",
-      state: "waiting",
-    };
-  }
-  return {
-    matches: false,
-    buttonLabel: "Confirmation phrase does not match",
-    message: "The phrase does not match yet. Copy it exactly, including capitalization.",
-    state: "mismatch",
-  };
-}
-
 export function selectRows(rows, options = {}) {
   const filters = inventorySelectionOptions(options);
   const selected = rows.filter((row) =>

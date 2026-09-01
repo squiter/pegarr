@@ -162,14 +162,12 @@ export interface CatalogAddInput {
   readonly monitored: boolean;
   readonly monitor?: "all" | "future" | "missing" | "existing" | "firstSeason" | "lastSeason" | "pilot" | "recent" | "none";
   readonly minimumAvailability?: "announced" | "inCinemas" | "released";
-  readonly confirmation: string;
 }
 
 export interface CatalogAddOptionsResult extends ArrCatalogAddOptions {
   readonly kind: "catalog-add-options";
   readonly mode: "catalog_add";
   readonly title: string;
-  readonly confirmation: string;
   readonly defaults: {
     readonly monitored: true;
     readonly monitor?: "all";
@@ -989,7 +987,6 @@ export function createRuntimeServices(
             kind: "catalog-add-options",
             mode: "catalog_add",
             title: item.title,
-            confirmation: catalogAddConfirmation(item),
             ...options,
             defaults: selection.application === "sonarr"
               ? { monitored: true, monitor: "all" }
@@ -999,7 +996,6 @@ export function createRuntimeServices(
         add: async (selection: CatalogAddSelection, input: CatalogAddInput): Promise<CatalogAddResult> => {
           const item = await resolveCatalogCoverageItem(selection, sonarrClients, radarrClients);
           if (item === undefined) throw new TypeError("Catalog item is no longer available");
-          if (input.confirmation !== catalogAddConfirmation(item)) throw new TypeError("Catalog add confirmation does not match");
           const receipt = selection.application === "sonarr"
             ? await requireClient(sonarrClients.get(selection.instanceId)).addCatalogSeries({
                 tvdbId: Number(selection.value),
@@ -1222,10 +1218,6 @@ function createUiOpenSubtitlesSource(
     }),
     environment,
   });
-}
-
-function catalogAddConfirmation(item: CatalogMediaItem): string {
-  return `ADD ${item.title} TO ${item.application.toUpperCase()}`;
 }
 
 function boundedElapsed(startedAt: number, completedAt: number): number {

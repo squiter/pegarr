@@ -516,7 +516,6 @@ test("PEG-CATALOG-008 PEG-CONTINUE-001 catalog add returns a bounded server-owne
     kind: "catalog-add-options",
     mode: "catalog_add",
     title: "Synthetic Add Movie",
-    confirmation: "ADD Synthetic Add Movie TO RADARR",
     rootFolders: [{ id: 4, label: "Movies", accessible: true }],
     qualityProfiles: [{ id: 8, name: "Synthetic UHD" }],
     defaults: { monitored: true, minimumAvailability: "released" },
@@ -524,14 +523,7 @@ test("PEG-CATALOG-008 PEG-CONTINUE-001 catalog add returns a bounded server-owne
   assert.doesNotMatch(JSON.stringify(options), /private|rootFolderPath|freeSpace|items|api.?key/iu);
 
   const input = { rootFolderId: 4, qualityProfileId: 8, monitored: true, minimumAvailability: "released" as const };
-  const postsBeforeConfirmation = requests.filter(({ method }) => method === "POST").length;
-  await assert.rejects(
-    services.catalogAdd.add(selection, { ...input, confirmation: "wrong" }),
-    /confirmation does not match/u,
-  );
-  assert.equal(requests.filter(({ method }) => method === "POST").length, postsBeforeConfirmation);
-
-  const result = await services.catalogAdd.add(selection, { ...input, confirmation: options.confirmation });
+  const result = await services.catalogAdd.add(selection, input);
   assert.equal(result.status, "added");
   assert.deepEqual(result.receipt, {
       status: "added",
@@ -621,13 +613,11 @@ test("PEG-CONTINUE-002 PEG-CONTINUE-007 Radarr continuation analysis can prepare
   assert.ok(services.catalogAdd);
   assert.ok(services.catalogContinuation);
   const selection = { application: "radarr" as const, instanceId: "synthetic-radarr", providerId: "tmdb" as const, value: "84" };
-  const options = await services.catalogAdd.readOptions(selection);
   const added = await services.catalogAdd.add(selection, {
     rootFolderId: 4,
     qualityProfileId: 8,
     monitored: true,
     minimumAvailability: "released",
-    confirmation: options.confirmation,
   });
   const result = await services.catalogContinuation.analyze(added.next.continuationId);
   assert.equal(result.status, "ready");
@@ -725,13 +715,11 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 Sonarr
   assert.ok(services.catalogAdd);
   assert.ok(services.catalogContinuation);
   const selection = { application: "sonarr" as const, instanceId: "synthetic-sonarr", providerId: "tvdb" as const, value: "42" };
-  const options = await services.catalogAdd.readOptions(selection);
   const added = await services.catalogAdd.add(selection, {
     rootFolderId: 3,
     qualityProfileId: 7,
     monitored: true,
     monitor: "all",
-    confirmation: options.confirmation,
   });
   const scopes = await services.catalogContinuation.scopes(added.next.continuationId);
   assert.equal(scopes.status, "ready");
