@@ -874,6 +874,18 @@ test("PEG-DASH-054 catalog add uses one clear submit button without a typed conf
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
+test("PEG-DASH-055 successful catalog add immediately updates the library state", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const assets = String(client.body);
+
+  assert.match(assets, /markCatalogItemAdded\(context\)/u);
+  assert.match(assets, /context\.item\.alreadyAdded = true/u);
+  assert.match(assets, /Already in \$\{applicationName\}|source-chip--ready/u);
+  assert.match(assets, /context\.openButton\.remove\(\)|setupControls/u);
+  assert.match(assets, /loadCatalogContinuationAnalysis|loadCatalogSeriesScopes/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
 test("PEG-DASH-045 successful movie add continues automatically into exact read-only analysis", async () => {
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
   const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());

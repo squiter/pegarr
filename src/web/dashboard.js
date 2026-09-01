@@ -595,7 +595,7 @@ function renderCatalogItem(item) {
     add.className = "primary-button catalog-add-button";
     add.type = "button";
     add.textContent = `Add to ${item?.application === "sonarr" ? "Sonarr" : "Radarr"}`;
-    add.addEventListener("click", () => loadCatalogAddOptions(item, add, addPanel));
+    add.addEventListener("click", () => loadCatalogAddOptions(item, add, addPanel, state));
     actions.append(add);
   } else if (!item?.alreadyAdded) {
     const disabledAdd = document.createElement("button");
@@ -610,7 +610,7 @@ function renderCatalogItem(item) {
   return row;
 }
 
-async function loadCatalogAddOptions(item, button, panel) {
+async function loadCatalogAddOptions(item, button, panel, state) {
   const identity = catalogIdentity(item);
   if (identity === undefined) {
     panel.hidden = false;
@@ -630,14 +630,14 @@ async function loadCatalogAddOptions(item, button, panel) {
       referrerPolicy: "no-referrer",
     });
     if (!response.ok) throw new Error("catalog_add_options_unavailable");
-    renderCatalogAddForm(item, identity, await response.json(), panel, button);
+    renderCatalogAddForm(item, identity, await response.json(), panel, button, state);
   } catch {
     panel.textContent = "Pegarr could not load the add options. Nothing was added.";
     button.disabled = false;
   }
 }
 
-function renderCatalogAddForm(item, identity, options, panel, openButton) {
+function renderCatalogAddForm(item, identity, options, panel, openButton, state) {
   const form = document.createElement("form");
   form.className = "catalog-add-form";
   const warning = document.createElement("p");
@@ -677,7 +677,8 @@ function renderCatalogAddForm(item, identity, options, panel, openButton) {
   status.className = "status-message catalog-add-status";
   form.addEventListener("submit", (event) => submitCatalogAdd(event, {
     item, identity, root: root.select, profile: profile.select,
-    monitored, applicationOption: applicationOption.select, submit, status,
+    monitored, applicationOption: applicationOption.select, submit, status, state, openButton,
+    setupControls: [warning, root.label, profile.label, applicationOption.label, monitoredLabel, actions],
   }));
   const actions = document.createElement("div");
   actions.className = "catalog-add-form-actions";
@@ -719,6 +720,7 @@ async function submitCatalogAdd(event, context) {
       return;
     }
     if (!response.ok) throw new Error("catalog_add_failed");
+    markCatalogItemAdded(context);
     const next = result?.next?.action === "choose_series_scope"
       ? "Choose a season or episode next for exact release analysis."
       : "The movie is ready for exact release analysis in Pegarr.";
@@ -735,6 +737,15 @@ async function submitCatalogAdd(event, context) {
     context.status.dataset.state = "error";
     context.submit.disabled = false;
   }
+}
+
+function markCatalogItemAdded(context) {
+  const applicationName = context.item.application === "sonarr" ? "Sonarr" : "Radarr";
+  context.item.alreadyAdded = true;
+  context.state.textContent = `Already in ${applicationName}`;
+  context.state.classList.add("source-chip--ready");
+  context.openButton.remove();
+  for (const control of context.setupControls) control.hidden = true;
 }
 
 async function loadCatalogSeriesScopes(continuationId, item, receipt, status) {

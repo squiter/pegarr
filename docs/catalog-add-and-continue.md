@@ -25,6 +25,8 @@ Pegarr re-resolves the exact TVDB or TMDB catalog record, root folder, and quali
 
 Sonarr adds always send `searchForMissingEpisodes: false` and `searchForCutoffUnmetEpisodes: false`. Radarr adds always send `searchForMovie: false` and use manual add mode. No successful add starts a release download.
 
+After Arr confirms the add, the catalog row immediately changes to **Already in Sonarr** or **Already in Radarr**, retires the obsolete add controls, and keeps the exact-analysis continuation visible. The user does not need to search again to learn whether the mutation succeeded.
+
 ## API
 
 ```text
@@ -65,4 +67,4 @@ If the upstream POST times out, Pegarr reports `timeout_unknown` and does not cl
 
 ## Verification boundary
 
-The deterministic harness injects synthetic Arr responses and proves request bodies, authentication ordering, output redaction, and the UI safety language. It never mutates a live Sonarr or Radarr service. `PEG-MANUAL-007` records the remaining installed-service compatibility check.
+The deterministic harness injects synthetic Arr responses and proves request bodies, authentication ordering, output redaction, and the UI safety language. It never mutates a live Sonarr or Radarr service. `PEG-MANUAL-007` records the remaining installed-service boundaries; the installed Sonarr add and automatic-search suppression are live-proven, while fresh post-fix exact continuation and the equivalent Radarr add remain open.

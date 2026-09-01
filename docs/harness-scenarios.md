@@ -181,6 +181,7 @@
 | PEG-DASH-052 | Modal setup drawer traps keyboard focus and background scrolling until it closes | `src/app.test.ts` |
 | PEG-DASH-053 | Pre-add coverage distinguishes availability from actionable provider failures | `src/dashboard-model.test.ts` |
 | PEG-DASH-054 | Catalog add uses one clear submit button without a typed confirmation | `src/app.test.ts` |
+| PEG-DASH-055 | Successful catalog add immediately changes the result to Already in Sonarr or Radarr | `src/app.test.ts` |
 | PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
 | PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
 | PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |
@@ -304,12 +305,12 @@
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima refreshed Sonarr 4.0.16.2944 status and a bounded one-row monitored missing-page envelope on 2026-08-30 after a measured release search on 2026-08-26; the NAS later proved installed Sonarr and Radarr status plus bounded series and movie catalog lookup, while exact installed release analysis remains open |
+| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | Local Colima proved status, missing-page, and release-search envelopes; the NAS later proved installed Sonarr/Radarr status, catalog lookup, and a monitored Severance Sonarr add without automatic search, while exact installed release analysis remains open |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | Local Colima refreshed the authenticated profile-list envelope on 2026-08-30 and measured one profile with one language item after targeted series-assignment shapes were verified on 2026-08-28; installed NAS compatibility remains intentionally untested |
-| PEG-MANUAL-003 | NAS runtime smoke test | Corrected immutable digest, container hardening, HTTPS readiness, persisted authentication/settings, mode-0600 password storage, successful SubDL evidence, the single-button add assets, and six unaffected sibling services are live-proven; installed Bazarr assignments, remaining provider-secret permissions, and cache reuse remain open |
+| PEG-MANUAL-003 | NAS runtime smoke test | Immutable digest `03842d…` is healthy with live retry assets, container hardening, HTTPS readiness, persisted settings, private password storage, successful SubDL evidence, and six unaffected sibling services; installed Bazarr assignments, remaining provider-secret permissions, cache reuse, and fresh authenticated exact-analysis interaction remain open |
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
 | PEG-MANUAL-005 | Live SubDL v2 compatibility | The live image returned 30 pt-br matches for Game of Thrones and one for The Adventures of Tintin, proving authenticated series/movie responses and mapping compatibility; sanitized quota and cache-hit evidence remain open |
 | PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The live image invoked OpenSubtitles for a movie and kept its temporary unavailability distinct from SubDL's positive pt-br result; a successful response, rate headers, mapping compatibility, and cache reuse remain open |
-| PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | The enabled live UI loaded installed Sonarr defaults and the current deployment serves the single-button flow without a typed-confirmation UI or payload; a harmless POST and automatic-search suppression check remain manual |
+| PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | The live Severance flow proved installed Sonarr add and title-scoped automatic-search suppression; the scope race fix is deployed, while fresh post-fix exact continuation and the equivalent Radarr add remain manual |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.

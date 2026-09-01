@@ -118,6 +118,14 @@ Commit `95c794b` removed the catalog-add confirmation phrase from both the authe
 
 The live HTTPS endpoint returned `ready`, unauthenticated session access remained `401`, and the served dashboard JavaScript contained the single **Add to Sonarr/Radarr** action without the typed phrase, confirmation view, or confirmation payload. The independently guarded controlled-Grab phrase remains unchanged. `PEG-MANUAL-007` stays open because this acceptance intentionally did not press Add or claim that installed Sonarr/Radarr automatic-search suppression was live-proven.
 
+#### 2026-08-31 live Sonarr add and continuation-race acceptance
+
+The authenticated catalog preview returned **Pt-Br: Available (29 matches)** for Severance before any mutation. The explicit single-button add then created Severance in the installed Sonarr library with the selected `tv` root, `Any` quality profile, all episodes monitored, and automatic search disabled. Sonarr showed the new monitored series with seasons 1 and 2 populated. Title-scoped queue and history checks contained no Severance activity, proving that this Pegarr add did not launch an automatic release search or download; unrelated Game of Thrones activity initiated separately in Sonarr was deliberately excluded from that evidence.
+
+The first continuation read raced Sonarr's episode population and received an empty scope list. Commit `bede482` now keeps that transient empty response out of Pegarr's scope cache and gives the browser bounded automatic retries plus an explicit **Retry loading seasons and episodes** action. GitHub CI and the multi-platform container workflow passed before Portainer replaced exactly one image digest with `sha256:03842df75d9778caf8c60f00b689dfd2e50670067b1ae6e886daea1a169d7c51`. Pegarr returned healthy, all six sibling services remained running, HTTPS readiness returned `200`, unauthenticated session access remained `401`, and the live dashboard asset contained the retry implementation.
+
+This substantially advances `PEG-MANUAL-007`: installed Sonarr add compatibility and title-scoped automatic-search suppression are live-proven. Keep the gap open for a fresh post-fix Sonarr add-to-exact-analysis continuation and the equivalent harmless Radarr add. Keep `PEG-MANUAL-001` open because exact installed release analysis has not yet completed. No controlled Grab was prepared or executed.
+
 ### 5. First public release
 
 After local acceptance and the read-only NAS smoke test:
