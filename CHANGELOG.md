@@ -4,6 +4,10 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 
 ## [Unreleased]
 
+### Changed
+
+- Exact analysis now displays Bazarr language aliases as canonical BCP 47-style labels, including `pb` as `pt-BR`, without changing the original matching identity.
+
 ## [0.1.0] - 2026-09-01
 
 ### Added

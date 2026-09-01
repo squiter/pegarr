@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { demoFeasibilityInput } from "./fixtures/demo.js";
 import { buildFeasibilityReport } from "./matching.js";
-import { activeInventoryFilterCount, catalogCoverageView, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases, subtitleLanguageRequirements } from "./web/dashboard-model.js";
+import { activeInventoryFilterCount, catalogCoverageView, displayLanguageCode, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, shortlistedReleases, subtitleLanguageRequirements } from "./web/dashboard-model.js";
 
 const inventory = {
   status: "ready",
@@ -63,7 +63,7 @@ test("PEG-DASH-053 catalog coverage distinguishes availability from actionable p
   });
   assert.deepEqual(available, {
     state: "ready",
-    languages: [{ code: "pt-BR", state: "available", label: "pt-BR: Available (12 matches)" }],
+    languages: [{ code: "pt-BR", displayCode: "pt-BR", state: "available", label: "pt-BR: Available (12 matches)" }],
     providers: [{ id: "subdl", name: "SubDL", status: "success", message: "SubDL: checked successfully." }],
   });
 
@@ -74,9 +74,45 @@ test("PEG-DASH-053 catalog coverage distinguishes availability from actionable p
   });
   assert.deepEqual(unknown, {
     state: "ready",
-    languages: [{ code: "pt-BR", state: "unknown", label: "pt-BR: Could not check" }],
+    languages: [{ code: "pt-BR", displayCode: "pt-BR", state: "unknown", label: "pt-BR: Could not check" }],
     providers: [{ id: "subdl", name: "SubDL", status: "unauthorized", message: "SubDL: rejected this request. Try again; if it keeps failing, update the API key in Setup & settings." }],
   });
+});
+
+test("PEG-DASH-056 Bazarr language aliases use canonical display labels without changing policy identity", () => {
+  assert.equal(displayLanguageCode("pb"), "pt-BR");
+  assert.equal(displayLanguageCode("pt_BR"), "pt-BR");
+  assert.equal(displayLanguageCode("EN"), "en");
+  assert.equal(displayLanguageCode("zh_hant"), "zh-Hant");
+  assert.equal(displayLanguageCode("es-419"), "es-419");
+
+  const report = buildFeasibilityReport(demoFeasibilityInput);
+  const view = feasibilityView({
+    kind: "item-feasibility",
+    status: "ready",
+    report: {
+      ...report,
+      policy: {
+        ...report.policy,
+        languages: report.policy.languages.map((language, index) => index === 0 ? { ...language, code: "pb" } : language),
+      },
+    },
+  });
+  assert.equal(view.state, "ready");
+  if (view.state !== "ready") return;
+  assert.equal(view.languages[0]?.code, "pb");
+  assert.equal(view.languages[0]?.displayCode, "pt-BR");
+
+  const coverage = catalogCoverageView({
+    status: "ready",
+    languages: [{ code: "pb", state: "available", subtitleCount: 7 }],
+    providers: [{ provider: "subdl", status: "success" }],
+  });
+  assert.equal(coverage.state, "ready");
+  if (coverage.state !== "ready") return;
+  assert.equal(coverage.languages[0]?.code, "pb");
+  assert.equal(coverage.languages[0]?.displayCode, "pt-BR");
+  assert.equal(coverage.languages[0]?.label, "pt-BR: Available (7 matches)");
 });
 
 test("PEG-DASH-001 inventory view-model mapping preserves only display-safe fields", () => {
@@ -457,8 +493,8 @@ test("PEG-DASH-020 release analysis preserves full Bazarr policy semantics", () 
   if (view.state !== "ready") return;
   assert.equal(view.policySource, "explicit_default");
   assert.deepEqual(view.languages, [
-    { code: "pt-BR", required: true, forced: true, hearingImpaired: "required", applicability: "audio_does_not_match", cutoff: true },
-    { code: "en", required: false, forced: false, hearingImpaired: "prefer", applicability: "always", cutoff: false },
+    { code: "pt-BR", displayCode: "pt-BR", required: true, forced: true, hearingImpaired: "required", applicability: "audio_does_not_match", cutoff: true },
+    { code: "en", displayCode: "en", required: false, forced: false, hearingImpaired: "prefer", applicability: "always", cutoff: false },
   ]);
   assert.doesNotMatch(JSON.stringify(view.languages), /sourceItemId|profileId|api.?key/iu);
   const unknownSource = feasibilityView({ kind: "item-feasibility", status: "ready", report: { ...report, policy: { ...report.policy, source: "unexpected" } } });
@@ -655,9 +691,9 @@ test("PEG-DASH-008 item summaries use the best Arr-accepted confidence and retai
     releaseCount: 2,
     acceptedCount: 1,
     policyName: "Original plus Brazilian Portuguese",
-    languages: [{ code: "pt-BR", required: true }, { code: "en", required: false }],
+    languages: [{ code: "pt-BR", displayCode: "pt-BR", required: true }, { code: "en", displayCode: "en", required: false }],
     requiredCoverage: "strong",
-    requiredLanguages: [{ code: "pt-BR", confidence: "likely" }],
+    requiredLanguages: [{ code: "pt-BR", displayCode: "pt-BR", confidence: "likely" }],
     providerEvidence: "partial",
     providerResultCount: 2,
     availableProviderResultCount: 1,
@@ -760,7 +796,7 @@ test("PEG-DASH-011 required-language coverage uses only Arr-accepted releases an
   const unknownSummary = itemAnalysisSummary({ ...mapped, releases: [rejectedConfirmed, requiredUnknown] });
 
   assert.equal(unknownSummary.requiredCoverage, "unknown");
-  assert.deepEqual(unknownSummary.requiredLanguages, [{ code: "pt-BR", confidence: "unknown" }]);
+  assert.deepEqual(unknownSummary.requiredLanguages, [{ code: "pt-BR", displayCode: "pt-BR", confidence: "unknown" }]);
 
   const noMatch = { ...accepted, languages: accepted.languages.map((language) => language.required ? { ...language, confidence: "no_match_found" as const } : language) };
   assert.equal(itemAnalysisSummary({ ...mapped, releases: [noMatch] }).requiredCoverage, "no_match_found");

@@ -1,4 +1,4 @@
-import { activeInventoryFilterCount, catalogCoverageView, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, subtitleLanguageRequirements } from "/assets/dashboard-model.js";
+import { activeInventoryFilterCount, catalogCoverageView, displayLanguageCode, feasibilityView, itemAnalysisSummary, leadingRelease, releaseComparison, rowsFromInventory, rowsWithAnalysis, selectReleases, selectRows, subtitleLanguageRequirements } from "/assets/dashboard-model.js";
 
 const elements = {
   accessPanel: document.querySelector("#access-panel"),
@@ -1283,15 +1283,15 @@ function populateInventoryAnalysisFilters(rows) {
   const languagesByCode = new Map();
   for (const language of rows.flatMap((row) => row.analysis?.languages ?? [])) {
     const key = language.code.toLocaleLowerCase();
-    const existing = languagesByCode.get(key) ?? { code: language.code, requirements: new Set() };
+    const existing = languagesByCode.get(key) ?? { code: language.code, displayCode: language.displayCode ?? displayLanguageCode(language.code), requirements: new Set() };
     existing.requirements.add(language.required);
     languagesByCode.set(key, existing);
   }
   const languageOptions = [...languagesByCode.values()]
     .toSorted((left, right) => left.code.localeCompare(right.code));
   replaceScopedOptions(elements.profileFilter, "All analyzed profiles", "profile", profileOptions.map((label) => ({ label, value: label })));
-  replaceScopedOptions(elements.policyLanguageFilter, "All analyzed languages", "language", languageOptions.map(({ code, requirements }) => ({
-    label: `${code} · ${requirements.size > 1 ? "mixed requirements" : requirements.has(true) ? "required" : "optional"}`,
+  replaceScopedOptions(elements.policyLanguageFilter, "All analyzed languages", "language", languageOptions.map(({ code, displayCode, requirements }) => ({
+    label: `${displayCode} · ${requirements.size > 1 ? "mixed requirements" : requirements.has(true) ? "required" : "optional"}`,
     value: code,
   })));
 }
@@ -1376,7 +1376,7 @@ function renderItemAnalysis(summary) {
   const detail = document.createElement("span");
   detail.className = "item-analysis-detail";
   if (summary.state === "ready" || summary.state === "stale") {
-    const requiredLanguages = (summary.requiredLanguages ?? []).map(({ code, confidence }) => `${code} ${confidenceLabel(confidence)}`).join(", ");
+    const requiredLanguages = (summary.requiredLanguages ?? []).map(({ code, displayCode, confidence }) => `${displayCode ?? displayLanguageCode(code)} ${confidenceLabel(confidence)}`).join(", ");
     const providerCount = summary.providerResultCount === 0
       ? "No provider search result"
       : `${summary.availableProviderResultCount} of ${summary.providerResultCount} provider searches available`;
@@ -1692,7 +1692,7 @@ function renderRelease(row) {
   subtitle.append(confidence, requiredFit);
   for (const language of row.languages) {
     const languageStatus = document.createElement("span");
-    languageStatus.textContent = `${language.language}: ${language.confidence.replaceAll("_", " ")} · ${language.providerCount} ${language.providerCount === 1 ? "provider" : "providers"}`;
+    languageStatus.textContent = `${displayLanguageCode(language.language)}: ${language.confidence.replaceAll("_", " ")} · ${language.providerCount} ${language.providerCount === 1 ? "provider" : "providers"}`;
     subtitle.append(languageStatus);
   }
 
@@ -2141,14 +2141,14 @@ function policyLanguageChip(language) {
     language.applicability ? language.applicability.replaceAll("_", " ") : "applicability unspecified",
     language.cutoff === true ? "cutoff" : language.cutoff === false ? "not cutoff" : "cutoff unspecified",
   ];
-  chip.textContent = `${language.code} · ${traits.join(" · ")}`;
+  chip.textContent = `${language.displayCode ?? displayLanguageCode(language.code)} · ${traits.join(" · ")}`;
   return chip;
 }
 
 function populatePolicyLanguageFilter(languages) {
   const previous = elements.releaseLanguageFilter.value;
   const options = [new Option("All policy languages", "all")];
-  for (const language of languages) options.push(new Option(`${language.code}${language.required ? " · required" : " · optional"}`, language.code));
+  for (const language of languages) options.push(new Option(`${language.displayCode ?? displayLanguageCode(language.code)}${language.required ? " · required" : " · optional"}`, language.code));
   elements.releaseLanguageFilter.replaceChildren(...options);
   elements.releaseLanguageFilter.value = options.some(({ value }) => value === previous) ? previous : "all";
 }
@@ -2254,7 +2254,7 @@ function comparisonTable(comparison) {
     comparisonRow("Subtitle confidence", comparison.candidates, (candidate) => comparisonValue(confidenceLabel(candidate.confidence), candidate.strengths.subtitleConfidence)),
     comparisonRow("Required-language fit", comparison.candidates, (candidate) => comparisonValue(requiredFitLabel(candidate.requiredFit), candidate.strengths.requiredFit)),
     ...comparison.languages.map((language) => comparisonRow(
-      `${language.code} · ${language.required ? "required" : "optional"}`,
+      `${language.displayCode ?? displayLanguageCode(language.code)} · ${language.required ? "required" : "optional"}`,
       language.assessments,
       (assessment) => languageComparison(assessment),
     )),

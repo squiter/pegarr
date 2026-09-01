@@ -23,6 +23,7 @@ The page deliberately does not contain or receive Sonarr, Radarr, Bazarr, or sub
 - Selecting an item opens its interactive release table and requests one protected read-only feasibility report.
 - Video acceptance and Arr rejection reasons remain separate from subtitle confidence.
 - The resolved policy states whether it came from Bazarr or an explicit default and shows every language's required/optional, forced, hearing-impaired, audio-applicability, and cutoff semantics without guessing missing values.
+- Language labels use canonical BCP 47-style display codes while retaining the original Bazarr policy identity for matching and filters; for example, Bazarr's `pb` alias is shown as `pt-BR`.
 - Each release exposes per-language confidence, contributing provider count, provider state, matching evidence, and warnings.
 - Each release also gets an honest required-language fit: Strong, Possible, No match found, Unknown, or No required languages. Unknown wins whenever required evidence is incomplete, so an outage cannot masquerade as absence.
 - Release rows also show safe Arr size, age, seeders/leechers when supplied, release group/edition, language names, and matched custom formats. Download handles and credentials never enter the browser model.

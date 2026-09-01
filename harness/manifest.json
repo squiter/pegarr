@@ -1719,6 +1719,12 @@
       "boundary": "Static dashboard state transition preserving exact-analysis continuation; no credentials, network, or live mutation"
     },
     {
+      "id": "PEG-DASH-056",
+      "title": "Bazarr language aliases use canonical display labels without changing policy identity",
+      "evidence": "src/dashboard-model.test.ts",
+      "boundary": "Pure dashboard projection with synthetic Bazarr policy codes; no credentials, network, or mutation"
+    },
+    {
       "id": "PEG-SETTINGS-004",
       "title": "Per-language policy preferences remain explicit, unique, and bounded",
       "evidence": "src/dashboard-model.test.ts",

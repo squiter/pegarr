@@ -186,6 +186,7 @@
 | PEG-DASH-053 | Pre-add coverage distinguishes availability from actionable provider failures | `src/dashboard-model.test.ts` |
 | PEG-DASH-054 | Catalog add uses one clear submit button without a typed confirmation | `src/app.test.ts` |
 | PEG-DASH-055 | Successful catalog add immediately changes the result to Already in Sonarr or Radarr | `src/app.test.ts` |
+| PEG-DASH-056 | Bazarr language aliases use canonical display labels without changing policy identity | `src/dashboard-model.test.ts` |
 | PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
 | PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
 | PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |

@@ -18,15 +18,16 @@ export function catalogCoverageView(value) {
   const languages = value.languages.flatMap((language) => {
     if (!isRecord(language) || typeof language.code !== "string") return [];
     const code = safeCatalogLanguage(language.code);
+    const displayCode = displayLanguageCode(code);
     const subtitleCount = Number.isSafeInteger(language.subtitleCount) && language.subtitleCount >= 0
       ? Math.min(language.subtitleCount, 1_000_000)
       : 0;
     if (language.state === "available") {
-      return [{ code, state: "available", label: `${code}: Available${subtitleCount > 0 ? ` (${subtitleCount} matches)` : ""}` }];
+      return [{ code, displayCode, state: "available", label: `${displayCode}: Available${subtitleCount > 0 ? ` (${subtitleCount} matches)` : ""}` }];
     }
-    if (language.state === "no_match_found") return [{ code, state: "no_match_found", label: `${code}: Not found` }];
-    if (language.state === "unsupported") return [{ code, state: "unsupported", label: `${code}: Provider not configured for this language` }];
-    return [{ code, state: "unknown", label: `${code}: Could not check` }];
+    if (language.state === "no_match_found") return [{ code, displayCode, state: "no_match_found", label: `${displayCode}: Not found` }];
+    if (language.state === "unsupported") return [{ code, displayCode, state: "unsupported", label: `${displayCode}: Provider not configured for this language` }];
+    return [{ code, displayCode, state: "unknown", label: `${displayCode}: Could not check` }];
   });
   const providers = value.providers.flatMap((provider) => {
     if (!isRecord(provider)) return [];
@@ -110,6 +111,20 @@ export function subtitleLanguageRequirements(value, preferences = []) {
   });
 }
 
+export function displayLanguageCode(value) {
+  if (typeof value !== "string") return "Language";
+  const code = safeCatalogLanguage(value);
+  if (code === "Language") return code;
+  const normalized = code.toLocaleLowerCase();
+  if (normalized === "pb") return "pt-BR";
+  return normalized.split("-").map((part, index) => {
+    if (index === 0 || /^\d{3}$/u.test(part)) return part;
+    if (part.length === 2) return part.toLocaleUpperCase();
+    if (part.length === 4) return `${part[0].toLocaleUpperCase()}${part.slice(1)}`;
+    return part;
+  }).join("-");
+}
+
 export function rowsWithAnalysis(rows, analyses) {
   return rows.map((row) => {
     const analysis = analyses.get(row.key);
@@ -135,7 +150,7 @@ export function itemAnalysisSummary(view) {
   const analysis = isRecord(view.analysis) ? view.analysis : {};
   const languages = Array.isArray(view.languages)
     ? view.languages.flatMap((language) => isRecord(language) && typeof language.code === "string"
-      ? [{ code: language.code, required: language.required === true }]
+      ? [{ code: language.code, displayCode: displayLanguageCode(language.code), required: language.required === true }]
       : [])
     : [];
   const requiredCoverage = summarizeRequiredCoverage(languages, accepted);
@@ -174,16 +189,16 @@ function summarizeRequiredCoverage(languages, acceptedReleases) {
   if (acceptedReleases.length === 0) {
     return {
       requiredCoverage: "no_accepted_release",
-      requiredLanguages: required.map(({ code }) => ({ code, confidence: "unknown" })),
+      requiredLanguages: required.map(({ code, displayCode }) => ({ code, displayCode, confidence: "unknown" })),
     };
   }
-  const requiredLanguages = required.map(({ code }) => {
+  const requiredLanguages = required.map(({ code, displayCode }) => {
     const assessments = acceptedReleases.flatMap(({ languages: releaseLanguages }) =>
       Array.isArray(releaseLanguages)
         ? releaseLanguages.filter(({ language }) => language === code).map(({ confidence }) => safeConfidence(confidence))
         : [],
     );
-    return { code, confidence: bestLanguageConfidence(assessments) };
+    return { code, displayCode, confidence: bestLanguageConfidence(assessments) };
   });
   const confidences = requiredLanguages.map(({ confidence }) => confidence);
   const requiredCoverage = confidences.includes("unknown")
@@ -348,6 +363,7 @@ export function releaseComparison(rows, releaseIds) {
     })),
     languages: languageDefinitions.map(({ code, key, required }) => ({
       code,
+      displayCode: displayLanguageCode(code),
       required,
       assessments: releases.map((release) => {
         const assessment = release.languages.find(({ language }) => language.toLocaleLowerCase() === key);
@@ -385,6 +401,7 @@ export function feasibilityView(value) {
     ? policy.languages.flatMap((language) => isRecord(language) && typeof language.code === "string"
       ? [{
           code: language.code,
+          displayCode: displayLanguageCode(language.code),
           required: language.required === true,
           forced: language.forced === true,
           hearingImpaired: hearingImpairedValues.includes(language.hearingImpaired) ? language.hearingImpaired : "either",
@@ -719,10 +736,10 @@ function scopedFilterValue(value, scope, maximumLength) {
 function rowSearchText(row) {
   const policy = row.analysis?.policyName ?? "";
   const languages = Array.isArray(row.analysis?.languages)
-    ? row.analysis.languages.map(({ code }) => code).join(" ")
+    ? row.analysis.languages.map(({ code, displayCode }) => `${code} ${displayCode ?? ""}`).join(" ")
     : "";
   const requiredLanguages = Array.isArray(row.analysis?.requiredLanguages)
-    ? row.analysis.requiredLanguages.map(({ code, confidence }) => `${code} ${confidence}`).join(" ")
+    ? row.analysis.requiredLanguages.map(({ code, displayCode, confidence }) => `${code} ${displayCode ?? ""} ${confidence}`).join(" ")
     : "";
   const providerFailures = Array.isArray(row.analysis?.providerFailures) ? row.analysis.providerFailures.join(" ") : "";
   return `${row.title} ${row.context} ${row.application} ${policy} ${languages} ${requiredLanguages} ${providerFailures}`.toLocaleLowerCase();

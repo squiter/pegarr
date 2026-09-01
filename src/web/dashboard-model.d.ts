@@ -18,9 +18,9 @@ export interface DashboardAnalysisSummary {
   readonly releaseCount: number;
   readonly acceptedCount: number;
   readonly policyName?: string;
-  readonly languages?: readonly { readonly code: string; readonly required: boolean }[];
+  readonly languages?: readonly { readonly code: string; readonly displayCode?: string; readonly required: boolean }[];
   readonly requiredCoverage: RequiredCoverage;
-  readonly requiredLanguages: readonly { readonly code: string; readonly confidence: FeasibilityReleaseRow["confidence"] }[];
+  readonly requiredLanguages: readonly { readonly code: string; readonly displayCode?: string; readonly confidence: FeasibilityReleaseRow["confidence"] }[];
   readonly providerEvidence: ProviderEvidence;
   readonly providerResultCount: number;
   readonly availableProviderResultCount: number;
@@ -33,11 +33,12 @@ export function rowsFromInventory(value: unknown): readonly DashboardRow[];
 export type CatalogCoverageView =
   | {
       readonly state: "ready";
-      readonly languages: readonly { readonly code: string; readonly state: "available" | "no_match_found" | "unknown" | "unsupported"; readonly label: string }[];
+      readonly languages: readonly { readonly code: string; readonly displayCode: string; readonly state: "available" | "no_match_found" | "unknown" | "unsupported"; readonly label: string }[];
       readonly providers: readonly { readonly id: "subdl" | "opensubtitles" | "provider"; readonly name: string; readonly status: string; readonly message: string }[];
     }
   | { readonly state: "invalid"; readonly message: string };
 export function catalogCoverageView(value: unknown): CatalogCoverageView;
+export function displayLanguageCode(value: unknown): string;
 export function selectRows(
   rows: readonly DashboardRow[],
   options: { readonly query?: string; readonly application?: string; readonly kind?: string; readonly analysis?: string; readonly confidence?: string; readonly requiredCoverage?: string; readonly providerEvidence?: string; readonly profile?: string; readonly language?: string; readonly analysisAge?: string; readonly nowEpochMs?: number; readonly sort?: string },
@@ -109,6 +110,7 @@ export interface ReleaseComparisonCandidate extends FeasibilityReleaseRow {
 }
 export interface ReleaseComparisonLanguage {
   readonly code: string;
+  readonly displayCode: string;
   readonly required: boolean;
   readonly assessments: readonly {
     readonly releaseId: string;
@@ -125,7 +127,7 @@ export function releaseComparison(
 ): { readonly candidates: readonly ReleaseComparisonCandidate[]; readonly languages: readonly ReleaseComparisonLanguage[] };
 
 export type FeasibilityView =
-  | { readonly state: "ready"; readonly title: string; readonly context: string; readonly policyName: string; readonly policySource: "bazarr" | "explicit_default" | "unknown"; readonly languages: readonly { readonly code: string; readonly required: boolean; readonly forced: boolean; readonly hearingImpaired: "required" | "prefer" | "avoid" | "either"; readonly applicability?: "always" | "audio_matches" | "audio_does_not_match"; readonly cutoff?: boolean }[]; readonly providers: readonly { readonly provider: string; readonly status: string; readonly detail: string; readonly cacheStatus?: "hit" | "miss"; readonly cachedAt?: string; readonly cacheExpiresAt?: string; readonly quota: { readonly remaining?: number; readonly limit?: number; readonly resetAtEpochSeconds?: number; readonly windowSeconds?: number } }[]; readonly releases: readonly FeasibilityReleaseRow[]; readonly controlledGrab: boolean; readonly analysis: { readonly source: "computed" | "memory_cache" | "stale_cache"; readonly generatedAt?: string; readonly expiresAt?: string; readonly staleUntil?: string; readonly refreshFailure?: "inventory_unavailable" | "integration_failure" | "unexpected_failure"; readonly unavailableIntegrations: readonly ("sonarr" | "radarr" | "bazarr" | "subdl")[]; readonly elapsedMs: number; readonly arrRequests: number; readonly bazarrRequests: number; readonly providerRequests: number } }
+  | { readonly state: "ready"; readonly title: string; readonly context: string; readonly policyName: string; readonly policySource: "bazarr" | "explicit_default" | "unknown"; readonly languages: readonly { readonly code: string; readonly displayCode: string; readonly required: boolean; readonly forced: boolean; readonly hearingImpaired: "required" | "prefer" | "avoid" | "either"; readonly applicability?: "always" | "audio_matches" | "audio_does_not_match"; readonly cutoff?: boolean }[]; readonly providers: readonly { readonly provider: string; readonly status: string; readonly detail: string; readonly cacheStatus?: "hit" | "miss"; readonly cachedAt?: string; readonly cacheExpiresAt?: string; readonly quota: { readonly remaining?: number; readonly limit?: number; readonly resetAtEpochSeconds?: number; readonly windowSeconds?: number } }[]; readonly releases: readonly FeasibilityReleaseRow[]; readonly controlledGrab: boolean; readonly analysis: { readonly source: "computed" | "memory_cache" | "stale_cache"; readonly generatedAt?: string; readonly expiresAt?: string; readonly staleUntil?: string; readonly refreshFailure?: "inventory_unavailable" | "integration_failure" | "unexpected_failure"; readonly unavailableIntegrations: readonly ("sonarr" | "radarr" | "bazarr" | "subdl")[]; readonly elapsedMs: number; readonly arrRequests: number; readonly bazarrRequests: number; readonly providerRequests: number } }
   | { readonly state: "invalid" | "disabled" | "policy_unresolved" | "inventory_unavailable" | "integration_failure" | "not_found"; readonly message: string };
 
 export function feasibilityView(value: unknown): FeasibilityView;
