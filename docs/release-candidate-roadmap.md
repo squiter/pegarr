@@ -138,7 +138,7 @@ The same authenticated deployment completed a read-only analysis of Severance S0
 
 This closes `PEG-MANUAL-005` and proves the Sonarr side of `PEG-MANUAL-001`, the installed Bazarr series side of `PEG-MANUAL-002`, the cache-reuse portion of `PEG-MANUAL-003`, and the post-fix Sonarr continuation portion of `PEG-MANUAL-007`. Exact installed Radarr analysis/add, installed Bazarr movie assignment, successful OpenSubtitles evidence, remaining provider-secret permissions, and an operator-owned harmless controlled Grab stay open. No catalog add, automatic search, controlled Grab, or download mutation was performed during this acceptance.
 
-### 5. First public release
+### 5. First public release — completed
 
 After local acceptance and the read-only NAS smoke test:
 
@@ -150,6 +150,10 @@ After local acceptance and the read-only NAS smoke test:
 - verify the published release and container metadata.
 
 Do not call the build production-proven before the relevant manual evidence exists.
+
+Pegarr `v0.1.0` was published on 2026-09-01 from commit `f8d97eb332c93b672bc8ac42ed69b8183f773253`. The exact release commit passed the full local harness plus GitHub CI and multi-platform container publication. The public GHCR image was deployed by immutable digest and returned the expected `0.1.0` version and Git revision without weakening the remaining manual boundaries.
+
+The `v0.1.1` patch keeps the same product and safety boundary while canonicalizing Bazarr's `pb` display alias as `pt-BR`. Its post-release acceptance sequence is: publish and deploy the immutable patch image, verify the authenticated read-only dashboard and restart-safe session, then attempt the installed Radarr movie/add/exact-analysis path and successful OpenSubtitles evidence. A controlled Grab remains a separate operator-owned acceptance action and is never automated.
 
 ## Known implementation limitations
 

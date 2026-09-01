@@ -1,9 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
+
+const packageVersion = JSON.parse(readFileSync(resolve("package.json"), "utf8")).version;
+const defaultOpenSubtitlesUserAgent = `Pegarr v${packageVersion}`;
 
 export function shouldRetryWithClassicBuilder(output) {
   return /docker\/dockerfile\/manifests\/[^\s"]+.*(?:i\/o timeout|deadline exceeded)/isu.test(output);
@@ -71,7 +74,7 @@ async function smokeTest() {
       "  const response = await fetch('http://127.0.0.1:8080' + path);",
       "  const body = await response.json();",
       "  if (response.status !== 200) throw new Error(path + ' returned ' + response.status);",
-      "  if (path.endsWith('/version') && (body.kind !== 'build-info' || body.service !== 'pegarr' || body.version !== '0.1.0' || body.revision !== undefined)) throw new Error('local build identity is not bounded');",
+      `  if (path.endsWith('/version') && (body.kind !== 'build-info' || body.service !== 'pegarr' || body.version !== ${JSON.stringify(packageVersion)} || body.revision !== undefined)) throw new Error('local build identity is not bounded');`,
       "  if (path.endsWith('/demo') && body.mode !== 'read_only') throw new Error('demo is not read_only');",
       "  if (path.endsWith('/sonarr/status') && (body.mode !== 'read_only' || body.state !== 'disabled')) throw new Error('Sonarr status is not safely disabled');",
       "  if (path.endsWith('/radarr/status') && (body.mode !== 'read_only' || body.state !== 'disabled')) throw new Error('Radarr status is not safely disabled');",
@@ -585,7 +588,7 @@ async function configuredOpenSubtitlesProbeSmokeTest() {
     "const expectedUrl = '/api/v1/subtitles?episode_number=5&languages=en&parent_imdb_id=9000005&season_number=3&type=episode';",
     "const body = { data: [{ attributes: { language: 'en', release: 'private.release.name', files: [] } }] };",
     "createServer((request, response) => {",
-    "  if (request.method !== 'GET' || request.url !== expectedUrl || request.headers['api-key'] !== expectedKey || request.headers['user-agent'] !== 'Pegarr v0.1.0') { response.writeHead(401); response.end('{}'); return; }",
+    `  if (request.method !== 'GET' || request.url !== expectedUrl || request.headers['api-key'] !== expectedKey || request.headers['user-agent'] !== ${JSON.stringify(defaultOpenSubtitlesUserAgent)}) { response.writeHead(401); response.end('{}'); return; }`,
     "  response.writeHead(200, { 'content-type': 'application/json', 'x-ratelimit-limit-second': '5', 'x-ratelimit-remaining-second': '4' });",
     "  response.end(JSON.stringify(body));",
     "}).listen(8082, '0.0.0.0');",

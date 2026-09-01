@@ -37,7 +37,7 @@ export interface OpenSubtitlesSearchWindow {
 
 export interface OpenSubtitlesClientOptions {
   readonly apiKey: string;
-  readonly userAgent?: string;
+  readonly userAgent: string;
   readonly timeoutMs?: number;
   readonly maxResponseBytes?: number;
   readonly cacheTtlMs?: number;
@@ -63,7 +63,6 @@ const defaultTimeoutMs = 15_000;
 const defaultMaxResponseBytes = 2 * 1024 * 1024;
 const defaultCacheTtlMs = 15 * 60 * 1_000;
 const defaultMaxCachedWindows = 256;
-const defaultUserAgent = "Pegarr v0.1.0";
 
 export class OpenSubtitlesClient {
   readonly #apiKey: string;
@@ -78,7 +77,7 @@ export class OpenSubtitlesClient {
 
   constructor(options: OpenSubtitlesClientOptions, transport: JsonTransport) {
     this.#apiKey = safeHeader(options.apiKey, "apiKey");
-    this.#userAgent = safeHeader(options.userAgent ?? defaultUserAgent, "userAgent");
+    this.#userAgent = safeHeader(options.userAgent, "userAgent");
     this.#timeoutMs = boundedInteger(options.timeoutMs ?? defaultTimeoutMs, 1, 60_000, "timeoutMs");
     this.#maxResponseBytes = boundedInteger(
       options.maxResponseBytes ?? defaultMaxResponseBytes,

@@ -116,7 +116,7 @@ test("PEG-OPENSUBTITLES-001 exact searches use sorted bounded GETs and header-on
   ]);
   assert.doesNotMatch(JSON.stringify(transport.requests.map(({ query }) => query)), /api.?key/iu);
   assert.throws(
-    () => new OpenSubtitlesClient({ apiKey: "unsafe\nheader" }, transport),
+    () => new OpenSubtitlesClient({ apiKey: "unsafe\nheader", userAgent: "Pegarr Tests v0.1.0" }, transport),
     /bounded header value/u,
   );
 });

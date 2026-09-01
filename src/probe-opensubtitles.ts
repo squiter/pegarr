@@ -7,6 +7,7 @@ import {
 } from "./adapters/opensubtitles.js";
 import type { FetchImplementation } from "./adapters/fetch-json-transport.js";
 import { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
+import { currentBuildInfo } from "./build-info.js";
 import { loadRuntimeConfiguration } from "./config.js";
 
 export type OpenSubtitlesProbeState =
@@ -64,7 +65,7 @@ export async function runOpenSubtitlesProbe(
           : { fetchImplementation: options.fetchImplementation }),
       });
       const client = new OpenSubtitlesClient(
-        { apiKey: opensubtitles.apiKey.reveal() },
+        { apiKey: opensubtitles.apiKey.reveal(), userAgent: `Pegarr v${currentBuildInfo.version}` },
         transport,
       );
       const startedAt = (options.now ?? Date.now)();

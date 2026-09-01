@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
+import { currentBuildInfo } from "./build-info.js";
+
 import type { FeasibilityReport } from "./domain.js";
 import { AccessControl } from "./access-control.js";
 import { SecretValue } from "./config.js";
@@ -61,7 +63,7 @@ test("PEG-RELEASE-001 version identity is public, read-only, and safely classifi
   const body = result.body as { kind: string; service: string; version: string; revision?: string };
   assert.equal(body.kind, "build-info");
   assert.equal(body.service, "pegarr");
-  assert.equal(body.version, "0.1.0");
+  assert.equal(body.version, currentBuildInfo.version);
   if (body.revision !== undefined) assert.match(body.revision, /^[0-9a-f]{7,64}$/u);
   assert.equal((await resolveRoute("POST", "/api/v1/version", tmpdir())).statusCode, 405);
   assert.equal(requestLogEntry("GET", "/api/v1/version?token=private", 200, 0, 1).route, "version");

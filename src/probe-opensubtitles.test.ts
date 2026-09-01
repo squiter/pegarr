@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { currentBuildInfo } from "./build-info.js";
 import { syntheticOpenSubtitlesEpisodeSearchResponse } from "./fixtures/opensubtitles-subtitle-search.js";
 import { runOpenSubtitlesProbe } from "./probe-opensubtitles.js";
 
@@ -59,7 +60,7 @@ test("PEG-PROBE-009 one-shot OpenSubtitles search reports only bounded aggregate
     assert.equal(requestUrl?.pathname, "/api/v1/subtitles");
     assert.equal(requestUrl?.searchParams.get("parent_imdb_id"), "9000005");
     assert.equal(requestHeaders?.get("api-key"), "synthetic-opensubtitles-api-key");
-    assert.equal(requestHeaders?.get("user-agent"), "Pegarr v0.1.0");
+    assert.equal(requestHeaders?.get("user-agent"), `Pegarr v${currentBuildInfo.version}`);
     assert.deepEqual(JSON.parse(outputs.join("")), {
       probe: "opensubtitles-search",
       provider: "opensubtitles",

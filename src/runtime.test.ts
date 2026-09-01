@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { resolveRoute } from "./app.js";
+import { currentBuildInfo } from "./build-info.js";
 import { loadRuntimeConfiguration, SecretValue } from "./config.js";
 import { syntheticSonarrSystemStatusResponse } from "./fixtures/sonarr-system-status.js";
 import { syntheticRadarrSystemStatusResponse } from "./fixtures/radarr-system-status.js";
@@ -1113,7 +1114,7 @@ test("PEG-RUNTIME-012 runtime planner calls OpenSubtitles only after insufficien
   ]);
   assert.equal(providerRequests[0]?.headers.get("authorization"), "Bearer synthetic-subdl-key-value");
   assert.equal(providerRequests[1]?.headers.get("api-key"), "synthetic-opensubtitles-key-value");
-  assert.equal(providerRequests[1]?.headers.get("user-agent"), "Pegarr v0.1.0");
+  assert.equal(providerRequests[1]?.headers.get("user-agent"), `Pegarr v${currentBuildInfo.version}`);
   assert.deepEqual(result.report.providerStatus.map(({ provider, status }) => ({ provider, status })), [
     { provider: "subdl", status: "success" },
     { provider: "subdl", status: "unsupported" },

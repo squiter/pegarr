@@ -1,5 +1,6 @@
 import type { FetchJsonTransport } from "./adapters/fetch-json-transport.js";
 import { OpenSubtitlesClient } from "./adapters/opensubtitles.js";
+import { currentBuildInfo } from "./build-info.js";
 import type { OpenSubtitlesRuntimeConfiguration } from "./config.js";
 import { readProviderCacheRuntimeOptions } from "./provider-cache-configuration.js";
 import { ProviderSearchCache } from "./provider-search-cache.js";
@@ -16,7 +17,7 @@ export function createConfiguredOpenSubtitlesSource(options: {
   readonly environment: Readonly<Record<string, string | undefined>>;
 }): ManagedOpenSubtitlesSource {
   const client = new OpenSubtitlesClient(
-    { apiKey: options.configuration.apiKey.reveal() },
+    { apiKey: options.configuration.apiKey.reveal(), userAgent: `Pegarr v${currentBuildInfo.version}` },
     options.transport,
   );
   const cacheOptions = readProviderCacheRuntimeOptions(options.environment);

@@ -4,6 +4,8 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-01
+
 ### Changed
 
 - Exact analysis now displays Bazarr language aliases as canonical BCP 47-style labels, including `pb` as `pt-BR`, without changing the original matching identity.
@@ -31,5 +33,6 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 - Specials season `0` remains unsupported until provider season identity is validated.
 - Synthetic coverage does not prove installed-service compatibility. A successful OpenSubtitles response, installed Radarr exact analysis and catalog add, installed Bazarr movie assignment, and an operator-owned harmless controlled Grab remain explicit manual acceptance boundaries.
 
-[Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/squiter/pegarr/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/squiter/pegarr/releases/tag/v0.1.0
