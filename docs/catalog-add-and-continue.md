@@ -41,6 +41,8 @@ A successful response returns only a safe Arr ID, title, application/instance id
 
 For Radarr, the dashboard follows the continuation automatically and opens exact movie release analysis using the explicit Pegarr subtitle policy. For Sonarr, the dashboard loads a sanitized list of seasons and episodes from the verified series; choosing one starts the matching exact season or episode release analysis. Scope IDs that were not issued by that continuation are rejected before release search.
 
+Sonarr may briefly return an empty episode list while it populates a newly created series. Pegarr does not cache that transient empty response: the dashboard retries a bounded number of read-only scope requests and, if Sonarr still is not ready, offers an explicit retry without repeating the catalog add.
+
 The continuation expires after ten minutes, is held only in bounded server memory, and repeated reads for the same scope share one analysis. It carries no Arr handle, API key, or mutation authority. When controlled Grab is independently enabled, an exact movie, episode, or issued season analysis may prepare the existing administrator-only challenge through the server-owned continuation target. Season packs have their own truthful audit identity: Sonarr instance, series ID, and season number.
 
 ```text

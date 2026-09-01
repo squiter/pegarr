@@ -891,6 +891,7 @@ test("PEG-DASH-046 successful series add loads explicit season and episode scope
   const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
   const assets = [client.body, model.body, styles.body].join("\n");
   assert.match(String(client.body), /loadCatalogSeriesScopes|\/scopes`|Analyze a season or episode|Analyze exact releases/u);
+  assert.match(String(client.body), /scopeRetryDelaysMs|Sonarr is still populating episodes|Retry loading seasons and episodes/u);
   assert.match(String(client.body), /analysis\$\{scopePath\}|seasonGroup|episodeGroup/u);
   assert.match(String(model.body), /item\.kind === "season"|Specials|Season \$\{item\.season\}/u);
   assert.match(String(styles.body), /catalog-scope-panel/u);

@@ -803,7 +803,9 @@ export function createRuntimeServices(
       delete entry.scopes;
       throw error;
     });
-    return entry.scopes;
+    const scopes = await entry.scopes;
+    if (scopes.seasons.length === 0 && scopes.episodes.length === 0) delete entry.scopes;
+    return scopes;
   };
   const buildSonarrContinuation = async (
     entry: CatalogContinuationEntry,

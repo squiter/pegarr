@@ -1725,6 +1725,12 @@
       "boundary": "Temporary audit database and injected Sonarr responses with exactly one synthetic season mutation; no network or live service"
     },
     {
+      "id": "PEG-CONTINUE-011",
+      "title": "Transiently empty Sonarr episode scopes are not cached",
+      "evidence": "src/runtime.test.ts",
+      "boundary": "Injected Sonarr episode responses return one empty list before populated scopes; no network or live mutation"
+    },
+    {
       "id": "PEG-DASH-050",
       "title": "Season analysis can enter the exact controlled Grab dialog",
       "evidence": "src/app.test.ts",

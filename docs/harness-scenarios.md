@@ -186,6 +186,7 @@
 | PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |
 | PEG-GRAB-010 | Legacy Grab audit schemas migrate before season identities are recorded | `src/grab-audit.test.ts` |
 | PEG-CONTINUE-010 | Issued season scopes reuse controlled Grab safety and audit | `src/runtime.test.ts` |
+| PEG-CONTINUE-011 | Transiently empty Sonarr episode scopes are not cached | `src/runtime.test.ts` |
 | PEG-DASH-050 | Season analysis can enter the exact controlled Grab dialog | `src/app.test.ts` |
 | PEG-CONFIG-006 | Browser API access uses only a bounded secret file | `src/config.test.ts` |
 | PEG-ACCESS-002 | Hidden and unauthorized inventory requests perform no upstream work | `src/app.test.ts` |

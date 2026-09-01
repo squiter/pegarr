@@ -648,7 +648,7 @@ test("PEG-CONTINUE-002 PEG-CONTINUE-007 Radarr continuation analysis can prepare
   services.close();
 });
 
-test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 Sonarr continuation accepts only issued scopes for episode or season-pack controlled Grab", async (context) => {
+test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 PEG-CONTINUE-011 Sonarr continuation accepts only issued scopes and retries an initially empty episode list", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-sonarr-continuation-"));
   context.after(async () => rm(directory, { recursive: true }));
   await new SubtitleSettingsStore(directory).update({ languages: [
@@ -679,6 +679,7 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 Sonarr
   };
   const requests: URL[] = [];
   let releasePosts = 0;
+  let scopeRequests = 0;
   const services = createRuntimeServices(configuration, {
     dataDirectory: directory,
     now: () => 20_000,
@@ -694,6 +695,8 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 Sonarr
       if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/series" && method === "POST") return new Response(JSON.stringify({ id: 91 }), { status: 201 });
       if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/series/91") return new Response(JSON.stringify({ id: 91, title: "Synthetic Show", tvdbId: 42 }), { status: 200 });
       if (url.hostname === "sonarr.example.invalid" && url.pathname === "/api/v3/episode") {
+        scopeRequests += 1;
+        if (scopeRequests === 1) return new Response(JSON.stringify([]), { status: 200 });
         return new Response(JSON.stringify([
           { id: 305, seasonNumber: 3, episodeNumber: 5, title: "Synthetic Episode" },
           { id: 306, seasonNumber: 3, episodeNumber: 6, title: "Another Episode" },
@@ -721,6 +724,11 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 Sonarr
     monitored: true,
     monitor: "all",
   });
+  const initialScopes = await services.catalogContinuation.scopes(added.next.continuationId);
+  assert.equal(initialScopes.status, "ready");
+  if (initialScopes.status !== "ready") return;
+  assert.deepEqual(initialScopes.seasons, []);
+  assert.deepEqual(initialScopes.episodes, []);
   const scopes = await services.catalogContinuation.scopes(added.next.continuationId);
   assert.equal(scopes.status, "ready");
   if (scopes.status !== "ready") return;
@@ -782,7 +790,7 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 Sonarr
   );
   assert.equal(grabbed.status, "grabbed");
   assert.equal(releasePosts, 2);
-  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/episode").length, 1);
+  assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/episode").length, 2);
   assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/release").length, 8);
   assert.deepEqual(services.controlledGrab?.history().map(({ kind, itemId, seasonNumber }) => ({ kind, itemId, seasonNumber })).toSorted((left, right) => left.kind.localeCompare(right.kind)), [
     { kind: "episode", itemId: 305, seasonNumber: undefined },

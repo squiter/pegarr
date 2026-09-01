@@ -738,19 +738,34 @@ async function submitCatalogAdd(event, context) {
 }
 
 async function loadCatalogSeriesScopes(continuationId, item, receipt, status) {
+  status.parentElement?.querySelector(".catalog-scope-panel")?.remove();
   status.textContent = "Added with automatic search off. Loading seasons and episodes…";
   status.dataset.state = "loading";
   try {
-    const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/scopes`, {
-      method: "GET",
-      headers: libraryHeaders(),
-      cache: "no-store",
-      credentials: "same-origin",
-      redirect: "error",
-      referrerPolicy: "no-referrer",
-    });
-    const result = await response.json();
-    if (!response.ok || result?.status !== "ready") throw new Error("catalog_scopes_unavailable");
+    const scopeRetryDelaysMs = [0, 1_000, 2_000, 3_000];
+    let result;
+    for (const delayMs of scopeRetryDelaysMs) {
+      if (delayMs > 0) {
+        status.textContent = "Added with automatic search off. Sonarr is still populating episodes…";
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+      const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/scopes`, {
+        method: "GET",
+        headers: libraryHeaders(),
+        cache: "no-store",
+        credentials: "same-origin",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+      });
+      const candidate = await response.json();
+      if (!response.ok || candidate?.status !== "ready") throw new Error("catalog_scopes_unavailable");
+      if ((Array.isArray(candidate.seasons) && candidate.seasons.length > 0)
+        || (Array.isArray(candidate.episodes) && candidate.episodes.length > 0)) {
+        result = candidate;
+        break;
+      }
+    }
+    if (result === undefined) throw new Error("catalog_scopes_not_ready");
     const scopePanel = document.createElement("div");
     scopePanel.className = "catalog-scope-panel";
     const label = document.createElement("label");
@@ -794,8 +809,17 @@ async function loadCatalogSeriesScopes(continuationId, item, receipt, status) {
     status.textContent = "Added with automatic search off. Choose one season or episode for exact analysis.";
     status.dataset.state = "success";
   } catch {
-    status.textContent = "The series was added, but Pegarr could not load its season and episode choices.";
+    status.textContent = "The series was added with automatic search off, but Sonarr is still populating its seasons and episodes.";
     status.dataset.state = "warning";
+    const retryPanel = document.createElement("div");
+    retryPanel.className = "catalog-scope-panel";
+    const retry = document.createElement("button");
+    retry.className = "secondary-button";
+    retry.type = "button";
+    retry.textContent = "Retry loading seasons and episodes";
+    retry.addEventListener("click", () => loadCatalogSeriesScopes(continuationId, item, receipt, status));
+    retryPanel.append(retry);
+    status.parentElement?.append(retryPanel);
   }
 }
 
