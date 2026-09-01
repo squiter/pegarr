@@ -126,6 +126,12 @@ The first continuation read raced Sonarr's episode population and received an em
 
 This substantially advances `PEG-MANUAL-007`: installed Sonarr add compatibility and title-scoped automatic-search suppression are live-proven. Keep the gap open for a fresh post-fix Sonarr add-to-exact-analysis continuation and the equivalent harmless Radarr add. Keep `PEG-MANUAL-001` open because exact installed release analysis has not yet completed. No controlled Grab was prepared or executed.
 
+#### 2026-09-01 restart-safe session production acceptance
+
+Commits `a65b337` and `0d821b0` moved username/password sessions from process memory into private hashed state under the existing `/data` volume. The implementation and packaged image passed `PEG-SESSION-004` and `PEG-DOCKER-027`: only SHA-256 session and CSRF digests plus the fixed expiry are persisted, the database is mode `0600`, an unexpired login survives a real container restart without extending its expiry, and logout remains durable across a second restart. GitHub CI and the multi-platform container workflow passed before Portainer replaced exactly one image reference with `ghcr.io/squiter/pegarr@sha256:c16c6ccdb58d82a3885fbb737812049f7ccdfd30fcbaf6c0e83ba45f96537f8c`.
+
+The replacement became healthy at revision `0d821b041d930a79e5d6950671a020a6ce4bfad1`; HTTPS readiness returned `200`, unauthenticated session access returned `401`, and Jellyfin, Sonarr, Radarr, Bazarr, Lidarr, and Prowlarr remained running with their earlier creation timestamps. After one expected migration login from the superseded memory-only release, Portainer restarted only `jellyfin-pegarr-1`. The bounded log sequence recorded `shutdown_started`, a fresh `server_started`, and then authenticated `session_status=200`; reloading the same browser tab showed **Sign out**, restored **Setup & settings: Ready**, and loaded the 50-item inventory without another login. A post-restart read-only catalog search returned 31 Game of Thrones matches and its series preview returned **Pt-Br: Available (30 Matches)** from SubDL. No catalog add, automatic search, controlled Grab, or download mutation was performed.
+
 ### 5. First public release
 
 After local acceptance and the read-only NAS smoke test:
