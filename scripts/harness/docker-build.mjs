@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
@@ -197,18 +197,27 @@ async function packagedSessionRestartSmokeTest() {
       throw new Error(`${scenario} restored session changed its fixed boundary`);
     }
 
-    const databasePath = join(dataDirectory, "sessions.sqlite");
-    if ((statSync(databasePath).mode & 0o777) !== 0o600) throw new Error(`${scenario} persistent session database is not mode 0600`);
-    const databaseBytes = readFileSync(databasePath).toString("latin1");
-    for (const rawSecret of [password, rawSessionToken, loginState.csrfToken, restoredState.csrfToken]) {
-      if (databaseBytes.includes(rawSecret)) throw new Error(`${scenario} persisted raw private session material`);
-    }
-    const database = new DatabaseSync(databasePath, { readOnly: true });
-    const row = database.prepare("SELECT session_digest, expires_at_ms FROM sessions").get();
-    database.close();
-    if (row?.session_digest !== createHash("sha256").update(rawSessionToken).digest("hex") || new Date(row.expires_at_ms).toISOString() !== loginState.expiresAt) {
-      throw new Error(`${scenario} persistent session digest or fixed expiry is invalid`);
-    }
+    const persistedStateScript = [
+      "const { readFileSync, statSync } = require('node:fs');",
+      "const { DatabaseSync } = require('node:sqlite');",
+      "try {",
+      "  if ((statSync('/data/sessions.sqlite').mode & 0o777) !== 0o600) process.exit(1);",
+      "  const bytes = readFileSync('/data/sessions.sqlite').toString('latin1');",
+      "  if (JSON.parse(process.env.PEGARR_TEST_RAW_SECRETS).some((secret) => bytes.includes(secret))) process.exit(1);",
+      "  const database = new DatabaseSync('/data/sessions.sqlite', { readOnly: true });",
+      "  const row = database.prepare('SELECT session_digest, expires_at_ms FROM sessions').get();",
+      "  database.close();",
+      "  if (row?.session_digest !== process.env.PEGARR_TEST_DIGEST || new Date(row.expires_at_ms).toISOString() !== process.env.PEGARR_TEST_EXPIRY) process.exit(1);",
+      "} catch { process.exit(1); }",
+    ].join("\n");
+    const persistedState = docker([
+      "exec",
+      "--env", `PEGARR_TEST_RAW_SECRETS=${JSON.stringify([password, rawSessionToken, loginState.csrfToken, restoredState.csrfToken])}`,
+      "--env", `PEGARR_TEST_DIGEST=${createHash("sha256").update(rawSessionToken).digest("hex")}`,
+      "--env", `PEGARR_TEST_EXPIRY=${loginState.expiresAt}`,
+      containerName, "node", "-e", persistedStateScript,
+    ]);
+    if (persistedState.status !== 0) throw new Error(`${scenario} persistent mode-0600 hashed state is invalid`);
 
     const logoutScript = [
       "(async () => {",
@@ -224,10 +233,11 @@ async function packagedSessionRestartSmokeTest() {
     await waitForReady();
     const rejected = docker(["exec", "--env", `PEGARR_TEST_COOKIE=${loginState.cookie}`, containerName, "node", "-e", "fetch('http://127.0.0.1:8080/api/v1/session', { headers: { cookie: process.env.PEGARR_TEST_COOKIE } }).then((response) => { if (response.status !== 401) process.exit(1); }).catch(() => process.exit(1));"]);
     if (rejected.status !== 0) throw new Error(`${scenario} logout did not remain effective after restart`);
-    const afterLogout = new DatabaseSync(databasePath, { readOnly: true });
-    const remaining = afterLogout.prepare("SELECT COUNT(*) AS count FROM sessions").get();
-    afterLogout.close();
-    if (remaining?.count !== 0) throw new Error(`${scenario} logout left a durable session row`);
+    const emptyDatabase = docker([
+      "exec", containerName, "node", "-e",
+      "const { DatabaseSync } = require('node:sqlite'); try { const database = new DatabaseSync('/data/sessions.sqlite', { readOnly: true }); const row = database.prepare('SELECT COUNT(*) AS count FROM sessions').get(); database.close(); if (row?.count !== 0) process.exit(1); } catch { process.exit(1); }",
+    ]);
+    if (emptyDatabase.status !== 0) throw new Error(`${scenario} logout left a durable session row`);
 
     const logs = outputOf(docker(["logs", containerName]));
     for (const rawSecret of [password, rawSessionToken, loginState.csrfToken, restoredState.csrfToken]) {
