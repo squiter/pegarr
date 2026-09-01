@@ -177,6 +177,8 @@ The same browser acceptance exposed the reason for repeated Pegarr sign-ins: the
 
 OpenSubtitles still needs a successful installed response with sanitized rate, mapping, and cache evidence under `PEG-MANUAL-006`. The only live controlled-Grab gap remains `PEG-MANUAL-004`, which is intentionally operator-owned and was not exercised by this work.
 
+Pegarr `v0.1.3` was published from commit `91c65f7c0501ccd2443bd3734581f97fbc39ec5b` after the exact code and documentation passed the full 301-scenario local gate. GitHub CI, main-branch container publication, and version-tag container publication all passed for that commit. The AMD64/ARM64 image is pinned at immutable digest `sha256:5239983744c591ae7b2922deee69c3a8b19e8c6d8b767d9e6b71c5d5d1253d48f`; live deployment remains a separate reversible Portainer step.
+
 ## Known implementation limitations
 
 These are honest follow-up candidates, not regressions in the completed Phase 3 contract:
