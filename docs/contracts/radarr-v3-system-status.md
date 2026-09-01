@@ -39,4 +39,4 @@ The probe exits `0` for `available`, `1` for a configured upstream failure, and 
 
 ## Remaining proof
 
-The automated harness injects a sanitized response and executes the packaged command against a synthetic Radarr sibling container on an internal-only Docker network. `PEG-MANUAL-001` remains open until a separately authorized probe records the installed Radarr version and measured evidence without recording the API key or private address.
+The automated harness injects a sanitized response and executes the packaged command against a synthetic Radarr sibling container on an internal-only Docker network. Installed acceptance later reported Radarr `6.3.0.10514` available through Pegarr's bounded runtime, then completed catalog lookup, an automatic-search-disabled add, and exact analysis with 11 release candidates without recording the API key or private address. The live compatibility boundary is closed; controlled Grab remains separate under `PEG-MANUAL-004`.

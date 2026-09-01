@@ -4,6 +4,17 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-01
+
+### Fixed
+
+- Refreshing an exact post-add catalog continuation now stays on that continuation and preserves the explicit Pegarr subtitle policy instead of falling through to Bazarr's file-backed library view.
+
+### Acceptance
+
+- Installed Radarr accepted a monitored movie add with automatic search disabled, returned 11 exact release candidates, and showed no title-scoped queue or history activity.
+- Bazarr's installed Radarr sync processed the new title but correctly excluded it from its library because no video file exists; Pegarr therefore continues using the explicit pre-download policy.
+
 ## [0.1.1] - 2026-09-01
 
 ### Changed
@@ -33,6 +44,7 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 - Specials season `0` remains unsupported until provider season identity is validated.
 - Synthetic coverage does not prove installed-service compatibility. A successful OpenSubtitles response, installed Radarr exact analysis and catalog add, installed Bazarr movie assignment, and an operator-owned harmless controlled Grab remain explicit manual acceptance boundaries.
 
-[Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/squiter/pegarr/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/squiter/pegarr/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/squiter/pegarr/releases/tag/v0.1.0

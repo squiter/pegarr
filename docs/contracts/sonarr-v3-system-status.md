@@ -51,4 +51,4 @@ No API key, private hostname, private address, filesystem path, database detail,
 
 ## Remaining proof
 
-The automated harness injects a sanitized response and also executes the packaged command against a synthetic sibling container on an internal-only Docker network. The installed version, Docker runtime, route reachability, authentication requirement, and unauthenticated latency are now verified. `PEG-MANUAL-001` remains open only for an API-key-authenticated packaged probe of the response shape, exact response size, and latency, plus the corresponding Radarr proof.
+The automated harness injects a sanitized response and also executes the packaged command against a synthetic sibling container on an internal-only Docker network. Installed Sonarr `4.0.19.2979` and Radarr `6.3.0.10514` later passed bounded authenticated status, catalog, add-without-search, and exact-analysis paths. The live compatibility boundary is closed without retaining response bodies, credentials, or private topology.

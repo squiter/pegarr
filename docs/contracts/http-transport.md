@@ -16,7 +16,7 @@ Pegarr adapters use one transport boundary so network, URL, timeout, size, and r
 - Request headers are restricted to `Accept`, `Authorization`, `Content-Type`, `User-Agent`, and `X-Api-Key`.
 - Redirects are rejected, cookies are omitted, caching is disabled, and the referrer policy is `no-referrer`.
 
-These checks prevent an adapter from turning a configured service into an arbitrary URL fetcher. DNS resolution and rebinding behavior still require a live deployment review and remain part of `PEG-MANUAL-001`.
+These checks prevent an adapter from turning a configured service into an arbitrary URL fetcher. The installed same-network deployment has passed bounded Sonarr, Radarr, and Bazarr reads; any new topology still requires the live deployment review recorded under `PEG-MANUAL-003`.
 
 ## Response policy
 

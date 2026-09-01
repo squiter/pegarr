@@ -1,6 +1,6 @@
 {
   "name": "pegarr",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Subtitle-aware release selection for Sonarr and Radarr.",
   "license": "MIT",

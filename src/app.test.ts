@@ -903,6 +903,17 @@ test("PEG-DASH-055 successful catalog add immediately updates the library state"
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
+test("PEG-DASH-057 catalog continuation refresh preserves the explicit pre-download policy", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const script = String(client.body);
+
+  assert.match(script, /const analysisEndpoint = `\/api\/v1\/catalog\/continuations\//u);
+  assert.match(script, /analysisEndpoint,[\s\S]+grabEndpoint:/u);
+  assert.match(script, /typeof row\.analysisEndpoint === "string"[\s\S]+\? row\.analysisEndpoint[\s\S]+\/api\/v1\/library\/items/u);
+  assert.match(script, /fetch\(analysisEndpoint,/u);
+  assert.doesNotMatch(script, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
 test("PEG-DASH-045 successful movie add continues automatically into exact read-only analysis", async () => {
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
   const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());

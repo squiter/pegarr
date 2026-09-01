@@ -155,6 +155,18 @@ Pegarr `v0.1.0` was published on 2026-09-01 from commit `f8d97eb332c93b672bc8ac4
 
 The `v0.1.1` patch keeps the same product and safety boundary while canonicalizing Bazarr's `pb` display alias as `pt-BR`. Its post-release acceptance sequence is: publish and deploy the immutable patch image, verify the authenticated read-only dashboard and restart-safe session, then attempt the installed Radarr movie/add/exact-analysis path and successful OpenSubtitles evidence. A controlled Grab remains a separate operator-owned acceptance action and is never automated.
 
+#### 2026-09-01 v0.1.1 release and installed Radarr acceptance
+
+Pegarr `v0.1.1` was published from commit `f79b9d8247cf4596433a7210ceb138bfb4f211d0`. The exact commit passed 299 deterministic automated scenarios and six recorded manual gaps locally, then both GitHub workflows passed. The stable multi-architecture image was published at immutable digest `sha256:674d08386f05657a1d686979f451357897ed773d95e85ea304c0c698d17cd2a0`.
+
+Portainer preserved the complete stack definition and replaced only the Pegarr image digest. The new container reported version `0.1.1`, exact release revision `f79b9d8247cf4596433a7210ceb138bfb4f211d0`, and healthy readiness while all six sibling services retained their existing creation timestamps. The persisted browser session survived the replacement.
+
+The authenticated catalog preview found one SubDL `pt-BR` match for **The Adventures of Tintin**. The explicit Radarr add created the monitored movie with root `movies`, quality profile `Any`, minimum availability `Released`, and automatic search disabled. Pegarr immediately evaluated 11 installed Radarr release candidates. Radarr's queue stayed empty and its history contained no Tintin activity, closing installed Sonarr/Radarr API compatibility and catalog-add/automatic-search gaps `PEG-MANUAL-001` and `PEG-MANUAL-007`. Controlled Grab stayed disabled and no release was downloaded.
+
+A bounded manual Bazarr sync completed and named the new movie, but Bazarr's movie inventory remained at 13 file-backed titles and omitted Tintin. This is Bazarr's documented behavior: it stores only Radarr movies whose video file already exists. The subsequent dashboard refresh exposed a Pegarr routing defect by leaving the server-owned continuation and opening ordinary Bazarr-backed missing-item analysis. `PEG-DASH-057` fixes that defect: continuation refresh preserves the explicit Pegarr pre-download policy. The installed Bazarr movie-assignment gap remains open for a file-backed movie, and OpenSubtitles still reports temporary service unavailability honestly rather than `No match found`.
+
+The follow-up `v0.1.2` patch contains only that continuation-refresh fix and the resulting acceptance ledger updates. Its deployment must repeat the same immutable-digest, session-survival, and no-automatic-search checks; it must not repeat the catalog add or attempt a controlled Grab.
+
 ## Known implementation limitations
 
 These are honest follow-up candidates, not regressions in the completed Phase 3 contract:

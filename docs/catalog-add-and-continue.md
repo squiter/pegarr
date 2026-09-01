@@ -43,6 +43,8 @@ A successful response returns only a safe Arr ID, title, application/instance id
 
 For Radarr, the dashboard follows the continuation automatically and opens exact movie release analysis using the explicit Pegarr subtitle policy. For Sonarr, the dashboard loads a sanitized list of seasons and episodes from the verified series; choosing one starts the matching exact season or episode release analysis. Scope IDs that were not issued by that continuation are rejected before release search.
 
+Bazarr intentionally imports only Radarr movies that already have a video file. A newly added fileless movie therefore cannot have a Bazarr movie assignment yet. Pegarr keeps the explicit pre-download policy attached to the short-lived continuation, including when the user selects **Refresh analysis**; it does not replace that policy with Bazarr's honest `media not found` response.
+
 Sonarr may briefly return an empty episode list while it populates a newly created series. Pegarr does not cache that transient empty response: the dashboard retries a bounded number of read-only scope requests and, if Sonarr still is not ready, offers an explicit retry without repeating the catalog add.
 
 The continuation expires after ten minutes, is held only in bounded server memory, and repeated reads for the same scope share one analysis. It carries no Arr handle, API key, or mutation authority. When controlled Grab is independently enabled, an exact movie, episode, or issued season analysis may prepare the existing administrator-only challenge through the server-owned continuation target. Season packs have their own truthful audit identity: Sonarr instance, series ID, and season number.
@@ -67,4 +69,4 @@ If the upstream POST times out, Pegarr reports `timeout_unknown` and does not cl
 
 ## Verification boundary
 
-The deterministic harness injects synthetic Arr responses and proves request bodies, authentication ordering, output redaction, and the UI safety language. It never mutates a live Sonarr or Radarr service. `PEG-MANUAL-007` records the remaining installed-service boundaries; the installed Sonarr add and automatic-search suppression are live-proven, while fresh post-fix exact continuation and the equivalent Radarr add remain open.
+The deterministic harness injects synthetic Arr responses and proves request bodies, authentication ordering, output redaction, continuation refresh routing, and the UI safety language. It never mutates a live Sonarr or Radarr service. Installed Sonarr and Radarr adds, automatic-search suppression, and exact post-add continuation are live-proven; controlled Grab remains a separate manual boundary.

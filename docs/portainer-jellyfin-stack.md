@@ -28,6 +28,10 @@ On 2026-09-01, Portainer replaced only Pegarr with restart-safe-session digest `
 
 The same deployment then completed exact read-only Severance S02E10 analysis with the installed `PT-BR + English` Bazarr series assignment and 29 Sonarr candidates. The first analysis stored successful SubDL evidence with 1,978 of 2,000 provider requests remaining; an explicit refresh reported a provider-cache hit and the unchanged quota value while still refreshing Sonarr and Bazarr. OpenSubtitles authentication failure and the unmapped English policy language stayed separately visible. This closes live SubDL compatibility and cache reuse while leaving Radarr exact analysis/add, Bazarr movie assignment, successful OpenSubtitles evidence, and controlled Grab as manual boundaries.
 
+The published `v0.1.1` image at `ghcr.io/squiter/pegarr@sha256:674d08386f05657a1d686979f451357897ed773d95e85ea304c0c698d17cd2a0` then replaced only Pegarr. The saved Portainer definition contained the new digest exactly once and no longer contained the previous digest. Pegarr became healthy at version `0.1.1` and revision `f79b9d8247cf4596433a7210ceb138bfb4f211d0`; the existing login survived, and all six sibling containers retained their earlier creation timestamps.
+
+The authorized live Radarr flow added **The Adventures of Tintin** as monitored with automatic search disabled, immediately returned 11 exact Radarr release candidates, and left controlled Grab disabled. Radarr's queue remained empty and its history contained no Tintin event. A manual Bazarr Radarr-sync job completed and named Tintin, but Bazarr correctly kept it out of the movie inventory because no video file exists. Pegarr must therefore retain its explicit pre-download policy across continuation refreshes. `PEG-DASH-057` ratchets the discovered refresh-routing fix for the `v0.1.2` follow-up; no second add, automatic search, Grab, or download is required for that deployment check.
+
 Port `8080` was occupied on the NAS, so the overlay publishes Pegarr on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
 
 ## Configuration and credentials

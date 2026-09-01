@@ -841,6 +841,7 @@ async function loadCatalogContinuationAnalysis(continuationId, item, receipt, st
   const scopeKind = scope?.kind === "season" || scope?.kind === "episode" ? scope.kind : undefined;
   const scopeValue = Number.isSafeInteger(scope?.value) ? scope.value : undefined;
   const scopePath = scopeKind === undefined ? "" : `/${scopeKind}/${scopeValue}`;
+  const analysisEndpoint = `/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis${scopePath}`;
   const row = {
     key: `catalog-continuation:${continuationId}`,
     itemId: scopeKind === "episode" ? scopeValue : receipt?.itemId,
@@ -853,6 +854,7 @@ async function loadCatalogContinuationAnalysis(continuationId, item, receipt, st
       : scopeKind === "episode"
         ? "Selected episode"
         : Number.isSafeInteger(item?.year) ? String(item.year) : "Movie",
+    analysisEndpoint,
     grabEndpoint: `/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis${scopePath}/grab`,
   };
   selectedRow = row;
@@ -867,7 +869,7 @@ async function loadCatalogContinuationAnalysis(continuationId, item, receipt, st
   elements.releaseControls.hidden = true;
   setFeasibilityNotice("Searching exact Radarr releases and checking subtitle evidence…", "loading");
   try {
-    const response = await fetch(`/api/v1/catalog/continuations/${encodeURIComponent(continuationId)}/analysis${scopePath}`, {
+    const response = await fetch(analysisEndpoint, {
       method: "GET",
       headers: libraryHeaders(),
       cache: "no-store",
@@ -1463,7 +1465,9 @@ async function loadFeasibility(row, refresh = false) {
   setFeasibilityNotice("Searching releases, resolving Bazarr policy, and checking subtitle evidence…", "loading");
   setBusy(true);
   try {
-    const endpoint = `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/feasibility${refresh ? "?refresh=1" : ""}`;
+    const endpoint = typeof row.analysisEndpoint === "string"
+      ? row.analysisEndpoint
+      : `/api/v1/library/items/${row.application}/${encodeURIComponent(row.instanceId)}/${row.kind}/${row.itemId}/feasibility${refresh ? "?refresh=1" : ""}`;
     const response = await fetch(endpoint, {
       method: "GET",
       headers: libraryHeaders(),

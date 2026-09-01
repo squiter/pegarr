@@ -70,4 +70,4 @@ For Grab, `200` is accepted. Authentication, unavailable-release, quota, and oth
 
 ## Remaining proof
 
-`PEG-MANUAL-001` remains open for live read compatibility, while `PEG-MANUAL-004` covers a separately authorized harmless Grab and reconciliation drill. Automated tests never call a live Radarr.
+Installed Radarr `6.3.0.10514` returned 11 exact movie release candidates through the bounded read-only path on 2026-09-01, closing live read compatibility. `PEG-MANUAL-004` still covers a separately authorized harmless Grab and reconciliation drill. Automated tests never call a live Radarr.

@@ -187,6 +187,7 @@
 | PEG-DASH-054 | Catalog add uses one clear submit button without a typed confirmation | `src/app.test.ts` |
 | PEG-DASH-055 | Successful catalog add immediately changes the result to Already in Sonarr or Radarr | `src/app.test.ts` |
 | PEG-DASH-056 | Bazarr language aliases use canonical display labels without changing policy identity | `src/dashboard-model.test.ts` |
+| PEG-DASH-057 | Catalog continuation refresh preserves the explicit pre-download subtitle policy | `src/app.test.ts` |
 | PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
 | PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
 | PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |
@@ -310,11 +311,9 @@
 
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
-| PEG-MANUAL-001 | Live Sonarr/Radarr compatibility | The NAS proves installed status, catalog lookup, Sonarr add, and exact Sonarr episode release analysis with 29 candidates; exact installed Radarr release analysis remains open |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | The installed NAS resolved the `PT-BR + English` series profile and assignment during exact Sonarr analysis; equivalent installed movie-assignment evidence remains open |
-| PEG-MANUAL-003 | NAS runtime smoke test | Immutable digest `c16c6c…` is healthy with restart-safe authentication, hardening controls, restored settings/inventory, exact Sonarr/Bazarr analysis, and a successful SubDL cache hit without quota change; Radarr exact analysis, Bazarr movie assignment, and remaining provider-secret permissions remain open |
+| PEG-MANUAL-003 | NAS runtime smoke test | Immutable v0.1.1 digest `674d08…` is healthy with restart-safe authentication, hardening controls, restored settings/inventory, exact Sonarr and Radarr analysis, and a successful SubDL cache hit without quota change; Bazarr movie assignment and remaining provider-secret permissions remain open |
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
 | PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The live image invoked OpenSubtitles for a movie and kept its temporary unavailability distinct from SubDL's positive pt-br result; a successful response, rate headers, mapping compatibility, and cache reuse remain open |
-| PEG-MANUAL-007 | Live Sonarr/Radarr catalog-add compatibility and automatic-search suppression | The live Severance flow proved installed Sonarr add, title-scoped automatic-search suppression, and post-fix exact episode continuation; the equivalent Radarr add remains manual |
 
 When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.

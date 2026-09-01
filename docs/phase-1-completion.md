@@ -23,13 +23,12 @@ The ledger contains the exact scenario IDs for every criterion. The harness repo
 
 These gaps stay explicit and do not masquerade as automated coverage:
 
-- `PEG-MANUAL-001`: live Radarr compatibility remains unverified; local Sonarr compatibility is already measured read-only.
-- `PEG-MANUAL-002`: local Bazarr shapes are measured, but the installed NAS policy remains production validation.
-- `PEG-MANUAL-003`: NAS pull, startup, persistence, and architecture smoke testing requires a separate deployment decision.
-- `PEG-MANUAL-004`: any future Grab confirmation belongs to Phase 2 and requires a new mutation-specific design and harness.
-- `PEG-MANUAL-005`: live authenticated SubDL response and language-code compatibility remain unverified.
+- `PEG-MANUAL-002`: installed Bazarr series policy is proven; an equivalent file-backed movie assignment remains production validation.
+- `PEG-MANUAL-003`: the NAS runtime is healthy and restart-safe; provider-secret permissions and the file-backed Bazarr movie case remain open.
+- `PEG-MANUAL-004`: controlled Grab has complete synthetic coverage, but the harmless operator-owned live mutation and timeout-reconciliation drill remain manual.
+- `PEG-MANUAL-006`: OpenSubtitles failures remain honest, but a successful installed response, rate evidence, mapping compatibility, and cache reuse remain open.
 
-The absence of local Radarr and SubDL services is not repaired with private fixtures, hidden network calls, or a false green label.
+Installed Sonarr, Radarr, and SubDL compatibility are now live-proven. The remaining boundaries are not repaired with private fixtures, hidden network calls, or false green labels.
 
 ## Phase boundary
 
