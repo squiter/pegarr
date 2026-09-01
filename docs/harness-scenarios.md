@@ -312,7 +312,6 @@
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
 | PEG-MANUAL-002 | Live Bazarr policy resolution | The installed NAS resolved the `PT-BR + English` series profile and assignment during exact Sonarr analysis; equivalent installed movie-assignment evidence remains open |
-| PEG-MANUAL-003 | NAS runtime smoke test | Immutable v0.1.1 digest `674d08…` is healthy with restart-safe authentication, hardening controls, restored settings/inventory, exact Sonarr and Radarr analysis, and a successful SubDL cache hit without quota change; Bazarr movie assignment and remaining provider-secret permissions remain open |
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
 | PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The live image invoked OpenSubtitles for a movie and kept its temporary unavailability distinct from SubDL's positive pt-br result; a successful response, rate headers, mapping compatibility, and cache reuse remain open |
 

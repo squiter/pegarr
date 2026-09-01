@@ -1816,11 +1816,6 @@
       "reason": "Local Colima proved bounded profile-list and targeted assignment shapes; on 2026-09-01 the installed NAS resolved the PT-BR + English Bazarr series profile and assignment during exact Sonarr analysis while preserving required and cutoff semantics; equivalent installed movie-assignment evidence remains unproven"
     },
     {
-      "id": "PEG-MANUAL-003",
-      "title": "NAS pull, startup, persistence, and architecture smoke test",
-      "reason": "The live NAS repeatedly pulled immutable multi-architecture images while preserving the seven-service Jellyfin stack, hardening controls, HTTPS readiness, authentication, settings, and inventory across replacement and restart; on 2026-09-01 v0.1.1 digest sha256:674d08386f05657a1d686979f451357897ed773d95e85ea304c0c698d17cd2a0 preserved the restart-safe session, completed exact installed Radarr analysis with 11 candidates, and kept all sibling services running; Bazarr movie assignment and remaining provider-secret permissions remain open"
-    },
-    {
       "id": "PEG-MANUAL-004",
       "title": "Live controlled Grab and unknown-outcome reconciliation",
       "reason": "Synthetic tests prove the safety flow, but a harmless operator-confirmed Sonarr/Radarr Grab and timeout reconciliation must be validated manually; automated tests never mutate live services"

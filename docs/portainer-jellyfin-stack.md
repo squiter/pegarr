@@ -32,6 +32,8 @@ The published `v0.1.1` image at `ghcr.io/squiter/pegarr@sha256:674d08386f05657a1
 
 The authorized live Radarr flow added **The Adventures of Tintin** as monitored with automatic search disabled, immediately returned 11 exact Radarr release candidates, and left controlled Grab disabled. Radarr's queue remained empty and its history contained no Tintin event. A manual Bazarr Radarr-sync job completed and named Tintin, but Bazarr correctly kept it out of the movie inventory because no video file exists. Pegarr must therefore retain its explicit pre-download policy across continuation refreshes. `PEG-DASH-057` ratchets the discovered refresh-routing fix for the `v0.1.2` follow-up; no second add, automatic search, Grab, or download is required for that deployment check.
 
+The stable `v0.1.2` image at `ghcr.io/squiter/pegarr@sha256:fca18d1dfb9bcab34ab4ba57b1f9d2f7f6e3c625a6d7e06a79d71ed1fcc2b48f` then replaced only Pegarr in the saved 5,277-character definition. It became healthy at version `0.1.2` and revision `cf846794d167034341c39e733b2323f6da5d5f65`; the existing login and 51-item inventory survived, the corrected refresh route was served, and all six sibling containers retained their earlier creation times. A sanitized console check as the `node` user reported `/data/provider-secrets` at mode `0700` and its two API-key files, provider settings, subtitle settings, and session database at mode `0600`, all owned by `node:node`. No secret value, second catalog add, automatic search, controlled Grab, or download was involved.
+
 Port `8080` was occupied on the NAS, so the overlay publishes Pegarr on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
 
 ## Configuration and credentials

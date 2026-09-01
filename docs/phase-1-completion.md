@@ -24,7 +24,6 @@ The ledger contains the exact scenario IDs for every criterion. The harness repo
 These gaps stay explicit and do not masquerade as automated coverage:
 
 - `PEG-MANUAL-002`: installed Bazarr series policy is proven; an equivalent file-backed movie assignment remains production validation.
-- `PEG-MANUAL-003`: the NAS runtime is healthy and restart-safe; provider-secret permissions and the file-backed Bazarr movie case remain open.
 - `PEG-MANUAL-004`: controlled Grab has complete synthetic coverage, but the harmless operator-owned live mutation and timeout-reconciliation drill remain manual.
 - `PEG-MANUAL-006`: OpenSubtitles failures remain honest, but a successful installed response, rate evidence, mapping compatibility, and cache reuse remain open.
 
