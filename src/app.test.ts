@@ -873,7 +873,7 @@ test("PEG-DASH-044 catalog add is an explicit login-only mutation and never offe
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
-test("PEG-DASH-053 pre-add coverage exposes actionable provider diagnostics", async () => {
+test("PEG-DASH-053 pre-add coverage exposes failures, quota, and cache provenance", async () => {
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
   const model = await resolveRoute("GET", "/assets/dashboard-model.js", tmpdir());
   const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
@@ -882,6 +882,7 @@ test("PEG-DASH-053 pre-add coverage exposes actionable provider diagnostics", as
   assert.match(String(client.body), /catalogCoverageView|Subtitle provider checks|Series preview checks title-level SubDL evidence/u);
   assert.match(String(client.body), /Could not check subtitle coverage.*valid response/u);
   assert.match(String(model.body), /Available.*matches|Not found|Could not check|API key was rejected|request limit reached/u);
+  assert.match(String(model.body), /Cached evidence reused|Fresh provider check|requests remaining/u);
   assert.match(String(styles.body), /catalog-provider-diagnostics|catalog-provider-diagnostic--unauthorized|catalog-coverage-scope/u);
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });

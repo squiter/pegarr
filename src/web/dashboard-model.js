@@ -34,7 +34,7 @@ export function catalogCoverageView(value) {
     const id = provider.provider === "subdl" || provider.provider === "opensubtitles" ? provider.provider : "provider";
     const name = id === "subdl" ? "SubDL" : id === "opensubtitles" ? "OpenSubtitles" : "Subtitle provider";
     const status = providerStatusValues.includes(provider.status) ? provider.status : "unexpected_status";
-    return [{ id, name, status, message: catalogProviderMessage(name, status) }];
+    return [{ id, name, status, message: catalogProviderMessage(name, status, providerView(provider)[0]) }];
   });
   return { state: "ready", languages, providers };
 }
@@ -780,7 +780,7 @@ function safeCatalogLanguage(value) {
     : "Language";
 }
 
-function catalogProviderMessage(name, status) {
+function catalogProviderMessage(name, status, evidence) {
   const messages = {
     success: `${name}: checked successfully.`,
     unauthorized: `${name}: rejected this request. Try again; if it keeps failing, update the API key in Setup & settings.`,
@@ -791,7 +791,19 @@ function catalogProviderMessage(name, status) {
     invalid_response: `${name}: returned an invalid response.`,
     unexpected_status: `${name}: rejected the check with an unexpected response.`,
   };
-  return messages[status];
+  const details = [];
+  if (evidence?.cacheStatus === "hit") details.push("Cached evidence reused.");
+  if (evidence?.cacheStatus === "miss") details.push("Fresh provider check.");
+  const remaining = evidence?.quota?.remaining;
+  const limit = evidence?.quota?.limit;
+  if (remaining !== undefined || limit !== undefined) {
+    const count = remaining !== undefined && limit !== undefined
+      ? `${remaining.toLocaleString("en-US")} of ${limit.toLocaleString("en-US")} requests remaining`
+      : `${(remaining ?? limit).toLocaleString("en-US")} requests ${remaining !== undefined ? "remaining" : "in quota"}`;
+    const seconds = evidence?.quota?.windowSeconds;
+    details.push(`${count}${seconds === undefined ? "" : seconds === 1 ? " per second" : ` per ${seconds.toLocaleString("en-US")} seconds`}.`);
+  }
+  return [messages[status], ...details].join(" ");
 }
 
 const confidenceValues = ["confirmed", "likely", "possible", "no_match_found", "unknown"];

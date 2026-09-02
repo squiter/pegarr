@@ -184,7 +184,7 @@
 | PEG-DASH-048 | First-run guidance separates prerequisites, operator actions, and administrator Grab | `src/app.test.ts` |
 | PEG-DASH-051 | Setup stays in a collapsible menu and opens only while first-run work remains | `src/app.test.ts` |
 | PEG-DASH-052 | Modal setup drawer traps keyboard focus and background scrolling until it closes | `src/app.test.ts` |
-| PEG-DASH-053 | Pre-add coverage distinguishes availability from actionable provider failures | `src/dashboard-model.test.ts` |
+| PEG-DASH-053 | Pre-add coverage exposes availability, provider failures, quota, and cache provenance | `src/dashboard-model.test.ts` |
 | PEG-DASH-054 | Catalog add uses one clear submit button without a typed confirmation | `src/app.test.ts` |
 | PEG-DASH-055 | Successful catalog add immediately changes the result to Already in Sonarr or Radarr | `src/app.test.ts` |
 | PEG-DASH-056 | Bazarr language aliases use canonical display labels without changing policy identity | `src/dashboard-model.test.ts` |

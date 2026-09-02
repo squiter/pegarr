@@ -4,6 +4,10 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 
 ## [Unreleased]
 
+### Added
+
+- Pre-add provider diagnostics now identify fresh versus cached subtitle evidence and show bounded quota values when a provider reports them.
+
 ## [0.1.3] - 2026-09-01
 
 ### Fixed

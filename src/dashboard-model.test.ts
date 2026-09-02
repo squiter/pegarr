@@ -55,16 +55,27 @@ const inventory = {
   ],
 };
 
-test("PEG-DASH-053 catalog coverage distinguishes availability from actionable provider failures", () => {
+test("PEG-DASH-053 catalog coverage exposes availability, failures, quota, and cache provenance", () => {
   const available = catalogCoverageView({
     status: "ready",
     languages: [{ code: "pt-BR", state: "available", subtitleCount: 12 }],
-    providers: [{ provider: "subdl", status: "success", searchedLanguages: ["pt-br"] }],
+    providers: [{
+      provider: "subdl",
+      status: "success",
+      searchedLanguages: ["pt-br"],
+      quota: { limit: 2_000, remaining: 1_999, windowSeconds: 1 },
+      cache: { status: "hit", storedAt: "2026-09-02T01:37:22.521Z", expiresAt: "2026-09-03T01:37:22.521Z" },
+    }],
   });
   assert.deepEqual(available, {
     state: "ready",
     languages: [{ code: "pt-BR", displayCode: "pt-BR", state: "available", label: "pt-BR: Available (12 matches)" }],
-    providers: [{ id: "subdl", name: "SubDL", status: "success", message: "SubDL: checked successfully." }],
+    providers: [{
+      id: "subdl",
+      name: "SubDL",
+      status: "success",
+      message: "SubDL: checked successfully. Cached evidence reused. 1,999 of 2,000 requests remaining per second.",
+    }],
   });
 
   const unknown = catalogCoverageView({
