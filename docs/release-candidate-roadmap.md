@@ -185,6 +185,12 @@ Portainer preserved the exact 5,277-character stack definition and changed only 
 
 A bounded Radarr catalog preview for **The Matrix Resurrections** returned **pt-BR: Available (16 matches)** with both SubDL and OpenSubtitles checked successfully. Sanitized provider evidence recorded 11 OpenSubtitles candidates, a limit of 5, 2 remaining, and a one-second rate window. Repeating the same preview returned `providerRequests: 0`; both providers reported `cache: hit` with unchanged stored and expiry timestamps. This closes `PEG-MANUAL-006` and supplies the final quota/cache proof for the already closed SubDL gap. No API key, raw provider response, media identifier, subtitle filename, or download handle was exposed. No catalog add, automatic search, controlled Grab, or download mutation ran. `PEG-MANUAL-004` is now the sole manual gap.
 
+#### 2026-09-02 v0.1.4 release and production deployment
+
+Pegarr `v0.1.4` was published from signed commit `2ed900e2c6aa21b2f2cf344883be5b9228f8e766` after the full 304-scenario release gate and the exact-commit GitHub CI and multi-platform container workflows passed. The signed tag workflow published the public AMD64/ARM64 image at immutable digest `sha256:ce149b54a9536d7c2a488f4749b2e28af6f1996c6988a71619d0c5fb959d51ed`.
+
+Portainer preserved the 5,277-character `jellyfin` stack definition and replaced only the Pegarr image digest. Container `a4cd08985eddc0e4c847229e72e44a9ce819a0d826f62b80b061201a8b5439e9` became healthy at version `0.1.4` and the exact release revision. Jellyfin, Sonarr, Radarr, Bazarr, Lidarr, and Prowlarr retained their earlier creation times and running state. HTTPS readiness returned `ready`, and reloading the existing browser session restored **Setup & settings: Ready**, discovery, and the 51-item inventory without another sign-in. This deployment performed no provider search, catalog add, automatic search, controlled Grab, or download mutation. `PEG-MANUAL-004` remains the sole operator-owned gap.
+
 ## Known implementation limitations
 
 These are honest follow-up candidates, not regressions in the completed Phase 3 contract:
