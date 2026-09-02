@@ -12,6 +12,7 @@ import {
   requestMediaIds,
   requestPositiveInteger,
   requestRecord,
+  requestSeasonNumber,
   requestString,
 } from "./report-request.js";
 import {
@@ -98,11 +99,11 @@ function parseRequest(value: unknown): SonarrSeasonFeasibilityRequest {
   const item = requestRecord(request.item);
   return {
     sonarrSeriesId: requestPositiveInteger(request.sonarrSeriesId),
-    seasonNumber: requestPositiveInteger(request.seasonNumber),
+    seasonNumber: requestSeasonNumber(request.seasonNumber),
     item: {
       kind: item.kind === "season" ? "season" : invalidKind(),
       title: requestString(item.title),
-      season: requestPositiveInteger(item.season),
+      season: requestSeasonNumber(item.season),
       ids: requestMediaIds(item.ids),
     },
     subdlLanguages: requestLanguageMappings(request.subdlLanguages),

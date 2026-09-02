@@ -260,7 +260,7 @@ export function mapSubdlSearchResponse(
       subtitle.full_season,
       `subtitles[${index}].full_season`,
     );
-    const season = optionalPositiveInteger(subtitle.season, `subtitles[${index}].season`);
+    const season = optionalSeasonNumber(subtitle.season, `subtitles[${index}].season`);
     const episode = optionalPositiveInteger(subtitle.episode, `subtitles[${index}].episode`);
     const episodeNumbers = episodeRange(subtitle, index);
     const frameRate = optionalFrameRate(subtitle.fps, `subtitles[${index}].fps`);
@@ -329,11 +329,11 @@ function normalizeSearchWindow(window: SubdlSearchWindow): NormalizedSearchWindo
 
   const episodeFields = window.item.kind === "episode"
     ? {
-        season: boundedInteger(window.item.season ?? 0, 1, 100_000, "season"),
+        season: boundedInteger(window.item.season ?? -1, 0, 100_000, "season"),
         episode: boundedInteger(window.item.episode ?? 0, 1, 100_000, "episode"),
       }
     : window.item.kind === "season"
-      ? { season: boundedInteger(window.item.season ?? 0, 1, 100_000, "season") }
+      ? { season: boundedInteger(window.item.season ?? -1, 0, 100_000, "season") }
       : {};
   const rawKey = JSON.stringify({
     kind: window.item.kind,
@@ -491,6 +491,16 @@ function optionalPositiveInteger(value: unknown, field: string): number | undefi
     throw new TypeError(`${field} must be a number`);
   }
   return boundedInteger(value, 1, 100_000, field);
+}
+
+function optionalSeasonNumber(value: unknown, field: string): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "number") {
+    throw new TypeError(`${field} must be a number`);
+  }
+  return boundedInteger(value, 0, 100_000, field);
 }
 
 function optionalFrameRate(value: unknown, field: string): number | undefined {

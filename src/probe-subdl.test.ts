@@ -128,3 +128,22 @@ test("PEG-PROBE-008 SubDL probe states stay distinct and invalid input is redact
     await rm(configured.directory, { recursive: true });
   }
 });
+
+test("PEG-SPECIALS-001 SubDL probe accepts an exact season-zero special", async () => {
+  const configured = await configuredEnvironment();
+  try {
+    let requestUrl: URL | undefined;
+    const exitCode = await runSubdlProbe({
+      environment: { ...configured.environment, PEGARR_SUBDL_PROBE_SEASON: "0", PEGARR_SUBDL_PROBE_EPISODE: "1" },
+      fetchImplementation: async (input) => {
+        requestUrl = new URL(input);
+        return new Response(JSON.stringify(syntheticSubdlV2EpisodeSearchResponse), { status: 200 });
+      },
+      write: () => undefined,
+    });
+    assert.equal(exitCode, 0);
+    assert.equal(requestUrl?.searchParams.get("season"), "0");
+  } finally {
+    await rm(configured.directory, { recursive: true });
+  }
+});

@@ -133,7 +133,7 @@ function probeWindow(
   }
   const episodeFields = kind === "episode"
     ? {
-        season: positiveInteger(environment.PEGARR_SUBDL_PROBE_SEASON),
+        season: seasonNumber(environment.PEGARR_SUBDL_PROBE_SEASON),
         episode: positiveInteger(environment.PEGARR_SUBDL_PROBE_EPISODE),
       }
     : {};
@@ -177,6 +177,18 @@ function positiveInteger(value: string | undefined): number {
   const parsed = Number(normalized);
   if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 100_000) {
     throw new TypeError("SubDL episode coordinates are outside the supported range");
+  }
+  return parsed;
+}
+
+function seasonNumber(value: string | undefined): number {
+  const normalized = required(value);
+  if (!/^\d+$/u.test(normalized)) {
+    throw new TypeError("SubDL season coordinate must be a non-negative integer");
+  }
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed > 100_000) {
+    throw new TypeError("SubDL season coordinate is outside the supported range");
   }
   return parsed;
 }

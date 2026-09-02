@@ -189,9 +189,8 @@ A bounded Radarr catalog preview for **The Matrix Resurrections** returned **pt-
 
 These are honest follow-up candidates, not regressions in the completed Phase 3 contract:
 
-- OpenSubtitles season-pack search is not implemented; its adapter currently supports exact movie and episode searches.
-- Specials season `0` remains unsupported until provider season identity is validated.
-- Provider credentials and Bazarr-to-provider language mappings are configured independently in Pegarr. A future onboarding helper may reduce duplication, but Pegarr must not depend on Bazarr provider internals.
+- OpenSubtitles season searches are conservative: only explicit full-season, complete-season, or season-pack release evidence can satisfy a season release. Ordinary episode results from the same season remain unresolved rather than being promoted to a pack.
+- Provider credentials and Bazarr-to-provider language mappings remain explicit Pegarr settings. The UI can fill mappings from the configured subtitle policy as a starting point, but the user must review provider-specific codes; Pegarr does not depend on Bazarr provider internals.
 - Release-name parsing will need new sanitized fixtures when real providers expose previously unseen notation.
 
 ## Phase 4 boundary

@@ -150,11 +150,11 @@ export class SonarrSeasonFeasibilityService {
 
 function validateRequest(request: SonarrSeasonFeasibilityRequest): SonarrSeasonFeasibilityRequest {
   positiveInteger(request.sonarrSeriesId, "sonarrSeriesId");
-  positiveInteger(request.seasonNumber, "seasonNumber");
+  nonNegativeInteger(request.seasonNumber, "seasonNumber");
   if (request.item.kind !== "season") {
     throw new TypeError("Sonarr season feasibility requires a season item");
   }
-  positiveInteger(request.item.season ?? 0, "item.season");
+  nonNegativeInteger(request.item.season ?? -1, "item.season");
   if (request.item.season !== request.seasonNumber) {
     throw new TypeError("item.season must match seasonNumber");
   }
@@ -199,6 +199,13 @@ function metrics(
 function positiveInteger(value: number, field: string): number {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new TypeError(`${field} must be a positive integer`);
+  }
+  return value;
+}
+
+function nonNegativeInteger(value: number, field: string): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError(`${field} must be a non-negative integer`);
   }
   return value;
 }

@@ -48,6 +48,13 @@ export function requestPositiveInteger(value: unknown): number {
   return value;
 }
 
+export function requestSeasonNumber(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > 100_000) {
+    throw new TypeError("Request season number must be a non-negative bounded integer");
+  }
+  return value as number;
+}
+
 export function requestMediaIds(value: unknown): Readonly<Record<string, string>> {
   const ids = requestRecord(value);
   const imdb = ids.imdb === undefined ? undefined : requestString(ids.imdb);

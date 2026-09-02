@@ -4,9 +4,23 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-09-02
+
 ### Added
 
 - Pre-add provider diagnostics now identify fresh versus cached subtitle evidence and show bounded quota values when a provider reports them.
+- OpenSubtitles season searches now join the fallback path and accept only explicit full-season, complete-season, or season-pack release evidence as full coverage.
+- Provider language mappings can be filled from the explicit Pegarr subtitle policy as a reviewable starting point.
+
+### Fixed
+
+- Season `0` now remains a valid specials identity across Sonarr scopes, SubDL and OpenSubtitles searches, feasibility reports, and packaged probes.
+
+### Safety and known boundaries
+
+- Ordinary episode results returned by a season search remain unresolved and cannot be promoted to full-season coverage.
+- Provider-specific mapping codes remain explicit and reviewable; Pegarr does not read Bazarr provider internals.
+- The sole remaining manual boundary is an operator-owned harmless controlled Grab and Unknown-outcome reconciliation. Automated tests never mutate live services.
 
 ## [0.1.3] - 2026-09-01
 
@@ -59,7 +73,8 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 - Specials season `0` remains unsupported until provider season identity is validated.
 - Synthetic coverage does not prove installed-service compatibility. A successful OpenSubtitles response, installed Radarr exact analysis and catalog add, installed Bazarr movie assignment, and an operator-owned harmless controlled Grab remain explicit manual acceptance boundaries.
 
-[Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/squiter/pegarr/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/squiter/pegarr/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/squiter/pegarr/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/squiter/pegarr/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/squiter/pegarr/compare/v0.1.0...v0.1.1

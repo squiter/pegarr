@@ -187,3 +187,16 @@ test("PEG-SEASONFLOW-004 individual episode evidence cannot satisfy a season rel
     0,
   );
 });
+
+test("PEG-SPECIALS-001 season zero remains a valid explicit specials scope", async () => {
+  const harness = service();
+  const outcome = await harness.service.build({
+    ...request,
+    seasonNumber: 0,
+    item: { ...request.item, title: "Example Show — Specials", season: 0 },
+  });
+
+  assert.equal(outcome.status, "ready");
+  assert.deepEqual(harness.sonarr.calls, [{ seriesId: 42, seasonNumber: 0 }]);
+  assert.ok(harness.subdl.calls.every(({ item }) => item.kind === "season" && item.season === 0));
+});

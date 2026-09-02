@@ -195,7 +195,7 @@ function validateRequest(
   if (request.item.kind !== "episode") {
     throw new TypeError("Sonarr episode feasibility requires an episode item");
   }
-  positiveInteger(request.item.season ?? 0, "item.season");
+  nonNegativeInteger(request.item.season ?? -1, "item.season");
   positiveInteger(request.item.episode ?? 0, "item.episode");
   if (!request.item.title.trim() || request.item.title.length > 1_024) {
     throw new TypeError("item.title must be a non-empty bounded string");
@@ -243,6 +243,13 @@ function metrics(
 function positiveInteger(value: number, field: string): number {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new TypeError(`${field} must be a positive integer`);
+  }
+  return value;
+}
+
+function nonNegativeInteger(value: number, field: string): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError(`${field} must be a non-negative integer`);
   }
   return value;
 }

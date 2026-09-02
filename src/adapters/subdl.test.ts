@@ -376,3 +376,53 @@ test("PEG-SUBDL-007 multi-episode ranges are bounded evidence without download h
     (error: unknown) => error instanceof SubdlAdapterError && error.code === "invalid_response",
   );
 });
+
+test("PEG-SPECIALS-001 SubDL preserves season zero for exact specials and specials packs", async () => {
+  const transport = new FakeTransport();
+  transport.response = {
+    status: 200,
+    headers: {},
+    body: {
+      status: true,
+      subtitles: [{
+        id: 901,
+        release_name: "Synthetic.Show.S00E01.1080p.WEB-DL.H264-GROUP",
+        language: "EN",
+        season: 0,
+        episode: 1,
+        full_season: false,
+      }],
+    },
+  };
+  const result = await client(transport).search({
+    item: { ...episode, title: "Synthetic Show — S00E01", season: 0, episode: 1 },
+    language: { policyCode: "en", providerCode: "EN" },
+  });
+
+  assert.equal(transport.requests[0]?.query?.season, "0");
+  assert.equal(transport.requests[0]?.query?.episode, "1");
+  assert.equal(result.subtitles[0]?.season, 0);
+  assert.equal(result.subtitles[0]?.episode, 1);
+
+  transport.response = {
+    status: 200,
+    headers: {},
+    body: {
+      status: true,
+      subtitles: [{
+        id: 902,
+        release_name: "Synthetic.Show.Specials.1080p.WEB-DL.H264-GROUP",
+        language: "EN",
+        season: 0,
+        full_season: true,
+      }],
+    },
+  };
+  const pack = await client(transport).search({
+    item: { ...season, title: "Synthetic Show — Specials", season: 0 },
+    language: { policyCode: "en", providerCode: "EN" },
+  });
+  assert.equal(transport.requests[1]?.query?.season, "0");
+  assert.equal(pack.subtitles[0]?.season, 0);
+  assert.equal(pack.subtitles[0]?.fullSeason, true);
+});

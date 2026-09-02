@@ -18,7 +18,7 @@ import {
   syntheticBazarrLanguageProfilesResponse,
   syntheticBazarrSeriesAssignmentResponse,
 } from "./fixtures/bazarr-language-policy.js";
-import { syntheticSubdlV2EpisodeSearchResponse, syntheticSubdlV2MovieSearchResponse, syntheticSubdlV2SeasonSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
+import { syntheticSubdlV2EpisodeSearchResponse, syntheticSubdlV2MovieSearchResponse } from "./fixtures/subdl-v2-subtitle-search.js";
 import { syntheticOpenSubtitlesEpisodeSearchResponse } from "./fixtures/opensubtitles-subtitle-search.js";
 import { createRuntimeServices } from "./runtime.js";
 import { SubtitleSettingsStore } from "./subtitle-settings.js";
@@ -649,7 +649,7 @@ test("PEG-CONTINUE-002 PEG-CONTINUE-007 Radarr continuation analysis can prepare
   services.close();
 });
 
-test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 PEG-CONTINUE-011 Sonarr continuation accepts only issued scopes and retries an initially empty episode list", async (context) => {
+test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 PEG-CONTINUE-011 PEG-OPENSUBTITLES-006 Sonarr continuation accepts only issued scopes and retries an initially empty episode list", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "pegarr-sonarr-continuation-"));
   context.after(async () => rm(directory, { recursive: true }));
   await new SubtitleSettingsStore(directory).update({ languages: [
@@ -671,6 +671,15 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 PEG-CO
       apiKey: new SecretValue("synthetic-subdl-key-value"),
     },
     subdlLanguageMappings: [{ policyCode: "pt-BR", providerCode: "PT-BR" }],
+    opensubtitles: {
+      instanceId: "synthetic-opensubtitles",
+      baseUrl: "https://opensubtitles.example.invalid/api/v1",
+      allowedHosts: ["opensubtitles.example.invalid"],
+      allowInsecureHttp: false,
+      apiKey: new SecretValue("synthetic-opensubtitles-key-value"),
+      userAgent: "Pegarr Tests v0.1.0",
+    },
+    opensubtitlesLanguageMappings: [{ policyCode: "pt-BR", providerCode: "pt-br" }],
     catalogAdd: { enabled: true as const },
     controlledGrab: {
       enabled: true as const,
@@ -711,7 +720,18 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 PEG-CO
         return new Response(JSON.stringify(url.searchParams.has("seasonNumber") ? syntheticSonarrSeasonReleaseResponse : syntheticSonarrEpisodeReleaseResponse), { status: 200 });
       }
       if (url.hostname === "subdl.example.invalid" && url.pathname === "/api/v2/subtitles/search") {
-        return new Response(JSON.stringify(url.searchParams.has("episode") ? syntheticSubdlV2EpisodeSearchResponse : syntheticSubdlV2SeasonSearchResponse), { status: 200 });
+        return new Response(JSON.stringify(url.searchParams.has("episode") ? syntheticSubdlV2EpisodeSearchResponse : { status: true, subtitles: [] }), { status: 200 });
+      }
+      if (url.hostname === "opensubtitles.example.invalid" && url.pathname === "/api/v1/subtitles") {
+        return new Response(JSON.stringify({
+          data: [{
+            attributes: {
+              language: "pt-br",
+              release: "Synthetic.Show.S03.COMPLETE.1080p.WEB-DL.H264-GROUP",
+              files: [{ file_name: "Synthetic.Show.S03.COMPLETE.1080p.WEB-DL.H264-GROUP.srt" }],
+            },
+          }],
+        }), { status: 200 });
       }
       return new Response("not found", { status: 404 });
     },
@@ -745,6 +765,8 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 PEG-CO
   assert.equal(season.report.item.kind, "season");
   assert.equal(season.report.item.season, 3);
   assert.equal(season.report.policy.source, "explicit_default");
+  assert.equal(season.report.providerStatus.find(({ provider }) => provider === "opensubtitles")?.status, "success");
+  assert.equal(season.report.releases[0]?.subtitle.confidence, "likely");
   assert.deepEqual(season.capabilities, { controlledGrab: true });
   const episode = await services.catalogContinuation.analyze(added.next.continuationId, { kind: "episode", episodeId: 305 });
   assert.equal(episode.status, "ready");
@@ -793,6 +815,7 @@ test("PEG-CONTINUE-004 PEG-CONTINUE-005 PEG-CONTINUE-008 PEG-CONTINUE-010 PEG-CO
   assert.equal(releasePosts, 2);
   assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/episode").length, 2);
   assert.equal(requests.filter(({ pathname }) => pathname === "/api/v3/release").length, 8);
+  assert.equal(requests.filter(({ hostname }) => hostname === "opensubtitles.example.invalid").length, 1);
   assert.deepEqual(services.controlledGrab?.history().map(({ kind, itemId, seasonNumber }) => ({ kind, itemId, seasonNumber })).toSorted((left, right) => left.kind.localeCompare(right.kind)), [
     { kind: "episode", itemId: 305, seasonNumber: undefined },
     { kind: "season", itemId: 91, seasonNumber: 3 },

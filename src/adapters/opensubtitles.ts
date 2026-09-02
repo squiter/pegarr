@@ -253,6 +253,9 @@ export function mapOpenSubtitlesResponse(
         mediaIds: window.mediaIds,
         ...(window.item.season === undefined ? {} : { season: window.item.season }),
         ...(window.item.episode === undefined ? {} : { episode: window.item.episode }),
+        ...(window.item.kind === "season" && explicitFullSeasonEvidence(releaseName, window.item.season ?? -1)
+          ? { fullSeason: true }
+          : {}),
         ...(hearingImpaired === undefined ? {} : { hearingImpaired }),
         ...(forced === undefined ? {} : { forced }),
         ...(frameRate === undefined ? {} : { traits: { frameRate } }),
@@ -281,7 +284,7 @@ function normalizeWindow(window: OpenSubtitlesSearchWindow): NormalizedWindow {
     if (identifier === undefined) throw new TypeError("OpenSubtitles search requires an IMDb or TMDB identifier");
     query = { ...identifier, languages: providerCode, type: "movie" };
   } else if (window.item.kind === "episode") {
-    const season = boundedInteger(window.item.season ?? 0, 1, 100_000, "season");
+    const season = boundedInteger(window.item.season ?? -1, 0, 100_000, "season");
     const episode = boundedInteger(window.item.episode ?? 0, 1, 100_000, "episode");
     const identifier = imdb !== undefined
       ? { parent_imdb_id: imdbIdentifier(imdb).slice(2) }
@@ -296,8 +299,22 @@ function normalizeWindow(window: OpenSubtitlesSearchWindow): NormalizedWindow {
       season_number: String(season),
       type: "episode",
     };
+  } else if (window.item.kind === "season") {
+    const season = boundedInteger(window.item.season ?? -1, 0, 100_000, "season");
+    const identifier = imdb !== undefined
+      ? { parent_imdb_id: imdbIdentifier(imdb).slice(2) }
+      : tmdb !== undefined
+        ? { parent_tmdb_id: numericIdentifier(tmdb, "tmdb") }
+        : undefined;
+    if (identifier === undefined) throw new TypeError("OpenSubtitles search requires an IMDb or TMDB identifier");
+    query = {
+      languages: providerCode,
+      ...identifier,
+      season_number: String(season),
+      type: "episode",
+    };
   } else {
-    throw new TypeError("OpenSubtitles season-pack search is not implemented");
+    throw new TypeError("OpenSubtitles title-level series search is not supported");
   }
   const orderedQuery = Object.fromEntries(Object.entries(query).sort(([left], [right]) => left.localeCompare(right)));
   const key = createHash("sha256")
@@ -321,6 +338,17 @@ function evidenceNames(attributes: Readonly<Record<string, unknown>>, index: num
   const unique = [...new Set(names)];
   if (unique.length === 0) throw new TypeError(`data[${index}] must include release evidence`);
   return unique;
+}
+
+function explicitFullSeasonEvidence(releaseName: string, season: number): boolean {
+  if (!Number.isSafeInteger(season) || season < 0) return false;
+  const number = String(season);
+  const separators = "[ ._-]*";
+  const seasonToken = `(?:s0*${number}|season${separators}0*${number})`;
+  return new RegExp(
+    `(?:\\bfull${separators}season(?:${separators}0*${number})?\\b|\\b${seasonToken}${separators}(?:complete|pack)\\b|\\b(?:complete|pack)${separators}${seasonToken}\\b)`,
+    "iu",
+  ).test(releaseName);
 }
 
 function stableId(

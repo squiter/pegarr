@@ -996,6 +996,24 @@ function renderSubtitleSettings(settings) {
     mappingInput.value = (provider?.languageMappings ?? []).map(({ policyCode, providerCode }) => `${policyCode}:${providerCode}`).join(", ");
     mappingLabel.append(mappingInput);
 
+    const mappingActions = document.createElement("div");
+    mappingActions.className = "provider-mapping-actions";
+    const fillMappings = document.createElement("button");
+    fillMappings.className = "text-button";
+    fillMappings.type = "button";
+    fillMappings.textContent = "Fill from subtitle policy";
+    fillMappings.disabled = languages.length === 0;
+    fillMappings.addEventListener("click", () => {
+      mappingInput.value = languages
+        .map(({ code }) => typeof code === "string" ? `${code}:${code}` : "")
+        .filter(Boolean)
+        .join(", ");
+      mappingInput.focus();
+    });
+    const mappingHelp = document.createElement("small");
+    mappingHelp.textContent = "Copies your policy codes as a starting point. Review provider-specific codes before saving.";
+    mappingActions.append(fillMappings, mappingHelp);
+
     const keyLabel = document.createElement("label");
     keyLabel.textContent = "API key";
     const keyInput = document.createElement("input");
@@ -1011,7 +1029,7 @@ function renderSubtitleSettings(settings) {
     save.className = "secondary-button";
     save.type = "submit";
     save.textContent = provider?.configured ? "Update provider" : "Configure provider";
-    form.append(mappingLabel, keyLabel, save);
+    form.append(mappingLabel, mappingActions, keyLabel, save);
     form.addEventListener("submit", (event) => saveProviderSettings(event, provider, mappingInput, keyInput, save));
     card.append(name, state, mappings, form);
     return card;

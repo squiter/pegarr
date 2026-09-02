@@ -615,6 +615,12 @@
       "boundary": "Sanitized multi-episode provider fixture and injected transport; no network"
     },
     {
+      "id": "PEG-SPECIALS-001",
+      "title": "Season zero remains an exact specials scope across provider and feasibility paths",
+      "evidence": "src/adapters/subdl.test.ts",
+      "boundary": "Sanitized season-zero provider responses, injected transports, probes, and feasibility sources; no network or mutation"
+    },
+    {
       "id": "PEG-MATCH-012",
       "title": "Multi-episode evidence covers only explicitly listed episodes",
       "evidence": "src/matching.test.ts",
@@ -1335,6 +1341,12 @@
       "boundary": "Injected clock and transport; no network"
     },
     {
+      "id": "PEG-OPENSUBTITLES-006",
+      "title": "Season searches accept only explicit full-season OpenSubtitles evidence",
+      "evidence": "src/adapters/opensubtitles.test.ts",
+      "boundary": "Sanitized season results, injected transport, and runtime provider selection; no network or mutation"
+    },
+    {
       "id": "PEG-CONFIG-010",
       "title": "OpenSubtitles credentials load only from a bounded secret file",
       "evidence": "src/config.test.ts",
@@ -1735,6 +1747,12 @@
       "title": "Catalog continuation refresh preserves the explicit pre-download subtitle policy",
       "evidence": "src/app.test.ts",
       "boundary": "Static dashboard continuation routing with no credentials, network, provider request, or mutation"
+    },
+    {
+      "id": "PEG-DASH-058",
+      "title": "Provider mappings can be filled from the explicit subtitle policy",
+      "evidence": "src/app.test.ts",
+      "boundary": "Static dashboard assets and page-memory input values; no credentials, browser storage, network, or mutation"
     },
     {
       "id": "PEG-SETTINGS-004",

@@ -16,6 +16,7 @@ import {
   requestMediaIds,
   requestPositiveInteger,
   requestRecord,
+  requestSeasonNumber,
   requestString,
 } from "./report-request.js";
 
@@ -111,7 +112,7 @@ function parseRequest(value: unknown): SonarrEpisodeFeasibilityRequest {
     item: {
       kind: item.kind === "episode" ? "episode" : invalidKind(),
       title: requestString(item.title),
-      season: requestPositiveInteger(item.season),
+      season: requestSeasonNumber(item.season),
       episode: requestPositiveInteger(item.episode),
       ids: requestMediaIds(item.ids),
     },

@@ -116,6 +116,8 @@
 | PEG-SONARR-009 | Season search preserves full-season and episode coverage evidence | `src/adapters/sonarr.test.ts` |
 | PEG-SUBDL-006 | Season searches omit episode and retain explicit pack coverage | `src/adapters/subdl.test.ts` |
 | PEG-SUBDL-007 | Multi-episode ranges and frame rates remain bounded safe evidence | `src/adapters/subdl.test.ts` |
+| PEG-SPECIALS-001 | Season zero remains an exact specials scope across provider and feasibility paths | `src/adapters/subdl.test.ts` |
+| PEG-OPENSUBTITLES-006 | Season searches accept only explicit full-season OpenSubtitles evidence | `src/adapters/opensubtitles.test.ts` |
 | PEG-MATCH-009 | Full-season subtitle packs cover episodes with explicit evidence | `src/matching.test.ts` |
 | PEG-MATCH-010 | Season matching requires explicit full-season coverage | `src/matching.test.ts` |
 | PEG-SEASONFLOW-001 | Season releases and full-season subtitle evidence produce one report | `src/season-feasibility.test.ts` |
@@ -189,6 +191,7 @@
 | PEG-DASH-055 | Successful catalog add immediately changes the result to Already in Sonarr or Radarr | `src/app.test.ts` |
 | PEG-DASH-056 | Bazarr language aliases use canonical display labels without changing policy identity | `src/dashboard-model.test.ts` |
 | PEG-DASH-057 | Catalog continuation refresh preserves the explicit pre-download subtitle policy | `src/app.test.ts` |
+| PEG-DASH-058 | Provider mappings can be filled from the explicit subtitle policy | `src/app.test.ts` |
 | PEG-SETTINGS-004 | Per-language policy preferences remain explicit, unique, and bounded | `src/dashboard-model.test.ts` |
 | PEG-DASH-049 | Subtitle settings expose required, forced, and hearing-impaired preferences | `src/app.test.ts` |
 | PEG-SONARR-015 | Season-pack revalidation preserves the exact issued Sonarr scope | `src/adapters/sonarr.test.ts` |

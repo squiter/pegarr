@@ -16,7 +16,7 @@
       "id": "P3-OPENSUBTITLES",
       "title": "OpenSubtitles provider adapter",
       "status": "complete",
-      "scenarioIds": ["PEG-CONFIG-010", "PEG-OPENSUBTITLES-001", "PEG-OPENSUBTITLES-002", "PEG-OPENSUBTITLES-003", "PEG-OPENSUBTITLES-004", "PEG-OPENSUBTITLES-005"]
+      "scenarioIds": ["PEG-CONFIG-010", "PEG-OPENSUBTITLES-001", "PEG-OPENSUBTITLES-002", "PEG-OPENSUBTITLES-003", "PEG-OPENSUBTITLES-004", "PEG-OPENSUBTITLES-005", "PEG-OPENSUBTITLES-006", "PEG-SPECIALS-001"]
     },
     {
       "id": "P3-PROVIDER-QUOTA",
@@ -28,7 +28,7 @@
       "id": "P3-SEASON-PACKS",
       "title": "Season-pack matching",
       "status": "complete",
-      "scenarioIds": ["PEG-SUBDL-006", "PEG-SUBDL-007", "PEG-MATCH-009", "PEG-MATCH-010", "PEG-MATCH-012", "PEG-SEASONFLOW-001", "PEG-SEASONFLOW-004"]
+      "scenarioIds": ["PEG-SUBDL-006", "PEG-SUBDL-007", "PEG-OPENSUBTITLES-006", "PEG-SPECIALS-001", "PEG-MATCH-009", "PEG-MATCH-010", "PEG-MATCH-012", "PEG-SEASONFLOW-001", "PEG-SEASONFLOW-004"]
     },
     {
       "id": "P3-SUBTITLE-PREFERENCES",

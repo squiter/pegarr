@@ -524,7 +524,7 @@ export function createRuntimeServices(
     uiProviderRevision = -1;
   };
 
-  const resolveCatalogProviders = async (kind: CatalogMediaItem["kind"] | "episode"): Promise<readonly {
+  const resolveCatalogProviders = async (kind: CatalogMediaItem["kind"] | "episode" | "season"): Promise<readonly {
     readonly provider: "subdl" | "opensubtitles";
     readonly tier: "preferred" | "fallback";
     readonly mappings: readonly ProviderLanguageMapping[];
@@ -840,7 +840,7 @@ export function createRuntimeServices(
     if (settings.status !== "configured") {
       return { kind: "item-feasibility", mode: "read_only", status: "policy_unresolved", reason: "explicit_default_unconfigured", selection };
     }
-    const providers = await resolveCatalogProviders(selectedEpisode === undefined ? "series" : "episode");
+    const providers = await resolveCatalogProviders(selectedEpisode === undefined ? "season" : "episode");
     if (providers.length === 0) {
       return { kind: "item-feasibility", mode: "read_only", status: "disabled", selection, missingIntegrations: ["subdl"] };
     }

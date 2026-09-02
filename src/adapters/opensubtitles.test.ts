@@ -49,6 +49,13 @@ const movie: MediaIdentity = {
   ids: { tmdb: "84" },
 };
 
+const season: MediaIdentity = {
+  kind: "season",
+  title: "Synthetic Show — Season 3",
+  season: 3,
+  ids: { imdb: "tt9000005", tmdb: "900005" },
+};
+
 function client(
   transport: JsonTransport,
   options: { readonly now?: () => number; readonly cacheTtlMs?: number } = {},
@@ -264,4 +271,56 @@ test("PEG-OPENSUBTITLES-005 one stable item-language window uses one request unt
   now += 60_001;
   await opensubtitles.search(window);
   assert.equal(transport.requests.length, 2);
+});
+
+test("PEG-SPECIALS-001 OpenSubtitles exact special searches retain season zero", async () => {
+  const transport = new FakeTransport();
+  const result = await client(transport).search({
+    item: { ...episode, title: "Synthetic Show — S00E01", season: 0, episode: 1 },
+    language: { policyCode: "en", providerCode: "EN" },
+  });
+
+  assert.equal(transport.requests[0]?.query?.season_number, "0");
+  assert.equal(transport.requests[0]?.query?.episode_number, "1");
+  assert.ok(result.subtitles.every(({ season, episode: episodeNumber }) => season === 0 && episodeNumber === 1));
+});
+
+test("PEG-OPENSUBTITLES-006 season searches accept only explicit full-season evidence", async () => {
+  const transport = new FakeTransport();
+  transport.response = {
+    status: 200,
+    headers: {},
+    body: {
+      data: [
+        {
+          attributes: {
+            language: "en",
+            release: "Synthetic.Show.S03.COMPLETE.1080p.WEB-DL.H264-GROUP",
+            files: [{ file_name: "Synthetic.Show.S03.COMPLETE.1080p.WEB-DL.H264-GROUP.srt" }],
+          },
+        },
+        {
+          attributes: {
+            language: "en",
+            release: "Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP",
+            files: [{ file_name: "Synthetic.Show.S03E05.1080p.WEB-DL.H264-GROUP.srt" }],
+          },
+        },
+      ],
+    },
+  };
+  const result = await client(transport).search({
+    item: season,
+    language: { policyCode: "en", providerCode: "EN" },
+  });
+
+  assert.deepEqual(transport.requests[0]?.query, {
+    languages: "en",
+    parent_imdb_id: "9000005",
+    season_number: "3",
+    type: "episode",
+  });
+  assert.equal(result.subtitles.find(({ releaseName }) => releaseName.includes("COMPLETE"))?.fullSeason, true);
+  assert.equal(result.subtitles.find(({ releaseName }) => releaseName.includes("S03E05"))?.fullSeason, undefined);
+  assert.ok(result.subtitles.every(({ season: seasonNumber, episode: episodeNumber }) => seasonNumber === 3 && episodeNumber === undefined));
 });

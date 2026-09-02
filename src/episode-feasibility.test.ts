@@ -204,3 +204,14 @@ test("PEG-FLOW-004 provider failure stops further searches and keeps all languag
   );
   assert.deepEqual(outcome.report.providerStatus[0]?.searchedLanguages, ["en"]);
 });
+
+test("PEG-SPECIALS-001 exact special episodes remain valid read-only feasibility items", async () => {
+  const harness = service();
+  const outcome = await harness.service.build({
+    ...request,
+    item: { ...request.item, title: "Synthetic Show — S00E01", season: 0, episode: 1 },
+  });
+
+  assert.equal(outcome.status, "ready");
+  assert.ok(harness.subdl.calls.every(({ item }) => item.season === 0 && item.episode === 1));
+});

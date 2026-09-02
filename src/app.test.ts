@@ -858,6 +858,18 @@ test("PEG-DASH-043 provider onboarding clears credentials and keeps them page-me
   assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
 });
 
+test("PEG-DASH-058 provider mappings can be filled from the explicit subtitle policy", async () => {
+  const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());
+  const styles = await resolveRoute("GET", "/assets/dashboard.css", tmpdir());
+  const assets = [client.body, styles.body].join("\n");
+
+  assert.match(String(client.body), /Fill from subtitle policy|Copies your policy codes as a starting point/u);
+  assert.match(String(client.body), /languages[\s\S]+`\$\{code\}:\$\{code\}`[\s\S]+mappingInput\.focus\(\)/u);
+  assert.match(String(client.body), /fillMappings\.disabled = languages\.length === 0/u);
+  assert.match(String(styles.body), /provider-mapping-actions/u);
+  assert.doesNotMatch(assets, /localStor(?:age)|sessionStor(?:age)|indexedDB|document\.cookie|innerHTML/iu);
+});
+
 test("PEG-DASH-044 catalog add is an explicit login-only mutation and never offers automatic search", async () => {
   const page = await resolveRoute("GET", "/", tmpdir());
   const client = await resolveRoute("GET", "/assets/dashboard.js", tmpdir());

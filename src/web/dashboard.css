@@ -257,6 +257,8 @@ button:disabled { cursor: wait; opacity: .55; }
 .provider-settings-form label { color: var(--muted); font-size: .76rem; font-weight: 700; }
 .provider-settings-form input { margin-top: .35rem; }
 .provider-settings-form button { justify-self: start; }
+.provider-mapping-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .75rem; }
+.provider-mapping-actions small { color: var(--muted); max-width: 34rem; }
 .catalog-panel {
   margin-top: 3.25rem;
   padding: clamp(1.25rem, 3vw, 2rem);
