@@ -175,9 +175,15 @@ The authenticated installed Bazarr movie inventory listed 13 file-backed Radarr 
 
 The same browser acceptance exposed the reason for repeated Pegarr sign-ins: the server intentionally used a fixed eight-hour browser session and did not renew it on authenticated use. `PEG-SESSION-005` changes that UX to a bounded 30-day inactivity window. Loading an authenticated app rotates the page-memory CSRF token, renews the private server-side expiry and host-only cookie, and still keeps the opaque session token out of JavaScript and persistent browser storage. `PEG-DOCKER-027` proves the packaged session survives restart, renews after authenticated restore, stores only hashed private state at mode `0600`, and remains durably invalid after logout.
 
-OpenSubtitles still needs a successful installed response with sanitized rate, mapping, and cache evidence under `PEG-MANUAL-006`. The only live controlled-Grab gap remains `PEG-MANUAL-004`, which is intentionally operator-owned and was not exercised by this work.
+The only live controlled-Grab gap remains `PEG-MANUAL-004`, which is intentionally operator-owned and was not exercised by this work.
 
-Pegarr `v0.1.3` was published from commit `91c65f7c0501ccd2443bd3734581f97fbc39ec5b` after the exact code and documentation passed the full 301-scenario local gate. GitHub CI, main-branch container publication, and version-tag container publication all passed for that commit. The AMD64/ARM64 image is pinned at immutable digest `sha256:5239983744c591ae7b2922deee69c3a8b19e8c6d8b767d9e6b71c5d5d1253d48f`; live deployment remains a separate reversible Portainer step.
+Pegarr `v0.1.3` was published from commit `91c65f7c0501ccd2443bd3734581f97fbc39ec5b` after the exact code and documentation passed the full 301-scenario local gate. GitHub CI, main-branch container publication, and version-tag container publication all passed for that commit. The AMD64/ARM64 image is pinned at immutable digest `sha256:5239983744c591ae7b2922deee69c3a8b19e8c6d8b767d9e6b71c5d5d1253d48`.
+
+#### 2026-09-02 v0.1.3 deployment and provider acceptance
+
+Portainer preserved the exact 5,277-character stack definition and changed only the Pegarr image digest. The replacement became healthy at version `0.1.3` and revision `91c65f7c0501ccd2443bd3734581f97fbc39ec5b`; Jellyfin, Sonarr, Radarr, Bazarr, Lidarr, and Prowlarr retained their earlier creation times. HTTPS readiness returned `ready`. After one post-deployment login, a full page reload remained signed in and restored **Setup & settings: Ready** plus the 51-item inventory.
+
+A bounded Radarr catalog preview for **The Matrix Resurrections** returned **pt-BR: Available (16 matches)** with both SubDL and OpenSubtitles checked successfully. Sanitized provider evidence recorded 11 OpenSubtitles candidates, a limit of 5, 2 remaining, and a one-second rate window. Repeating the same preview returned `providerRequests: 0`; both providers reported `cache: hit` with unchanged stored and expiry timestamps. This closes `PEG-MANUAL-006` and supplies the final quota/cache proof for the already closed SubDL gap. No API key, raw provider response, media identifier, subtitle filename, or download handle was exposed. No catalog add, automatic search, controlled Grab, or download mutation ran. `PEG-MANUAL-004` is now the sole manual gap.
 
 ## Known implementation limitations
 

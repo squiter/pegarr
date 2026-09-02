@@ -36,6 +36,10 @@ The stable `v0.1.2` image at `ghcr.io/squiter/pegarr@sha256:fca18d1dfb9bcab34ab4
 
 The final read-only Bazarr acceptance used the installed web UI to verify 13 file-backed Radarr movies and an assigned `PT-BR + English` profile on movie ID `7`; the same value appeared in its edit view. This closes `PEG-MANUAL-002` without changing or exposing any library path, profile, provider, or subtitle data. The subsequent `v0.1.3` candidate changes browser login expiry from a fixed eight-hour boundary to a bounded 30-day inactivity window renewed by authenticated app restore; deployment must still preserve the existing `/data` volume because it contains the hashed session database.
 
+On 2026-09-02, Portainer preserved the exact 5,277-character stack definition and replaced only Pegarr with `ghcr.io/squiter/pegarr@sha256:5239983744c591ae7b2922deee69c3a8b19e8c6d8b767d9e6b71c5d5d1253d48`. The replacement became healthy at version `0.1.3` and revision `91c65f7c0501ccd2443bd3734581f97fbc39ec5b`; all six sibling containers retained their earlier creation times, and HTTPS readiness returned `ready`. One post-deployment login restored the ready settings state and 51-item inventory; a full page reload remained signed in.
+
+A bounded **The Matrix Resurrections** Radarr preview returned **pt-BR: Available (16 matches)** with successful SubDL and OpenSubtitles checks. Sanitized evidence reported 11 OpenSubtitles candidates, limit 5, remaining 2, and a one-second rate window. Repeating the preview returned zero provider requests with cache hits from both providers and unchanged cache timestamps. This closes the live OpenSubtitles and final provider-cache boundaries without exposing credentials, raw provider bodies, media identifiers, subtitle filenames, or download handles. No catalog add, automatic search, controlled Grab, or download mutation ran; `PEG-MANUAL-004` remains the sole operator-owned gap.
+
 Port `8080` was occupied on the NAS, so the overlay publishes Pegarr on host port `8088` by default. Override `PEGARR_PORT` only after confirming the replacement port is free.
 
 ## Configuration and credentials

@@ -13,7 +13,7 @@ All notable changes to Pegarr are documented here. The project follows [Semantic
 ### Acceptance
 
 - The installed Bazarr listed a file-backed Radarr movie with the `PT-BR + English` profile and exposed the same assignment in its edit view, completing the live movie side of the Bazarr policy boundary.
-- OpenSubtitles successful-response, rate-header, language-mapping, and cache-reuse evidence remains an explicit manual gap; provider failure is still kept distinct from no subtitle matches.
+- The deployed release restored an authenticated browser session after reload, returned 16 combined pt-BR matches for a bounded Radarr movie preview, and recorded successful SubDL and OpenSubtitles responses with sanitized quota evidence and cache hits that made zero repeat provider requests.
 
 ## [0.1.2] - 2026-09-01
 

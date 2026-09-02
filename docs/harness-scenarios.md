@@ -313,6 +313,5 @@
 | ID | Not yet proven automatically | Why |
 | --- | --- | --- |
 | PEG-MANUAL-004 | Live controlled Grab and timeout reconciliation | Synthetic tests prove the safety path; a harmless operator-confirmed mutation and reconciliation remain manual |
-| PEG-MANUAL-006 | Live OpenSubtitles REST compatibility | The live image invoked OpenSubtitles for a movie and kept its temporary unavailability distinct from SubDL's positive pt-br result; a successful response, rate headers, mapping compatibility, and cache reuse remain open |
 
-When a gap becomes automated, move it into `automatedScenarios`, add its deterministic evidence, and update this catalog in the same change.
+When a gap becomes automated or its complete claim is proven through recorded live acceptance, update the manifest, phase ledgers, and this catalog in the same change.

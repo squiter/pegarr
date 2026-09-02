@@ -1820,11 +1820,6 @@
       "id": "PEG-MANUAL-004",
       "title": "Live controlled Grab and unknown-outcome reconciliation",
       "reason": "Synthetic tests prove the safety flow, but a harmless operator-confirmed Sonarr/Radarr Grab and timeout reconciliation must be validated manually; automated tests never mutate live services"
-    },
-    {
-      "id": "PEG-MANUAL-006",
-      "title": "Live OpenSubtitles REST search and language-code compatibility",
-      "reason": "The official search contract and deterministic adapter are pinned; on 2026-08-31 actionable-discovery digest sha256:bd9cacdf6935fbeba7bf4fb729ba42b88ccae5e520858fff6697762394992b60 invoked OpenSubtitles during a bounded not-yet-added movie preview and reported temporary service unavailability without hiding SubDL's positive pt-br evidence; a successful sanitized OpenSubtitles response, measured rate headers, live mapping compatibility, and cache reuse remain open"
     }
   ]
 }
